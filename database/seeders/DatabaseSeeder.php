@@ -14,6 +14,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(MOD07InventorySeeder::class);
+        $this->call([
+            ReferenceSeeder::class,
+            SampleDataSeeder::class,
+        ]);
     }
 }
