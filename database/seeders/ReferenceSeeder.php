@@ -22,6 +22,7 @@ class ReferenceSeeder extends Seeder
         $this->seedPermissions();
         $this->seedRoles();
         $this->seedRolePermissions();
+        $this->assignCustomerRoleToUsersWithoutActiveRole();
     }
 
     // --------------------------------------------------------
@@ -109,6 +110,12 @@ class ReferenceSeeder extends Seeder
                 'description' => 'Nhập xuất kho, kiểm kê, quản lý công thức',
                 'is_system' => true,
             ],
+            [
+                'code' => ConstantHelper::ROLE_CUSTOMER,
+                'name' => 'Khách hàng',
+                'description' => 'Tài khoản khách hàng tự đăng ký',
+                'is_system' => true,
+            ],
         ];
 
         DB::table(ConstantHelper::TABLE_ROLES)->upsert(
@@ -180,11 +187,27 @@ class ReferenceSeeder extends Seeder
                     // user.manage không nêu trong BRANCH_MANAGER
                     ConstantHelper::PERM_USER_MANAGE,
                     ConstantHelper::PERM_PERMISSION_VIEW,
+                    ConstantHelper::PERM_ROLES_VIEW,
+                    ConstantHelper::PERM_PERMISSIONS_VIEW,
+                    ConstantHelper::PERM_USERS_CREATE,
+                    ConstantHelper::PERM_USERS_UPDATE,
+                    ConstantHelper::PERM_USERS_DELETE,
+                    ConstantHelper::PERM_USERS_ASSIGN_ROLES,
+                    ConstantHelper::PERM_ROLES_CREATE,
+                    ConstantHelper::PERM_ROLES_UPDATE,
+                    ConstantHelper::PERM_ROLES_DELETE,
+                    ConstantHelper::PERM_ROLES_ASSIGN_PERMISSIONS,
+                    ConstantHelper::PERM_PERMISSIONS_CREATE,
+                    ConstantHelper::PERM_PERMISSIONS_UPDATE,
+                    ConstantHelper::PERM_PERMISSIONS_DELETE,
                 ], true);
             })),
 
             // CASHIER
             ConstantHelper::ROLE_CASHIER => [
+                ConstantHelper::PERM_DASHBOARD_VIEW,
+                ConstantHelper::PERM_PROFILE_VIEW,
+                ConstantHelper::PERM_PROFILE_UPDATE,
                 ConstantHelper::PERM_TABLE_VIEW,
                 ConstantHelper::PERM_SESSION_MANAGE,
                 ConstantHelper::PERM_ORDER_VIEW,
@@ -200,6 +223,9 @@ class ReferenceSeeder extends Seeder
 
             // WAITER
             ConstantHelper::ROLE_WAITER => [
+                ConstantHelper::PERM_DASHBOARD_VIEW,
+                ConstantHelper::PERM_PROFILE_VIEW,
+                ConstantHelper::PERM_PROFILE_UPDATE,
                 ConstantHelper::PERM_TABLE_VIEW,
                 ConstantHelper::PERM_SESSION_MANAGE,
                 ConstantHelper::PERM_ORDER_VIEW,
@@ -213,6 +239,9 @@ class ReferenceSeeder extends Seeder
 
             // KITCHEN
             ConstantHelper::ROLE_KITCHEN => [
+                ConstantHelper::PERM_DASHBOARD_VIEW,
+                ConstantHelper::PERM_PROFILE_VIEW,
+                ConstantHelper::PERM_PROFILE_UPDATE,
                 ConstantHelper::PERM_KITCHEN_VIEW,
                 ConstantHelper::PERM_KITCHEN_UPDATE_STATUS,
                 ConstantHelper::PERM_KITCHEN_PRINT,
@@ -224,6 +253,9 @@ class ReferenceSeeder extends Seeder
 
             // WAREHOUSE
             ConstantHelper::ROLE_WAREHOUSE => [
+                ConstantHelper::PERM_DASHBOARD_VIEW,
+                ConstantHelper::PERM_PROFILE_VIEW,
+                ConstantHelper::PERM_PROFILE_UPDATE,
                 ConstantHelper::PERM_INVENTORY_VIEW,
                 ConstantHelper::PERM_INVENTORY_RECEIVE_ISSUE,
                 ConstantHelper::PERM_INVENTORY_ADJUST,
@@ -232,6 +264,72 @@ class ReferenceSeeder extends Seeder
                 ConstantHelper::PERM_PURCHASE_CREATE,
                 ConstantHelper::PERM_REPORT_VIEW,
             ],
+
+            // CUSTOMER: quyền cơ bản cho người dùng tự đăng ký.
+            ConstantHelper::ROLE_CUSTOMER => [
+                ConstantHelper::PERM_PROFILE_VIEW,
+                ConstantHelper::PERM_PROFILE_UPDATE,
+                ConstantHelper::PERM_DASHBOARD_VIEW,
+            ],
         ];
+    }
+
+    private function assignCustomerRoleToUsersWithoutActiveRole(): void
+    {
+        $roleId = DB::table(ConstantHelper::TABLE_ROLES)
+            ->where('code', ConstantHelper::ROLE_CUSTOMER)
+            ->value('id');
+
+        if ($roleId === null) {
+            throw new \RuntimeException('The default customer role was not seeded.');
+        }
+
+        $usersWithoutActiveRole = DB::table(ConstantHelper::TABLE_USERS)
+            ->whereNull('deleted_at')
+            ->whereNotExists(function ($query): void {
+                $query->selectRaw('1')
+                    ->from(ConstantHelper::TABLE_USER_ROLES)
+                    ->whereColumn('user_roles.user_id', 'users.id')
+                    ->where('user_roles.valid_from', '<=', now())
+                    ->where(function ($validityQuery): void {
+                        $validityQuery
+                            ->whereNull('user_roles.valid_to')
+                            ->orWhere('user_roles.valid_to', '>=', now());
+                    });
+            })
+            ->pluck('id');
+
+        foreach ($usersWithoutActiveRole as $userId) {
+            $existingAssignment = DB::table(ConstantHelper::TABLE_USER_ROLES)
+                ->where('user_id', $userId)
+                ->where('role_id', $roleId)
+                ->where('scope_type', 'ALL')
+                ->whereNull('scope_id')
+                ->first();
+
+            if ($existingAssignment !== null) {
+                DB::table(ConstantHelper::TABLE_USER_ROLES)
+                    ->where('id', $existingAssignment->id)
+                    ->update([
+                        'valid_from' => now(),
+                        'valid_to' => null,
+                        'updated_at' => now(),
+                    ]);
+
+                continue;
+            }
+
+            DB::table(ConstantHelper::TABLE_USER_ROLES)->insert([
+                'user_id' => $userId,
+                'role_id' => $roleId,
+                'scope_type' => 'ALL',
+                'scope_id' => null,
+                'valid_from' => now(),
+                'valid_to' => null,
+                'granted_by' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 }

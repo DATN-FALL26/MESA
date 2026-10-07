@@ -27,7 +27,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $customer_name
  * @property string|null $customer_phone
  * @property string|null $note
- * @property int $created_by
+ * @property int|null $created_by
  * @property int|null $payment_requested_by
  * @property CarbonInterface|null $payment_requested_at
  * @property int|null $cancelled_by
@@ -38,7 +38,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface|null $updated_at
  * @property-read Branch $branch
  * @property-read DiningSession|null $session
- * @property-read User $creator
+ * @property-read User|null $creator
  * @property-read User|null $paymentRequester
  * @property-read User|null $canceller
  * @property-read Collection<int, OrderBatch> $batches

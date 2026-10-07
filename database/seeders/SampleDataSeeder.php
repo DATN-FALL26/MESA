@@ -508,6 +508,24 @@ class SampleDataSeeder extends Seeder
      */
     private function assignUserRole(int $userId, int $roleId, string $scopeType, ?int $scopeId): void
     {
+        $customerRoleId = DB::table(ConstantHelper::TABLE_ROLES)
+            ->where('code', ConstantHelper::ROLE_CUSTOMER)
+            ->value('id');
+
+        if ($customerRoleId !== null && (int) $customerRoleId !== $roleId) {
+            DB::table(ConstantHelper::TABLE_USER_ROLES)
+                ->where('user_id', $userId)
+                ->where('role_id', $customerRoleId)
+                ->where('valid_from', '<=', now())
+                ->where(fn ($query) => $query
+                    ->whereNull('valid_to')
+                    ->orWhere('valid_to', '>=', now()))
+                ->update([
+                    'valid_to' => now()->subSecond(),
+                    'updated_at' => now(),
+                ]);
+        }
+
         $existing = DB::table(ConstantHelper::TABLE_USER_ROLES)
             ->where('user_id', $userId)
             ->where('role_id', $roleId)
@@ -515,19 +533,36 @@ class SampleDataSeeder extends Seeder
             ->where('scope_id', $scopeId)
             ->first();
 
-        if (! $existing) {
-            DB::table(ConstantHelper::TABLE_USER_ROLES)->insert([
-                'user_id' => $userId,
-                'role_id' => $roleId,
-                'scope_type' => $scopeType,
-                'scope_id' => $scopeId,
-                'valid_from' => now(),
-                'valid_to' => null,
-                'granted_by' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        if ($existing) {
+            $now = now();
+
+            if (
+                $existing->valid_from > $now->toDateTimeString()
+                || ($existing->valid_to !== null && $existing->valid_to < $now->toDateTimeString())
+            ) {
+                DB::table(ConstantHelper::TABLE_USER_ROLES)
+                    ->where('id', $existing->id)
+                    ->update([
+                        'valid_from' => $now,
+                        'valid_to' => null,
+                        'updated_at' => $now,
+                    ]);
+            }
+
+            return;
         }
+
+        DB::table(ConstantHelper::TABLE_USER_ROLES)->insert([
+            'user_id' => $userId,
+            'role_id' => $roleId,
+            'scope_type' => $scopeType,
+            'scope_id' => $scopeId,
+            'valid_from' => now(),
+            'valid_to' => null,
+            'granted_by' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     /**

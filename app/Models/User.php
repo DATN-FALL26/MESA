@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Arr;
 
 /**
  * @property int $id
@@ -94,6 +95,70 @@ class User extends Authenticatable
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class, ConstantHelper::TABLE_USER_ROLES, 'user_id', 'role_id');
+    }
+
+    public function activeRoles(): BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, ConstantHelper::TABLE_USER_ROLES, 'user_id', 'role_id')
+            ->wherePivot('valid_from', '<=', now())
+            ->where(fn ($query) => $query
+                ->whereNull('user_roles.valid_to')
+                ->orWhere('user_roles.valid_to', '>=', now())
+            );
+    }
+
+    public function hasRole(string|array $roles): bool
+    {
+        $roles = Arr::wrap($roles);
+
+        if ($roles === []) {
+            return false;
+        }
+
+        return $this->activeRoles()
+            ->whereIn('roles.code', $roles)
+            ->exists();
+    }
+
+    public function hasAnyRole(string|array $roles): bool
+    {
+        return $this->hasRole($roles);
+    }
+
+    public function hasPermission(string $permission): bool
+    {
+        return Permission::query()
+            ->where('permissions.code', $permission)
+            ->whereHas('roles', function ($query) {
+                $query->whereHas('userRoles', function ($userRoleQuery) {
+                    $userRoleQuery
+                        ->where('user_roles.user_id', $this->getKey())
+                        ->where('user_roles.valid_from', '<=', now())
+                        ->where(function ($validityQuery) {
+                            $validityQuery
+                                ->whereNull('user_roles.valid_to')
+                                ->orWhere('user_roles.valid_to', '>=', now());
+                        });
+                });
+            })
+            ->exists();
+    }
+
+    public function hasAnyPermission(string|array $permissions): bool
+    {
+        $permissions = Arr::wrap($permissions);
+
+        if ($permissions === []) {
+            return false;
+        }
+
+        foreach ($permissions as $permission) {
+            if ($this->hasPermission($permission)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function openedDiningSessions(): HasMany

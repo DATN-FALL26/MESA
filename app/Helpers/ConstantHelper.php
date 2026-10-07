@@ -150,6 +150,8 @@ final class ConstantHelper
 
     public const ROLE_WAREHOUSE = 'WAREHOUSE';
 
+    public const ROLE_CUSTOMER = 'CUSTOMER';
+
     // ==========================================
     // MÃ HỆ THỐNG: PHÒNG BAN (DepartmentCode)
     // ==========================================
@@ -180,11 +182,45 @@ final class ConstantHelper
     // MÃ QUYỀN HẠN (PERMISSIONS)
     // ==========================================
     // Auth / User
+    public const PERM_PROFILE_VIEW = 'profile.view';
+
+    public const PERM_PROFILE_UPDATE = 'profile.update';
+
+    public const PERM_DASHBOARD_VIEW = 'dashboard.view';
+
     public const PERM_USER_VIEW = 'user.view';
 
     public const PERM_USER_MANAGE = 'user.manage';
 
     public const PERM_USER_ROLE_ASSIGN = 'user.role.assign';
+
+    public const PERM_USERS_VIEW = 'users.view';
+
+    public const PERM_USERS_CREATE = 'users.create';
+
+    public const PERM_USERS_UPDATE = 'users.update';
+
+    public const PERM_USERS_DELETE = 'users.delete';
+
+    public const PERM_USERS_ASSIGN_ROLES = 'users.assign_roles';
+
+    public const PERM_ROLES_VIEW = 'roles.view';
+
+    public const PERM_ROLES_CREATE = 'roles.create';
+
+    public const PERM_ROLES_UPDATE = 'roles.update';
+
+    public const PERM_ROLES_DELETE = 'roles.delete';
+
+    public const PERM_ROLES_ASSIGN_PERMISSIONS = 'roles.assign_permissions';
+
+    public const PERM_PERMISSIONS_VIEW = 'permissions.view';
+
+    public const PERM_PERMISSIONS_CREATE = 'permissions.create';
+
+    public const PERM_PERMISSIONS_UPDATE = 'permissions.update';
+
+    public const PERM_PERMISSIONS_DELETE = 'permissions.delete';
 
     public const PERM_ROLE_MANAGE = 'role.manage';
 
@@ -350,9 +386,26 @@ final class ConstantHelper
     {
         return [
             // auth/user
+            self::PERM_PROFILE_VIEW => ['auth_user', 'Xem hồ sơ cá nhân'],
+            self::PERM_PROFILE_UPDATE => ['auth_user', 'Cập nhật hồ sơ cá nhân'],
+            self::PERM_DASHBOARD_VIEW => ['auth_user', 'Truy cập bảng điều khiển chung'],
             self::PERM_USER_VIEW => ['auth_user', 'Xem danh sách người dùng'],
             self::PERM_USER_MANAGE => ['auth_user', 'Quản lý người dùng'],
             self::PERM_USER_ROLE_ASSIGN => ['auth_user', 'Gán chức vụ cho người dùng'],
+            self::PERM_USERS_VIEW => ['auth_user', 'Xem danh sách tài khoản'],
+            self::PERM_USERS_CREATE => ['auth_user', 'Tạo tài khoản'],
+            self::PERM_USERS_UPDATE => ['auth_user', 'Cập nhật tài khoản'],
+            self::PERM_USERS_DELETE => ['auth_user', 'Xóa tài khoản'],
+            self::PERM_USERS_ASSIGN_ROLES => ['auth_user', 'Gán vai trò cho tài khoản'],
+            self::PERM_ROLES_VIEW => ['auth_user', 'Xem danh sách vai trò'],
+            self::PERM_ROLES_CREATE => ['auth_user', 'Tạo vai trò'],
+            self::PERM_ROLES_UPDATE => ['auth_user', 'Cập nhật vai trò'],
+            self::PERM_ROLES_DELETE => ['auth_user', 'Xóa vai trò'],
+            self::PERM_ROLES_ASSIGN_PERMISSIONS => ['auth_user', 'Gán quyền cho vai trò'],
+            self::PERM_PERMISSIONS_VIEW => ['auth_user', 'Xem danh sách quyền'],
+            self::PERM_PERMISSIONS_CREATE => ['auth_user', 'Tạo quyền'],
+            self::PERM_PERMISSIONS_UPDATE => ['auth_user', 'Cập nhật quyền'],
+            self::PERM_PERMISSIONS_DELETE => ['auth_user', 'Xóa quyền'],
             self::PERM_ROLE_MANAGE => ['auth_user', 'Quản lý chức vụ và quyền'],
             self::PERM_PERMISSION_VIEW => ['auth_user', 'Xem danh mục quyền hạn'],
             self::PERM_AUDIT_VIEW => ['auth_user', 'Xem nhật ký kiểm toán hệ thống'],
