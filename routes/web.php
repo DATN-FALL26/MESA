@@ -33,12 +33,10 @@ Route::middleware('guest')->group(function () {
     // Xử lý đăng nhập 
     Route::post('/login', [AuthController::class, 'login']);
 
-    // Đăng ký tài khoản khách hàng với vai trò mặc định
-    Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-    Route::post('/register', [AuthController::class, 'register']);
 });
-
+    // Đăng nhập thành công từ link Url , hoặc Qr code
 Route::get('/dashboard', [CustomerOrderController::class, 'dashboard'])->name('dashboard');
+   // Luồng đặt món dành cho khách hàng qua QR/link, không cần đăng nhập tài khoản.
 Route::get('/customer/table/{diningTable}', [CustomerOrderController::class, 'table'])
     ->middleware('signed')
     ->name('customer.table');

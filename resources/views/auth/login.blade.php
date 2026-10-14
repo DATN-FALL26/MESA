@@ -133,13 +133,6 @@
                                 </label>
                             </div>
 
-                            @if (Route::has('register'))
-                                <a href="{{ route('register') }}"
-                                    class="text-decoration-none text-muted small hover-dark">
-                                    Đăng ký ngay
-                                </a>
-                            @endif
-
                         </div>
 
 

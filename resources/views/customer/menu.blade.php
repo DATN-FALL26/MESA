@@ -16,7 +16,6 @@
                     <a href="{{ route('dashboard') }}" class="text-slate-600">Dashboard</a>
                 @else
                     <a href="{{ route('login') }}" class="font-medium text-indigo-700">Đăng nhập</a>
-                    <a href="{{ route('register') }}" class="text-slate-600">Tạo tài khoản</a>
                 @endauth
             </nav>
         </div>
