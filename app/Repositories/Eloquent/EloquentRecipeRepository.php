@@ -6,6 +6,7 @@ namespace App\Repositories\Eloquent;
 
 use App\Models\Recipe;
 use App\Repositories\Contracts\RecipeRepositoryInterface;
+use Illuminate\Database\Eloquent\Collection;
 
 class EloquentRecipeRepository implements RecipeRepositoryInterface
 {
@@ -35,5 +36,62 @@ class EloquentRecipeRepository implements RecipeRepositoryInterface
             ->where('is_active', true)
             ->orderBy('version', 'desc')
             ->first();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function listByMenuItem(int $menuItemId, ?int $variantId = null): Collection
+    {
+        $query = Recipe::with(['items.ingredient', 'variant'])
+            ->where('menu_item_id', $menuItemId);
+
+        if ($variantId !== null) {
+            $query->where('variant_id', $variantId);
+        }
+
+        return $query->orderBy('version', 'desc')->get();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function findByIdWithItems(int $id): ?Recipe
+    {
+        return Recipe::with(['items.ingredient', 'menuItem', 'variant'])->find($id);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getNextVersion(int $menuItemId, ?int $variantId = null): int
+    {
+        $query = Recipe::where('menu_item_id', $menuItemId);
+
+        if ($variantId !== null) {
+            $query->where('variant_id', $variantId);
+        } else {
+            $query->whereNull('variant_id');
+        }
+
+        $maxVersion = (int) $query->max('version');
+
+        return $maxVersion + 1;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function deactivateAllVersions(int $menuItemId, ?int $variantId = null): void
+    {
+        $query = Recipe::where('menu_item_id', $menuItemId);
+
+        if ($variantId !== null) {
+            $query->where('variant_id', $variantId);
+        } else {
+            $query->whereNull('variant_id');
+        }
+
+        $query->update(['is_active' => false]);
     }
 }
