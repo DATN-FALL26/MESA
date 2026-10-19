@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\Auth\RoleController;
 use App\Http\Controllers\Auth\UserController;
 use App\Http\Controllers\CustomerOrderController;
+use App\Http\Controllers\Menu\CategoryController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -165,4 +166,26 @@ Route::middleware('auth')->group(function () {
     Route::delete('/permissions/{permission}', [PermissionController::class, 'destroy'])
         ->middleware('permission:permissions.delete')
         ->name('permissions.destroy');
+    /*
+    |--------------------------------------------------------------------------
+    | Quản lý Thực đơn (Module 3)
+    |--------------------------------------------------------------------------
+    | menu.view: xem | menu.manage: thêm/sửa/xóa, giá | menu.availability.update: báo hết/còn
+    */
+    Route::prefix('menu')->name('menu.')->group(function () {
+        // --- Xem ---
+        Route::middleware('permission:menu.view')->group(function () {
+            Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
+        });
+
+        // --- Quản trị thực đơn ---
+        Route::middleware('permission:menu.manage')->group(function () {
+            // Danh mục
+            Route::get('/categories/create', [CategoryController::class, 'create'])->name('categories.create');
+            Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
+            Route::get('/categories/{category}/edit', [CategoryController::class, 'edit'])->name('categories.edit');
+            Route::put('/categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
+            Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+        });
+    });
 });
