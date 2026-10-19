@@ -1,15 +1,14 @@
+<?php
+
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\DashboardController;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
-// Trang Dashboard tổng quan của Thuận
-Route::get('/dashboard', function () {
-    return view('admin.dashboard');
-});
+// Route trỏ tới trang Tổng quan Dashboard qua Controller
+Route::get('/dashboard', [DashboardController::class, 'index']);
 
-// Trang Báo cáo chi tiết của Thuận
-Route::get('/admin/reports', function () {
-    return view('admin.reports');
-});
+// Route trỏ tới trang Báo cáo chi tiết qua Controller
+Route::get('/admin/reports', [DashboardController::class, 'reports']);
