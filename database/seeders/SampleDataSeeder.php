@@ -508,24 +508,6 @@ class SampleDataSeeder extends Seeder
      */
     private function assignUserRole(int $userId, int $roleId, string $scopeType, ?int $scopeId): void
     {
-        $customerRoleId = DB::table(ConstantHelper::TABLE_ROLES)
-            ->where('code', ConstantHelper::ROLE_CUSTOMER)
-            ->value('id');
-
-        if ($customerRoleId !== null && (int) $customerRoleId !== $roleId) {
-            DB::table(ConstantHelper::TABLE_USER_ROLES)
-                ->where('user_id', $userId)
-                ->where('role_id', $customerRoleId)
-                ->where('valid_from', '<=', now())
-                ->where(fn ($query) => $query
-                    ->whereNull('valid_to')
-                    ->orWhere('valid_to', '>=', now()))
-                ->update([
-                    'valid_to' => now()->subSecond(),
-                    'updated_at' => now(),
-                ]);
-        }
-
         $existing = DB::table(ConstantHelper::TABLE_USER_ROLES)
             ->where('user_id', $userId)
             ->where('role_id', $roleId)

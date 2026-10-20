@@ -5,7 +5,7 @@ use App\Http\Controllers\Auth\PermissionController;
 use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\Auth\RoleController;
 use App\Http\Controllers\Auth\UserController;
-use App\Http\Controllers\CustomerOrderController;
+use App\Http\Controllers\PublicDashboardController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -15,9 +15,7 @@ use Illuminate\Support\Facades\Route;
 | Điều hướng mặc định khi truy cập hệ thống
 */
 Route::get('/', function () {
-    return auth()->check()
-        ? redirect()->route('dashboard')
-        : redirect()->route('login');
+    return redirect()->route('dashboard');
 });
 
 /*
@@ -35,14 +33,7 @@ Route::middleware('guest')->group(function () {
 
 });
     // Đăng nhập thành công từ link Url , hoặc Qr code
-Route::get('/dashboard', [CustomerOrderController::class, 'dashboard'])->name('dashboard');
-   // Luồng đặt món dành cho khách hàng qua QR/link, không cần đăng nhập tài khoản.
-Route::get('/customer/table/{diningTable}', [CustomerOrderController::class, 'table'])
-    ->middleware('signed')
-    ->name('customer.table');
-Route::post('/customer/table/{diningTable}/orders', [CustomerOrderController::class, 'store'])
-    ->middleware(['signed', 'throttle:10,1'])
-    ->name('customer.orders.store');
+Route::get('/dashboard', [PublicDashboardController::class, 'show'])->name('dashboard');
 
 /*
 |--------------------------------------------------------------------------
@@ -83,11 +74,6 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:users.view')->group(function () {
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
     });
-    // Tọa Qr link cho bàn ăn do nhân viên nhà hàng tạo
-    Route::get('/customer/table/{diningTable}/qr-link', [CustomerOrderController::class, 'qrUrl'])
-        ->middleware('permission:table.view')
-        ->name('customer.table.qr-link');
-
     // Tạo tài khoản; quyền được kiểm tra trong controller để hỗ trợ vai trò quản trị viên.
     Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
     Route::post('/users', [UserController::class, 'store'])->name('users.store');

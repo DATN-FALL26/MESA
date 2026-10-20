@@ -121,7 +121,7 @@ class RoleController extends Controller
                 'required',
                 'string',
                 'max:50',
-                'regex:/^[A-Za-z][A-Za-z0-9_-]*$/',
+                'regex:/^(?!CUSTOMER$)[A-Za-z][A-Za-z0-9_-]*$/i',
                 Rule::unique(Role::class, 'code')->ignore($role?->getKey()),
             ],
             'name' => ['required', 'string', 'max:100'],

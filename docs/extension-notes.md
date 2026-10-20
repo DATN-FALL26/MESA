@@ -35,6 +35,7 @@ Tài liệu này hướng dẫn cách mở rộng các tính năng mới trong t
 ---
 
 ## 3. Mở Rộng Quản Lý Khách Hàng Thân Thiết (CRM & Loyalty)
+Đây là đề xuất tương lai, chưa thuộc hệ thống hiện tại. Khách hiện chỉ là Guest xem dashboard công khai; không có tài khoản, đăng nhập, role, profile, điểm thưởng hoặc voucher.
 - Bổ sung các bảng độc lập:
   - `customers`: `id`, `phone` UNIQUE, `full_name`, `email`, `loyalty_tier` (Silver/Gold/Diamond), `current_points`.
   - `customer_point_history`: `id`, `customer_id` FK, `order_id` FK nullable, `points_delta`, `reason`.
@@ -43,6 +44,7 @@ Tài liệu này hướng dẫn cách mở rộng các tính năng mới trong t
 ---
 
 ## 4. Mở Rộng Khuyến Mãi & Voucher (Promotions & Discounts)
+Voucher khách hàng cũng chưa được triển khai; phần dưới đây chỉ áp dụng khi tính năng khuyến mãi được đưa vào phạm vi.
 - Bổ sung các bảng độc lập:
   - `promotions`: `id`, `code` UNIQUE, `name`, `discount_type` (percent, fixed_amount), `discount_value`, `min_order_amount`, `valid_from`, `valid_to`.
   - `order_promotions`: `id`, `order_id` FK, `promotion_id` FK, `discount_applied_amount`.

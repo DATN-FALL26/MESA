@@ -39,6 +39,16 @@ class AuthController extends Controller
                 ->onlyInput('login');
         }
 
+        if (! Auth::user()?->activeRoles()->exists()) {
+            Auth::logout();
+
+            return back()
+                ->withErrors([
+                    'login' => 'Tài khoản không có vai trò nhân viên đang hoạt động.',
+                ])
+                ->onlyInput('login');
+        }
+
         $request->session()->regenerate();
         Auth::user()?->forceFill(['last_login_at' => now()])->save();
 
