@@ -6,7 +6,12 @@ use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\Auth\RoleController;
 use App\Http\Controllers\Auth\UserController;
 use App\Http\Controllers\CustomerOrderController;
+use App\Http\Controllers\Menu\BranchMenuController;
 use App\Http\Controllers\Menu\CategoryController;
+use App\Http\Controllers\Menu\ItemVariantController;
+use App\Http\Controllers\Menu\MenuItemController;
+use App\Http\Controllers\Menu\ModifierController;
+use App\Http\Controllers\Menu\ModifierGroupController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -175,17 +180,57 @@ Route::middleware('auth')->group(function () {
     Route::prefix('menu')->name('menu.')->group(function () {
         // --- Xem ---
         Route::middleware('permission:menu.view')->group(function () {
+            Route::get('/items', [MenuItemController::class, 'index'])->name('items.index');
             Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
+            Route::get('/modifier-groups', [ModifierGroupController::class, 'index'])->name('modifier-groups.index');
+            Route::get('/availability', [BranchMenuController::class, 'index'])->name('availability.index');
+        });
+
+        // --- Còn hàng / hết hàng trong ngày ---
+        Route::middleware('permission:menu.availability.update,menu.manage')->group(function () {
+            Route::patch('/availability/{branch}/{menuItem}', [BranchMenuController::class, 'updateAvailability'])
+                ->name('availability.update');
+            Route::post('/availability/{branch}/reset', [BranchMenuController::class, 'resetAvailability'])
+                ->name('availability.reset');
         });
 
         // --- Quản trị thực đơn ---
         Route::middleware('permission:menu.manage')->group(function () {
+            // Giá riêng theo chi nhánh
+            Route::put('/availability/{branch}/{menuItem}/price', [BranchMenuController::class, 'updatePrice'])
+                ->name('availability.price');
+
             // Danh mục
             Route::get('/categories/create', [CategoryController::class, 'create'])->name('categories.create');
             Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
             Route::get('/categories/{category}/edit', [CategoryController::class, 'edit'])->name('categories.edit');
             Route::put('/categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
             Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+
+            // Món ăn
+            Route::get('/items/create', [MenuItemController::class, 'create'])->name('items.create');
+            Route::post('/items', [MenuItemController::class, 'store'])->name('items.store');
+            Route::get('/items/{menuItem}/edit', [MenuItemController::class, 'edit'])->name('items.edit');
+            Route::put('/items/{menuItem}', [MenuItemController::class, 'update'])->name('items.update');
+            Route::patch('/items/{menuItem}/toggle', [MenuItemController::class, 'toggle'])->name('items.toggle');
+            Route::delete('/items/{menuItem}', [MenuItemController::class, 'destroy'])->name('items.destroy');
+            Route::put('/items/{menuItem}/modifier-groups', [MenuItemController::class, 'syncModifierGroups'])
+                ->name('items.modifier-groups.sync');
+
+            // Biến thể (size) của món
+            Route::post('/items/{menuItem}/variants', [ItemVariantController::class, 'store'])->name('variants.store');
+            Route::put('/variants/{variant}', [ItemVariantController::class, 'update'])->name('variants.update');
+            Route::delete('/variants/{variant}', [ItemVariantController::class, 'destroy'])->name('variants.destroy');
+
+            // Nhóm topping & topping
+            Route::get('/modifier-groups/create', [ModifierGroupController::class, 'create'])->name('modifier-groups.create');
+            Route::post('/modifier-groups', [ModifierGroupController::class, 'store'])->name('modifier-groups.store');
+            Route::get('/modifier-groups/{modifierGroup}/edit', [ModifierGroupController::class, 'edit'])->name('modifier-groups.edit');
+            Route::put('/modifier-groups/{modifierGroup}', [ModifierGroupController::class, 'update'])->name('modifier-groups.update');
+            Route::delete('/modifier-groups/{modifierGroup}', [ModifierGroupController::class, 'destroy'])->name('modifier-groups.destroy');
+            Route::post('/modifier-groups/{modifierGroup}/modifiers', [ModifierController::class, 'store'])->name('modifiers.store');
+            Route::put('/modifiers/{modifier}', [ModifierController::class, 'update'])->name('modifiers.update');
+            Route::delete('/modifiers/{modifier}', [ModifierController::class, 'destroy'])->name('modifiers.destroy');
         });
     });
 });
