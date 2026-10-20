@@ -88,22 +88,15 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:table.view')
         ->name('customer.table.qr-link');
 
-    // Tạo tài khoản
-    Route::middleware('permission:users.create')->group(function () {
-        Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
-        Route::post('/users', [UserController::class, 'store'])->name('users.store');
-    });
+    // Tạo tài khoản; quyền được kiểm tra trong controller để hỗ trợ vai trò quản trị viên.
+    Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
+    Route::post('/users', [UserController::class, 'store'])->name('users.store');
 
     // Cập nhật tài khoản
     Route::middleware('permission:users.update')->group(function () {
         Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
         Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
     });
-
-    // Xóa tài khoản
-    Route::delete('/users/{user}', [UserController::class, 'destroy'])
-        ->middleware('permission:users.delete')
-        ->name('users.destroy');
 
     /*
     |--------------------------------------------------------------------------

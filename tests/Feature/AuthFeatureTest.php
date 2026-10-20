@@ -365,6 +365,56 @@ class AuthFeatureTest extends TestCase
         $this->get('/users')->assertOk();
     }
 
+    public function test_user_list_can_be_searched_filtered_and_keeps_filters_in_pagination(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'userfilterviewer',
+            'full_name' => 'User Filter Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'users.view');
+
+        $role = Role::query()->create([
+            'code' => 'FILTER_STAFF',
+            'name' => 'Filter Staff',
+            'is_system' => false,
+        ]);
+
+        for ($index = 1; $index <= 16; $index++) {
+            $user = $this->createUser([
+                'username' => sprintf('filterstaff%02d', $index),
+                'full_name' => sprintf('Staff Person %02d', $index),
+                'email' => sprintf('staff.person.%02d@example.com', $index),
+                'password' => Hash::make('Password123!'),
+                'status' => UserStatus::ACTIVE,
+            ]);
+
+            UserRole::query()->create([
+                'user_id' => $user->id,
+                'role_id' => $role->id,
+                'scope_type' => 'ALL',
+                'scope_id' => null,
+                'valid_from' => now()->subMinute(),
+                'granted_by' => null,
+            ]);
+        }
+
+        $this->withoutVite();
+        $this->actingAs($viewer)
+            ->get('/users?q=staff.person.01%40example.com&role_id='.$role->id.'&status=active')
+            ->assertOk()
+            ->assertSee('filterstaff01')
+            ->assertDontSee('filterstaff02')
+            ->assertSee('Đặt lại');
+
+        $this->get('/users?q=Staff&role_id='.$role->id.'&status=active')
+            ->assertOk()
+            ->assertSee('q=Staff')
+            ->assertSee('role_id='.$role->id)
+            ->assertSee('status=active');
+    }
+
     public function test_user_can_create_account_and_assign_a_role_with_permissions(): void
     {
         $manager = $this->createUser([
@@ -375,12 +425,17 @@ class AuthFeatureTest extends TestCase
         ]);
         $this->grantPermission($manager, 'users.create');
         $this->grantPermission($manager, 'users.assign_roles');
+        $this->grantPermission($manager, 'users.delete');
 
         $role = Role::query()->create([
             'code' => 'TEST_STAFF',
             'name' => 'Test Staff',
             'is_system' => false,
         ]);
+
+        $this->withoutVite();
+        $this->actingAs($manager);
+        $this->get('/users/create')->assertOk();
 
         $this->actingAs($manager)->post('/users', [
             'username' => 'newstaff',
@@ -394,6 +449,59 @@ class AuthFeatureTest extends TestCase
         ])->assertRedirect('/users');
 
         $createdUser = User::query()->where('username', 'newstaff')->firstOrFail();
+        $this->assertDatabaseHas('user_roles', [
+            'user_id' => $createdUser->id,
+            'role_id' => $role->id,
+            'scope_type' => 'ALL',
+            'scope_id' => null,
+        ]);
+
+        $this->delete('/users/'.$createdUser->id)->assertMethodNotAllowed();
+        $this->assertDatabaseHas('users', ['id' => $createdUser->id]);
+    }
+
+    public function test_admin_can_create_an_account_and_assign_a_role(): void
+    {
+        $adminRole = Role::query()->where('code', ConstantHelper::ROLE_ADMIN)->firstOrFail();
+        $admin = $this->createUser([
+            'username' => 'accountadmin',
+            'full_name' => 'Account Admin',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        UserRole::query()->create([
+            'user_id' => $admin->id,
+            'role_id' => $adminRole->id,
+            'scope_type' => 'ALL',
+            'scope_id' => null,
+            'valid_from' => now()->subMinute(),
+            'granted_by' => null,
+        ]);
+
+        $role = Role::query()->create([
+            'code' => 'ADMIN_ASSIGNED_STAFF',
+            'name' => 'Admin Assigned Staff',
+            'is_system' => false,
+        ]);
+
+        $this->withoutVite();
+        $this->actingAs($admin)
+            ->get('/users')
+            ->assertOk()
+            ->assertSee('Thêm tài khoản mới');
+        $this->get('/users/create')->assertOk();
+
+        $this->post('/users', [
+            'username' => 'admincreated',
+            'full_name' => 'Admin Created',
+            'status' => UserStatus::ACTIVE->value,
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'assign_roles' => '1',
+            'role_ids' => [$role->id],
+        ])->assertRedirect('/users');
+
+        $createdUser = User::query()->where('username', 'admincreated')->firstOrFail();
         $this->assertDatabaseHas('user_roles', [
             'user_id' => $createdUser->id,
             'role_id' => $role->id,
