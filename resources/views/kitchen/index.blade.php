@@ -20,13 +20,13 @@
 @section('content')
     <div class="flex min-h-screen flex-col">
         {{-- Thanh trên cùng --}}
-        <header class="sticky top-0 z-20 border-b border-stone-200 bg-white shadow-sm">
+        <header class="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
                 <div class="flex items-center gap-3">
                     <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-red-800 text-sm font-black text-white">IP</span>
                     <div>
-                        <p class="text-base font-bold leading-tight text-stone-900">I-Pho · Bếp (KDS)</p>
-                        <p class="text-xs text-stone-500">{{ $stationCode ? ($stationLabels[$stationCode->value] ?? $stationCode->value) : 'Tất cả quầy' }}</p>
+                        <p class="text-base font-bold leading-tight text-slate-900">I-Pho · Bếp (KDS)</p>
+                        <p class="text-xs text-slate-500">{{ $stationCode ? ($stationLabels[$stationCode->value] ?? $stationCode->value) : 'Tất cả quầy' }}</p>
                     </div>
                 </div>
 
@@ -40,32 +40,35 @@
                         <span id="kds-realtime-dot" class="h-2 w-2 rounded-full bg-emerald-500"></span>
                         <span id="kds-realtime-label">Realtime: đang kết nối</span>
                     </span>
-                    <span id="kds-clock" class="ml-1 font-mono text-lg font-bold tabular-nums text-stone-900">{{ now()->format('H:i') }}</span>
+                    <span id="kds-clock" class="ml-1 font-mono text-lg font-bold tabular-nums text-slate-900">{{ now()->format('H:i') }}</span>
                 </div>
             </div>
 
-            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 px-4 py-2 sm:px-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-2 sm:px-6">
                 <nav class="flex flex-wrap gap-2" aria-label="Lọc theo quầy">
                     <a href="{{ route('kitchen.index') }}"
-                       class="rounded-full px-4 py-1.5 text-sm font-semibold {{ $stationCode === null ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
+                       class="rounded-full px-4 py-1.5 text-sm font-semibold {{ $stationCode === null ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                         Tất cả quầy
                     </a>
                     @foreach ($stationCodes as $code)
                         <a href="{{ route('kitchen.index', ['station' => $code->value]) }}"
-                           class="rounded-full px-4 py-1.5 text-sm font-semibold {{ $stationCode === $code ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
+                           class="rounded-full px-4 py-1.5 text-sm font-semibold {{ $stationCode === $code ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                             {{ $stationLabels[$code->value] ?? $code->value }}
                         </a>
                     @endforeach
                 </nav>
 
                 <div class="flex items-center gap-3 text-sm">
-                    <span class="hidden text-stone-500 sm:inline">{{ auth()->user()->full_name }}</span>
+                    <span class="hidden text-slate-500 sm:inline">{{ auth()->user()->full_name }}</span>
+                    @if (auth()->user()->hasPermission('order.serve'))
+                        <x-button :href="route('kitchen.serve.index')" variant="ghost" size="sm">Trang ra món</x-button>
+                    @endif
                     @if (auth()->user()->hasPermission('dashboard.view'))
-                        <a href="{{ route('dashboard') }}" class="font-medium text-stone-600 hover:text-stone-900 hover:underline">Quản trị</a>
+                        <x-button :href="route('dashboard')" variant="ghost" size="sm">Quản trị</x-button>
                     @endif
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button type="submit" class="rounded-lg border border-stone-300 px-3 py-1 font-medium text-stone-700 hover:bg-stone-100">Đăng xuất</button>
+                        <x-button type="submit" variant="outline" size="sm">Đăng xuất</x-button>
                     </form>
                 </div>
             </div>

@@ -7,7 +7,7 @@
     <title>@yield('title', 'Bếp (KDS) | MESA')</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen bg-stone-100 text-stone-800 antialiased">
+<body class="min-h-screen bg-slate-100 text-slate-800 antialiased">
     @yield('content')
 </body>
 </html>

@@ -22,9 +22,9 @@
             $tickets = $columns[$columnKey];
         @endphp
 
-        <section class="flex min-h-[60vh] flex-col rounded-2xl bg-stone-200/60 p-3" aria-label="{{ $column['title'] }}">
+        <section class="flex min-h-[60vh] flex-col rounded-2xl bg-slate-200/60 p-3" aria-label="{{ $column['title'] }}">
             <header class="mb-3 flex items-center justify-between px-1">
-                <h2 class="text-sm font-bold uppercase tracking-wide text-stone-700">{{ $column['title'] }}</h2>
+                <h2 class="text-sm font-bold uppercase tracking-wide text-slate-700">{{ $column['title'] }}</h2>
                 <span class="flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-bold {{ $column['badge'] }}">{{ $tickets->count() }}</span>
             </header>
 
@@ -42,13 +42,13 @@
                     @endphp
 
                     <article data-ticket-id="{{ $ticket->id }}"
-                             class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-stone-200 {{ $isOverdue ? 'kds-card-overdue' : '' }}">
+                             class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 {{ $isOverdue ? 'kds-card-overdue' : '' }}">
                         <div class="flex items-start justify-between gap-3">
                             <div>
-                                <p class="text-lg font-bold leading-tight text-stone-900">
+                                <p class="text-lg font-bold leading-tight text-slate-900">
                                     {{ filled($tableCodes) ? 'Bàn '.$tableCodes : 'Mang về' }}
                                 </p>
-                                <p class="mt-0.5 text-xs text-stone-500">
+                                <p class="mt-0.5 text-xs text-slate-500">
                                     {{ $ticket->station->name }} · #{{ $ticket->id }} · Gửi {{ $ticket->fired_at->format('H:i') }}
                                 </p>
                             </div>
@@ -61,7 +61,7 @@
                                 <span data-timer="{{ $columnKey === 'preparing' ? 'cooking' : 'waiting' }}"
                                       data-fired-at="{{ $ticket->fired_at->toIso8601String() }}"
                                       data-since="{{ ($columnKey === 'preparing' ? $startedAt : $ticket->fired_at)->toIso8601String() }}"
-                                      class="shrink-0 rounded-full px-2.5 py-1 font-mono text-xs font-semibold tabular-nums {{ $columnKey === 'preparing' ? 'bg-amber-50 text-amber-800' : 'bg-stone-100 text-stone-700' }} {{ $isOverdue ? 'kds-chip-overdue' : '' }}">
+                                      class="shrink-0 rounded-full px-2.5 py-1 font-mono text-xs font-semibold tabular-nums {{ $columnKey === 'preparing' ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-700' }} {{ $isOverdue ? 'kds-chip-overdue' : '' }}">
                                     @if ($isOverdue)
                                         Quá {{ $overdueMinutes }} phút · {{ $formatDuration($elapsedSeconds) }}
                                     @else
@@ -82,18 +82,18 @@
                                     $orderItem = $ticketItem->orderItem;
                                 @endphp
                                 <li>
-                                    <p class="{{ $columnKey !== 'done' && $ticketItem->status === \App\Enums\TicketItemStatus::READY ? 'text-stone-400 line-through' : 'text-stone-900' }}">
+                                    <p class="{{ $columnKey !== 'done' && $ticketItem->status === \App\Enums\TicketItemStatus::READY ? 'text-slate-400 line-through' : 'text-slate-900' }}">
                                         <span class="font-bold">{{ $orderItem->quantity }}x</span>
                                         <span class="font-medium">{{ $orderItem->item_name_snapshot }}</span>
                                         @if ($orderItem->variant_name_snapshot)
-                                            <span class="text-stone-500">({{ $orderItem->variant_name_snapshot }})</span>
+                                            <span class="text-slate-500">({{ $orderItem->variant_name_snapshot }})</span>
                                         @endif
                                         @if ($orderItem->note)
                                             <span class="font-medium text-red-700">· {{ $orderItem->note }}</span>
                                         @endif
                                     </p>
                                     @foreach ($orderItem->modifiers as $modifier)
-                                        <p class="pl-5 text-xs text-stone-500">
+                                        <p class="pl-5 text-xs text-slate-500">
                                             + {{ $modifier->quantity > 1 ? $modifier->quantity.'x ' : '' }}{{ $modifier->name_snapshot }}
                                         </p>
                                     @endforeach
@@ -113,7 +113,7 @@
                                 };
                             @endphp
                             <div data-print-status="{{ $printStatus }}"
-                                 class="mt-3 flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs {{ $printStatus === 'printed' ? 'bg-stone-50 text-stone-600' : 'bg-red-50 text-red-800 ring-1 ring-red-200' }}">
+                                 class="mt-3 flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs {{ $printStatus === 'printed' ? 'bg-slate-50 text-slate-600' : 'bg-red-50 text-red-800 ring-1 ring-red-200' }}">
                                 <span class="font-medium">
                                     @if ($printStatus === 'printed')
                                         <span class="text-emerald-600" aria-hidden="true">●</span>
@@ -129,10 +129,9 @@
                                 @if (auth()->user()->hasPermission('kitchen.print'))
                                     <form method="POST" action="{{ route('kitchen.tickets.print', $ticket) }}" target="_blank">
                                         @csrf
-                                        <button type="submit"
-                                                class="shrink-0 rounded-md border px-2.5 py-1 font-semibold {{ $printStatus === 'printed' ? 'border-stone-300 bg-white text-stone-700 hover:bg-stone-100' : 'border-red-300 bg-white text-red-800 hover:bg-red-100' }}">
+                                        <x-button type="submit" :variant="$printStatus === 'printed' ? 'outline' : 'danger'" size="xs" class="shrink-0">
                                             In lại phiếu
-                                        </button>
+                                        </x-button>
                                     </form>
                                 @endif
                             </div>
@@ -159,15 +158,14 @@
                             <form method="POST" action="{{ route('kitchen.tickets.advance', $ticket) }}" data-kds-action class="mt-3">
                                 @csrf
                                 @method('PATCH')
-                                <button type="submit"
-                                        class="w-full rounded-lg py-2.5 text-sm font-bold text-white shadow-sm transition {{ $columnKey === 'new' ? 'bg-red-800 hover:bg-red-700' : 'bg-emerald-800 hover:bg-emerald-700' }}">
+                                <x-button type="submit" :variant="$columnKey === 'new' ? 'danger' : 'primary'" size="lg" class="w-full font-bold">
                                     {{ $columnKey === 'new' ? 'Bắt đầu nấu' : 'Hoàn thành' }}
-                                </button>
+                                </x-button>
                             </form>
                         @endif
                     </article>
                 @empty
-                    <p class="rounded-xl border-2 border-dashed border-stone-300 px-4 py-10 text-center text-sm text-stone-500">{{ $column['empty'] }}</p>
+                    <p class="rounded-xl border-2 border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">{{ $column['empty'] }}</p>
                 @endforelse
             </div>
         </section>
