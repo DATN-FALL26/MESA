@@ -6,6 +6,8 @@ use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\Auth\RoleController;
 use App\Http\Controllers\Auth\UserController;
 use App\Http\Controllers\CustomerOrderController;
+use App\Http\Controllers\Kitchen\KitchenDisplayController;
+use App\Http\Controllers\Kitchen\ServeController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -167,4 +169,37 @@ Route::middleware('auth')->group(function () {
     Route::delete('/permissions/{permission}', [PermissionController::class, 'destroy'])
         ->middleware('permission:permissions.delete')
         ->name('permissions.destroy');
+});
+
+/*
+|--------------------------------------------------------------------------
+| MOD04 - Bếp / KDS
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->prefix('kitchen')->name('kitchen.')->group(function () {
+    // Màn hình KDS và phần bảng phiếu bếp tự làm mới
+    Route::middleware('permission:kitchen.view')->group(function () {
+        Route::get('/', [KitchenDisplayController::class, 'index'])->name('index');
+        Route::get('/board', [KitchenDisplayController::class, 'board'])->name('board');
+    });
+
+    // Đổi trạng thái món / cả phiếu: Mới → Đang nấu → Hoàn thành
+    Route::middleware('permission:kitchen.update_status')->group(function () {
+        Route::patch('/ticket-items/{kitchenTicketItem}/advance', [KitchenDisplayController::class, 'advanceItem'])
+            ->name('ticket-items.advance');
+        Route::patch('/tickets/{kitchenTicket}/advance', [KitchenDisplayController::class, 'advanceTicket'])
+            ->name('tickets.advance');
+    });
+
+    // In lại phiếu bếp (INV-17)
+    Route::post('/tickets/{kitchenTicket}/print', [KitchenDisplayController::class, 'printTicket'])
+        ->middleware('permission:kitchen.print')
+        ->name('tickets.print');
+
+    // Màn hình phục vụ nhận món xong (INV-18)
+    Route::middleware('permission:order.serve')->prefix('serve')->name('serve.')->group(function () {
+        Route::get('/', [ServeController::class, 'index'])->name('index');
+        Route::get('/board', [ServeController::class, 'board'])->name('board');
+        Route::post('/orders/{order}/served', [ServeController::class, 'markServed'])->name('served');
+    });
 });
