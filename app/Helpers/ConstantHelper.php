@@ -150,8 +150,6 @@ final class ConstantHelper
 
     public const ROLE_WAREHOUSE = 'WAREHOUSE';
 
-    public const ROLE_CUSTOMER = 'CUSTOMER';
-
     // ==========================================
     // MÃ HỆ THỐNG: PHÒNG BAN (DepartmentCode)
     // ==========================================

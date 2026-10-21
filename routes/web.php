@@ -5,9 +5,9 @@ use App\Http\Controllers\Auth\PermissionController;
 use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\Auth\RoleController;
 use App\Http\Controllers\Auth\UserController;
-use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\Kitchen\KitchenDisplayController;
 use App\Http\Controllers\Kitchen\ServeController;
+use App\Http\Controllers\PublicDashboardController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -17,9 +17,7 @@ use Illuminate\Support\Facades\Route;
 | Điều hướng mặc định khi truy cập hệ thống
 */
 Route::get('/', function () {
-    return auth()->check()
-        ? redirect()->route('dashboard')
-        : redirect()->route('login');
+    return redirect()->route('dashboard');
 });
 
 /*
@@ -35,18 +33,9 @@ Route::middleware('guest')->group(function () {
     // Xử lý đăng nhập 
     Route::post('/login', [AuthController::class, 'login']);
 
-    // Đăng ký tài khoản khách hàng với vai trò mặc định
-    Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-    Route::post('/register', [AuthController::class, 'register']);
 });
-
-Route::get('/dashboard', [CustomerOrderController::class, 'dashboard'])->name('dashboard');
-Route::get('/customer/table/{diningTable}', [CustomerOrderController::class, 'table'])
-    ->middleware('signed')
-    ->name('customer.table');
-Route::post('/customer/table/{diningTable}/orders', [CustomerOrderController::class, 'store'])
-    ->middleware(['signed', 'throttle:10,1'])
-    ->name('customer.orders.store');
+    // Đăng nhập thành công từ link Url , hoặc Qr code
+Route::get('/dashboard', [PublicDashboardController::class, 'show'])->name('dashboard');
 
 /*
 |--------------------------------------------------------------------------
@@ -87,27 +76,15 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:users.view')->group(function () {
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
     });
-    // Tọa Qr link cho bàn ăn do nhân viên nhà hàng tạo
-    Route::get('/customer/table/{diningTable}/qr-link', [CustomerOrderController::class, 'qrUrl'])
-        ->middleware('permission:table.view')
-        ->name('customer.table.qr-link');
-
-    // Tạo tài khoản
-    Route::middleware('permission:users.create')->group(function () {
-        Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
-        Route::post('/users', [UserController::class, 'store'])->name('users.store');
-    });
+    // Tạo tài khoản; quyền được kiểm tra trong controller để hỗ trợ vai trò quản trị viên.
+    Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
+    Route::post('/users', [UserController::class, 'store'])->name('users.store');
 
     // Cập nhật tài khoản
     Route::middleware('permission:users.update')->group(function () {
         Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
         Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
     });
-
-    // Xóa tài khoản
-    Route::delete('/users/{user}', [UserController::class, 'destroy'])
-        ->middleware('permission:users.delete')
-        ->name('users.destroy');
 
     /*
     |--------------------------------------------------------------------------

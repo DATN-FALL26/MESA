@@ -63,9 +63,9 @@ class KitchenDisplayTest extends TestCase
 
     public function test_user_without_kitchen_permission_cannot_open_kds(): void
     {
-        $customer = $this->createUserWithRole(ConstantHelper::ROLE_CUSTOMER);
+        $warehouseStaff = $this->createUserWithRole(ConstantHelper::ROLE_WAREHOUSE);
 
-        $this->actingAs($customer)
+        $this->actingAs($warehouseStaff)
             ->get(route('kitchen.index'))
             ->assertForbidden();
     }
