@@ -17,7 +17,7 @@
                     <h1 class="text-2xl font-bold text-red-700">📈 Báo Cáo & Thống Kê Doanh Thu</h1>
                     <p class="text-sm text-gray-500">Hệ thống phân tích kinh doanh Phở MESA</p>
                 </div>
-                <a href="/dashboard" class="bg-gray-700 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-800 transition shadow-sm">
+                <a href="/admin/dashboard" class="bg-gray-700 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-800 transition shadow-sm">
                     ⬅️ Quay lại Dashboard
                 </a>
             </div>

@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Order;
 use App\Models\Table;
 use App\Models\Dish;
-use App\Models\OverDetail;
+use App\Models\OrderDetail;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller

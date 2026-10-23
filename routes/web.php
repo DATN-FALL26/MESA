@@ -8,7 +8,7 @@ use App\Http\Controllers\Auth\UserController;
 use App\Http\Controllers\CustomerOrderController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DashboardController;
-use Symfony\Component\Routing\Router;
+// use Symfony\Component\Routing\Router;
 
 /*
 |--------------------------------------------------------------------------
@@ -169,5 +169,5 @@ Route::middleware('auth')->group(function () {
         ->name('permissions.destroy');
 });
 
-Route::get('/dashboard', [DashboardController::class, 'index']);
+Route::get('/admin/dashboard', [DashboardController::class, 'index']);
 Route::get('/admin/reports', [DashboardController::class, 'reports']);
