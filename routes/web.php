@@ -9,6 +9,8 @@ use App\Http\Controllers\Kitchen\KitchenDisplayController;
 use App\Http\Controllers\Kitchen\ServeController;
 use App\Http\Controllers\PublicDashboardController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\DashboardController;
+// use Symfony\Component\Routing\Router;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,7 +32,7 @@ Route::middleware('guest')->group(function () {
     // Hiển thị trang đăng nhập
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 
-    // Xử lý đăng nhập 
+    // Xử lý đăng nhập
     Route::post('/login', [AuthController::class, 'login']);
 
 });
