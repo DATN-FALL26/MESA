@@ -5,22 +5,24 @@ declare(strict_types=1);
 namespace App\Services\Kitchen;
 
 use App\Enums\PrintDocType;
+use App\Enums\PrinterType;
 use App\Enums\PrintJobStatus;
 use App\Models\KitchenTicket;
+use App\Models\Printer;
 use App\Models\PrintJob;
 use Illuminate\Support\Collection;
 
 /**
- * MOD04 – INV-17: in phiếu bếp (mô phỏng máy in nhiệt).
+ * MOD04 – INV-17: in phiếu trả món (mô phỏng máy in nhiệt).
  *
- * - Tự in khi order được gửi bếp: gửi lệnh tới máy in gắn với quầy chế biến.
+ * - Tự in khi bếp bấm "Hoàn thành" phiếu: gửi lệnh tới máy in gắn với quầy chế biến.
  * - Máy in đang hoạt động: lệnh in thành công ngay. Máy in tắt / mất kết nối: lệnh in thất bại để KDS báo lỗi.
- * - Quầy chưa gắn máy in: không tạo được lệnh in, KDS báo lỗi để bếp in lại qua trình duyệt.
+ * - Quầy chưa gắn máy in riêng: dùng máy in bếp của chi nhánh. Chi nhánh không có máy in bếp nào thì KDS báo lỗi.
  */
 class KitchenTicketPrinter
 {
     /**
-     * Tự in phiếu khi phiếu bếp vừa được tạo.
+     * Tự in phiếu trả món khi phiếu bếp vừa hoàn thành.
      */
     public function autoPrint(KitchenTicket $ticket): ?PrintJob
     {
@@ -60,10 +62,24 @@ class KitchenTicketPrinter
             ->keyBy('ref_id');
     }
 
-    private function send(KitchenTicket $ticket, int $retryCount): ?PrintJob
+    /**
+     * Máy in của quầy; quầy chưa gắn máy in riêng (vd. quầy Nước, quầy Món kèm) thì dùng máy in bếp của chi nhánh.
+     */
+    public function printerFor(KitchenTicket $ticket): ?Printer
     {
         $ticket->loadMissing('station.printer');
-        $printer = $ticket->station->printer;
+
+        return $ticket->station->printer ?? Printer::query()
+            ->where('branch_id', $ticket->branch_id)
+            ->where('type', PrinterType::KITCHEN)
+            ->orderByDesc('is_active')
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function send(KitchenTicket $ticket, int $retryCount): ?PrintJob
+    {
+        $printer = $this->printerFor($ticket);
 
         if ($printer === null) {
             return null;

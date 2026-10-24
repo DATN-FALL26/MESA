@@ -1,110 +1,130 @@
 @php
     $order = $ticket->order;
-    $tableCodes = $order->session?->sessionTables
+    $session = $order->session;
+    $tableCodes = $session?->sessionTables
         ->map(fn ($sessionTable) => $sessionTable->diningTable?->code)
         ->filter()
         ->join(', ');
-    $waiter = $order->creator ?? $order->session?->openedByUser;
-    $printStatus = match (true) {
-        $printJob === null => 'missing',
-        $printJob->status === \App\Enums\PrintJobStatus::PRINTED => 'printed',
-        default => 'failed',
+    $stationLabel = match ($ticket->station->station_code) {
+        \App\Enums\StationCode::PHO => 'PHỞ',
+        \App\Enums\StationCode::DRINK => 'NƯỚC',
+        \App\Enums\StationCode::SIDE => 'MÓN KÈM',
+        default => mb_strtoupper($ticket->station->name),
     };
+    $waiter = $order->creator ?? $session?->openedByUser;
+    $orderCode = $order->created_at->format('Ymd').'-'.str_pad((string) $order->id, 4, '0', STR_PAD_LEFT);
 @endphp
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Phiếu bếp #{{ $ticket->id }} | MESA</title>
+    <title>Phiếu trả món {{ $stationLabel }} {{ $tableCodes }} | MESA</title>
     <style>
         * { box-sizing: border-box; }
-        body { margin: 0; background: #f5f5f4; font-family: ui-monospace, 'Courier New', monospace; color: #1c1917; }
+        body { margin: 0; background: #f1f5f9; font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; }
         .page { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px 12px; }
-        .ticket { width: 80mm; max-width: 100%; background: #fff; padding: 14px 12px; box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
-        .center { text-align: center; }
-        .title { font-size: 14px; font-weight: 700; letter-spacing: .12em; }
-        .table { margin-top: 4px; font-size: 26px; font-weight: 800; letter-spacing: .04em; }
-        .meta { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: #57534e; }
-        .rule { border: 0; border-top: 1px dashed #a8a29e; margin: 10px 0; }
-        .item { font-size: 15px; font-weight: 700; margin-top: 6px; }
-        .sub { font-size: 12px; color: #44403c; padding-left: 26px; margin-top: 2px; }
-        .note { font-size: 12px; color: #44403c; padding-left: 26px; margin-top: 2px; font-style: italic; }
-        .order-note { font-size: 12px; margin-top: 8px; }
-        .footer { font-size: 11px; color: #57534e; text-align: center; }
-        .status { width: 80mm; max-width: 100%; font-family: system-ui, sans-serif; font-size: 13px; padding: 8px 12px; border-radius: 8px; }
-        .status-ok { background: #ecfdf5; color: #065f46; }
-        .status-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-        .actions { width: 80mm; max-width: 100%; display: flex; gap: 8px; font-family: system-ui, sans-serif; }
-        .actions button { flex: 1; padding: 9px; border-radius: 8px; border: 1px solid #d6d3d1; background: #fff; font-weight: 600; cursor: pointer; }
-        .actions button.primary { background: #991b1b; border-color: #991b1b; color: #fff; }
+        .slip { width: 80mm; max-width: 100%; background: #fff; padding: 14px 14px 12px; box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+        .title { margin: 0; text-align: center; font-size: 30px; font-weight: 600; letter-spacing: .02em; }
+        .code { margin: 2px 0 10px; text-align: center; font-size: 12px; color: #475569; }
+        .info { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+        .info p { margin: 2px 0; font-size: 12px; }
+        .info span { color: #475569; }
+        .stamp { flex-shrink: 0; align-self: center; border: 2px solid #0f172a; padding: 4px 8px; font-size: 13px; font-weight: 700; letter-spacing: .04em; transform: rotate(-4deg); }
+        table { width: 100%; margin-top: 10px; border-collapse: collapse; }
+        th { font-size: 11px; font-weight: 500; color: #475569; text-align: left; padding: 4px 0; border-bottom: 1px solid #0f172a; }
+        th.qty, td.qty { width: 34px; text-align: right; }
+        td { padding: 6px 0; vertical-align: top; border-bottom: 1px dashed #cbd5e1; }
+        .item { font-size: 16px; font-weight: 600; text-transform: uppercase; }
+        .item small { font-size: 12px; font-weight: 400; text-transform: none; color: #475569; }
+        .sub { margin-top: 2px; font-size: 12px; color: #334155; }
+        td.qty { font-size: 18px; font-weight: 700; }
+        .order-note { margin: 8px 0 0; font-size: 12px; }
+        .footer { margin: 10px 0 0; font-size: 11px; color: #475569; text-align: center; }
+        .actions { width: 80mm; max-width: 100%; display: flex; gap: 8px; }
+        .actions button { flex: 1; padding: 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #0f172a; font-size: 15px; font-weight: 700; cursor: pointer; }
+        .actions button:hover { background: #f8fafc; }
+        .actions button.primary { border-color: #059669; background: #059669; color: #fff; }
+        .actions button.primary:hover { background: #047857; }
         @media print {
             @page { size: 80mm auto; margin: 0; }
             body { background: #fff; }
             .page { padding: 0; }
-            .ticket { box-shadow: none; }
-            .status, .actions { display: none; }
+            .slip { box-shadow: none; }
+            .actions { display: none; }
         }
     </style>
 </head>
 <body>
     <div class="page">
-        <article class="ticket">
-            <p class="center title">PHIẾU BẾP</p>
-            <p class="center table">{{ filled($tableCodes) ? 'BÀN '.$tableCodes : 'MANG VỀ' }}</p>
-            <div class="meta">
-                <span>Order #{{ str_pad((string) $order->id, 4, '0', STR_PAD_LEFT) }}</span>
-                <span>{{ $ticket->station->name }}</span>
-                <span>{{ $ticket->fired_at->format('H:i') }}</span>
+        <article class="slip">
+            <p class="title">{{ $stationLabel }} {{ filled($tableCodes) ? $tableCodes : '· MANG VỀ' }}</p>
+            <p class="code">Mã ĐH: {{ $orderCode }}</p>
+
+            <div class="info">
+                <div>
+                    <p><span>Số người:</span> {{ $session?->guest_count ?? '–' }}</p>
+                    <p><span>Nhân viên:</span> {{ $waiter?->full_name ?? '–' }}</p>
+                    <p><span>Bắt đầu:</span> {{ $ticket->fired_at->format('H:i d/m/Y') }}</p>
+                    <p><span>Trả món:</span> {{ ($ticket->ready_at ?? now())->format('H:i d/m/Y') }}</p>
+                </div>
+                <div class="stamp">ĐÃ XONG</div>
             </div>
 
-            <hr class="rule">
-
-            @foreach ($ticket->items as $ticketItem)
-                @php
-                    $orderItem = $ticketItem->orderItem;
-                @endphp
-                <p class="item">
-                    {{ $orderItem->quantity }}x {{ $orderItem->item_name_snapshot }}@if ($orderItem->variant_name_snapshot) ({{ $orderItem->variant_name_snapshot }})@endif
-                </p>
-                @foreach ($orderItem->modifiers as $modifier)
-                    <p class="sub">+ {{ $modifier->quantity > 1 ? $modifier->quantity.'x ' : '' }}{{ $modifier->name_snapshot }}</p>
-                @endforeach
-                @if ($orderItem->note)
-                    <p class="note">Ghi chú: {{ $orderItem->note }}</p>
-                @endif
-            @endforeach
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tên sản phẩm</th>
+                        <th class="qty">SL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($ticket->items as $ticketItem)
+                        @php
+                            $orderItem = $ticketItem->orderItem;
+                        @endphp
+                        <tr>
+                            <td>
+                                <div class="item">
+                                    {{ $orderItem->item_name_snapshot }}
+                                    @if ($orderItem->variant_name_snapshot)
+                                        <small>({{ $orderItem->variant_name_snapshot }})</small>
+                                    @endif
+                                </div>
+                                @foreach ($orderItem->modifiers as $modifier)
+                                    <div class="sub">+ {{ $modifier->quantity > 1 ? $modifier->quantity.'x ' : '' }}{{ $modifier->name_snapshot }}</div>
+                                @endforeach
+                                @if ($orderItem->note)
+                                    <div class="sub">Ghi chú: {{ $orderItem->note }}</div>
+                                @endif
+                            </td>
+                            <td class="qty">{{ $orderItem->quantity }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
 
             @if ($order->note)
                 <p class="order-note">Ghi chú đơn: {{ $order->note }}</p>
             @endif
 
-            <hr class="rule">
-
             <p class="footer">
-                In lúc {{ now()->format('H:i') }} · Phục vụ: {{ $waiter?->full_name ?? 'Khách đặt QR' }}
+                {{ $ticket->station->name }} · In lúc {{ now()->format('H:i d/m/Y') }}
                 @if ($printJob && $printJob->retry_count > 0)
                     <br>In lại lần {{ $printJob->retry_count }}
                 @endif
             </p>
         </article>
 
-        @if ($printStatus === 'printed')
-            <p class="status status-ok">● Đã gửi lệnh in tới {{ $ticket->station->printer->name }}.</p>
-        @elseif ($printStatus === 'failed')
-            <p class="status status-error">⚠ Máy in {{ $ticket->station->printer->name }} đang lỗi / mất kết nối. Bấm "In qua trình duyệt" để in tay.</p>
-        @else
-            <p class="status status-error">⚠ {{ $ticket->station->name }} chưa gắn máy in. Bấm "In qua trình duyệt" để in tay.</p>
-        @endif
-
         <div class="actions">
-            <button type="button" class="primary" onclick="window.print()">In qua trình duyệt</button>
+            <button type="button" class="primary" onclick="window.print()">In phiếu</button>
             <button type="button" onclick="window.close()">Đóng</button>
         </div>
     </div>
 
     <script>
-        window.addEventListener('load', () => window.print());
+        // In xong thì tự đóng tab phiếu.
+        window.addEventListener('afterprint', () => window.close());
     </script>
 </body>
 </html>

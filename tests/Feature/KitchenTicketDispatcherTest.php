@@ -12,6 +12,7 @@ use App\Enums\OrderItemStatus;
 use App\Enums\OrderStatus;
 use App\Enums\ServeMode;
 use App\Enums\StationCode;
+use App\Enums\TicketItemStatus;
 use App\Enums\TicketStatus;
 use App\Models\Branch;
 use App\Models\Category;
@@ -73,7 +74,14 @@ class KitchenTicketDispatcherTest extends TestCase
         $this->assertSame(TicketStatus::NEW, $phoTicket->status);
         $this->assertEqualsCanonicalizing([$pho->id, $secondPho->id], $phoTicket->items()->pluck('order_item_id')->all());
 
-        $this->assertSame(OrderItemStatus::SENT, $drink->fresh()->status);
+        $this->assertSame(OrderItemStatus::SENT, $pho->fresh()->status);
+
+        // Đồ uống là đồ có sẵn: vào thẳng "Đang nấu" để nhân viên chuẩn bị.
+        $drinkTicket = $tickets->first(fn ($ticket) => $ticket->station->station_code === StationCode::DRINK);
+        $this->assertSame(TicketStatus::PREPARING, $drinkTicket->status);
+        $this->assertSame(TicketItemStatus::PREPARING, $drinkTicket->items()->first()->status);
+        $this->assertNotNull($drinkTicket->items()->first()->started_at);
+        $this->assertSame(OrderItemStatus::PREPARING, $drink->fresh()->status);
         $this->assertSame(BatchStatus::SENT, $batch->fresh()->status);
         $this->assertNotNull($batch->fresh()->sent_at);
         $this->assertSame(OrderStatus::SENT, $batch->order->fresh()->status);
@@ -166,7 +174,11 @@ class KitchenTicketDispatcherTest extends TestCase
             'category_id' => $category->id,
             'sku' => Str::upper(Str::random(8)),
             'name' => $name,
-            'item_type' => ItemType::DISH,
+            'item_type' => match ($stationCode) {
+                StationCode::DRINK => ItemType::DRINK,
+                StationCode::SIDE => ItemType::SIDE,
+                default => ItemType::DISH,
+            },
             'station_code' => $stationCode,
             'base_price' => 40000,
             'tax_rate' => 0,

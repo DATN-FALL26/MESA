@@ -76,20 +76,6 @@
                     + (isConnected ? 'Realtime: đang kết nối' : 'Realtime: mất kết nối');
             }
 
-            /** Âm báo ngắn khi có bàn mới xong món (trình duyệt có thể chặn tới khi người dùng chạm vào trang). */
-            function beep() {
-                try {
-                    const context = new (window.AudioContext || window.webkitAudioContext)();
-                    const oscillator = context.createOscillator();
-                    oscillator.frequency.value = 880;
-                    oscillator.connect(context.destination);
-                    oscillator.start();
-                    oscillator.stop(context.currentTime + 0.2);
-                } catch (error) {
-                    // Không phát được âm thanh thì chỉ nhấp nháy thẻ.
-                }
-            }
-
             async function refreshBoard() {
                 if (isRefreshing) {
                     return;
@@ -108,17 +94,11 @@
 
                     board.innerHTML = await response.text();
 
-                    let hasNewReadyOrder = false;
                     board.querySelectorAll('[data-ready-order-id]').forEach((card) => {
                         if (! knownOrderIds.has(card.dataset.readyOrderId)) {
                             card.classList.add('serve-card-new');
-                            hasNewReadyOrder = true;
                         }
                     });
-
-                    if (hasNewReadyOrder) {
-                        beep();
-                    }
 
                     knownOrderIds = collectReadyOrderIds();
                     setRealtimeStatus(true);

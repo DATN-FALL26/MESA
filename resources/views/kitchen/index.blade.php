@@ -8,13 +8,6 @@
         'DRINK' => 'Quầy Nước',
         'SIDE' => 'Quầy Món kèm',
     ];
-    $printerReady = $printerSummary['total'] > 0 && $printerSummary['ready'] === $printerSummary['total'] && $unprintedCount === 0;
-    $printerLabel = match (true) {
-        $printerSummary['total'] === 0 => 'chưa cấu hình quầy',
-        $printerReady => 'sẵn sàng',
-        $printerSummary['ready'] === 0 => 'chưa gắn máy in',
-        default => $printerSummary['ready'].'/'.$printerSummary['total'].' quầy có máy in',
-    };
 @endphp
 
 @section('content')
@@ -31,10 +24,12 @@
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2 text-xs font-medium">
-                    <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 {{ $printerReady ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : ($unprintedCount > 0 ? 'bg-red-50 text-red-800 ring-1 ring-red-200' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200') }}"
-                          title="Theo cấu hình máy in của quầy và kết quả lệnh in phiếu bếp (mô phỏng máy in nhiệt).">
-                        <span class="h-2 w-2 rounded-full {{ $printerReady ? 'bg-emerald-500' : ($unprintedCount > 0 ? 'bg-red-500 animate-pulse' : 'bg-amber-500') }}"></span>
-                        Máy in nhiệt: {{ $printerLabel }}@if ($unprintedCount > 0) · {{ $unprintedCount }} phiếu chưa in @endif
+                    <span class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 ring-1 ring-slate-200"
+                          title="Chỉ tính phở (quầy Phở), theo số bát. Chưa nấu: đang ở cột Mới và Đang nấu. Đã nấu: hoàn thành trong hôm nay.">
+                        <span class="font-semibold text-slate-700">Phở</span>
+                        <span class="text-red-800">Chưa nấu: <strong id="kds-pending-count" class="tabular-nums">{{ $phoBowlStats['pending'] }}</strong> bát</span>
+                        <span class="h-3 w-px bg-slate-200"></span>
+                        <span class="text-emerald-800">Đã nấu: <strong id="kds-done-count" class="tabular-nums">{{ $phoBowlStats['done'] }}</strong> bát</span>
                     </span>
                     <span id="kds-realtime" class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-emerald-800 ring-1 ring-emerald-200">
                         <span id="kds-realtime-dot" class="h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -119,7 +114,7 @@
                     const firedAt = Date.parse(timer.dataset.firedAt);
                     const since = Date.parse(timer.dataset.since ?? timer.dataset.firedAt);
                     const isOverdue = now - firedAt >= overdueMs;
-                    const label = timer.dataset.timer === 'cooking' ? 'Đang nấu' : 'Chờ';
+                    const label = timer.dataset.label ?? (timer.dataset.timer === 'cooking' ? 'Đang nấu' : 'Chờ');
 
                     timer.textContent = isOverdue
                         ? `Quá ${board.dataset.overdueMinutes} phút · ${formatDuration(now - firedAt)}`
@@ -129,6 +124,16 @@
                 });
 
                 clock.textContent = new Date(now).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            }
+
+            /** Cập nhật số bát phở chưa nấu / đã nấu trên thanh trên cùng. */
+            function updatePhoStats() {
+                const stats = document.getElementById('kds-pho-stats');
+
+                if (stats) {
+                    document.getElementById('kds-pending-count').textContent = stats.dataset.pending;
+                    document.getElementById('kds-done-count').textContent = stats.dataset.done;
+                }
             }
 
             function setRealtimeStatus(isConnected) {
@@ -165,6 +170,7 @@
                     });
 
                     knownTicketIds = collectTicketIds();
+                    updatePhoStats();
                     setRealtimeStatus(true);
                     tickTimers();
                 } catch (error) {

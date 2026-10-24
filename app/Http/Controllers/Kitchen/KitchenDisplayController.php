@@ -7,7 +7,6 @@ namespace App\Http\Controllers\Kitchen;
 use App\Enums\BatchStatus;
 use App\Enums\NotificationType;
 use App\Enums\OrderItemStatus;
-use App\Enums\PrintJobStatus;
 use App\Enums\StationCode;
 use App\Enums\TicketItemStatus;
 use App\Enums\TicketStatus;
@@ -20,8 +19,8 @@ use App\Models\Notification;
 use App\Models\OrderBatch;
 use App\Models\OrderStatusHistory;
 use App\Models\PrintJob;
-use App\Models\Station;
 use App\Models\User;
+use App\Services\Kitchen\KitchenTicketDispatcher;
 use App\Services\Kitchen\KitchenTicketPrinter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -34,16 +33,16 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
- * Màn hình bếp (KDS) – MOD04: INV-15, INV-16, INV-17 (in phiếu bếp) & INV-18 (báo món xong).
+ * Màn hình bếp (KDS) – MOD04: INV-15, INV-16, INV-17 (in phiếu trả món) & INV-18 (báo món xong).
  */
 class KitchenDisplayController extends Controller
 {
     use ResolvesBranchScope;
 
     /**
-     * Phiếu đã hoàn thành vẫn hiện ở cột "Hoàn thành" trong khoảng thời gian này (phút).
+     * Phiếu đã được phục vụ mang ra bàn còn hiện ở cột "Hoàn thành" thêm khoảng thời gian này (giây) rồi ẩn.
      */
-    public const DONE_VISIBLE_MINUTES = 30;
+    public const SERVED_VISIBLE_SECONDS = 60;
 
     /**
      * Phiếu chờ lâu hơn số phút này sẽ được đánh dấu "Quá giờ".
@@ -57,15 +56,13 @@ class KitchenDisplayController extends Controller
         $stationCode = $this->selectedStationCode($request);
         $branchIds = $this->kitchenBranchIds($request->user());
         $columns = $this->boardColumns($branchIds, $stationCode);
-        $printJobs = $this->printJobsFor($columns);
 
         return view('kitchen.index', [
             'columns' => $columns,
-            'printJobs' => $printJobs,
+            'printJobs' => $this->printJobsFor($columns),
+            'phoBowlStats' => $this->phoBowlStats($branchIds),
             'stationCode' => $stationCode,
             'stationCodes' => [StationCode::PHO, StationCode::SIDE],
-            'printerSummary' => $this->printerSummary($branchIds, $stationCode),
-            'unprintedCount' => $this->unprintedCount($columns, $printJobs),
             'overdueMinutes' => self::OVERDUE_MINUTES,
         ]);
     }
@@ -75,14 +72,14 @@ class KitchenDisplayController extends Controller
      */
     public function board(Request $request): View
     {
-        $columns = $this->boardColumns(
-            $this->kitchenBranchIds($request->user()),
-            $this->selectedStationCode($request)
-        );
+        $branchIds = $this->kitchenBranchIds($request->user());
+        $stationCode = $this->selectedStationCode($request);
+        $columns = $this->boardColumns($branchIds, $stationCode);
 
         return view('kitchen.partials.board', [
             'columns' => $columns,
             'printJobs' => $this->printJobsFor($columns),
+            'phoBowlStats' => $this->phoBowlStats($branchIds),
             'overdueMinutes' => self::OVERDUE_MINUTES,
         ]);
     }
@@ -117,6 +114,7 @@ class KitchenDisplayController extends Controller
         $this->abortUnlessBranchAccessible($this->kitchenBranchIds($request->user()), (int) $kitchenTicket->branch_id);
 
         $items = $kitchenTicket->items()
+            ->with('orderItem.menuItem')
             ->whereIn('status', [TicketItemStatus::NEW, TicketItemStatus::SCHEDULED, TicketItemStatus::PREPARING])
             ->get();
 
@@ -127,7 +125,10 @@ class KitchenDisplayController extends Controller
         $hasWaitingItems = $items->contains(
             fn (KitchenTicketItem $item): bool => $item->status !== TicketItemStatus::PREPARING
         );
-        $targetStatus = $hasWaitingItems ? TicketItemStatus::PREPARING : TicketItemStatus::READY;
+        // Nước / quẩy (cột "Nước & Quẩy") chỉ cần bấm "Xong" một lần.
+        $targetStatus = $hasWaitingItems && ! $this->isReadyMadeTicketItems($items)
+            ? TicketItemStatus::PREPARING
+            : TicketItemStatus::READY;
 
         DB::transaction(function () use ($request, $kitchenTicket, $items, $targetStatus): void {
             foreach ($items as $item) {
@@ -143,12 +144,14 @@ class KitchenDisplayController extends Controller
     }
 
     /**
-     * In lại phiếu bếp: gửi lại lệnh in tới máy in của quầy và mở mẫu phiếu để in qua trình duyệt.
+     * In lại phiếu trả món: gửi thêm một lệnh in tới máy in của quầy và mở phiếu để in qua trình duyệt.
+     * (Lần in đầu diễn ra tự động, ngầm, khi bếp bấm "Hoàn thành".)
      */
     public function printTicket(Request $request, KitchenTicket $kitchenTicket): View
     {
         $branchIds = $this->accessibleBranchIds($request->user(), ConstantHelper::PERM_KITCHEN_PRINT);
         $this->abortUnlessBranchAccessible($branchIds, (int) $kitchenTicket->branch_id);
+        abort_unless($kitchenTicket->status === TicketStatus::READY, 422, 'Phiếu chưa hoàn thành nên chưa in được.');
 
         $printJob = $this->printer->reprint($kitchenTicket);
 
@@ -160,7 +163,7 @@ class KitchenDisplayController extends Controller
             'items' => fn ($query) => $query
                 ->where('status', '!=', TicketItemStatus::CANCELLED)
                 ->orderBy('id')
-                ->with('orderItem.modifiers'),
+                ->with(['orderItem.modifiers', 'orderItem.menuItem']),
         ]);
 
         return view('kitchen.print-ticket', [
@@ -178,10 +181,13 @@ class KitchenDisplayController extends Controller
     }
 
     /**
-     * Chia phiếu bếp thành 3 cột: Mới / Đang nấu / Hoàn thành (trong 30 phút gần nhất).
+     * Chia phiếu bếp thành 4 cột: Mới / Đang nấu / Nước & Quẩy / Hoàn thành.
+     * - Mới, Đang nấu: chỉ món phải nấu (phở...).
+     * - Nước & Quẩy: phiếu chỉ gồm đồ có sẵn, chưa hoàn thành.
+     * - Hoàn thành: giữ phiếu xong trong hôm nay cho tới khi phục vụ mang ra, sau đó hiện thêm 1 phút rồi ẩn.
      *
      * @param  list<int>|null  $branchIds
-     * @return array{new: Collection<int, KitchenTicket>, preparing: Collection<int, KitchenTicket>, done: Collection<int, KitchenTicket>}
+     * @return array{new: Collection<int, KitchenTicket>, preparing: Collection<int, KitchenTicket>, quick: Collection<int, KitchenTicket>, done: Collection<int, KitchenTicket>}
      */
     private function boardColumns(?array $branchIds, ?StationCode $stationCode): array
     {
@@ -192,13 +198,13 @@ class KitchenDisplayController extends Controller
                 'items' => fn ($query) => $query
                     ->where('status', '!=', TicketItemStatus::CANCELLED)
                     ->orderBy('id')
-                    ->with('orderItem.modifiers'),
+                    ->with(['orderItem.modifiers', 'orderItem.menuItem']),
             ])
             ->where(fn (Builder $query) => $query
                 ->whereIn('status', [TicketStatus::NEW, TicketStatus::PREPARING])
                 ->orWhere(fn (Builder $doneQuery) => $doneQuery
                     ->where('status', TicketStatus::READY)
-                    ->where('ready_at', '>=', now()->subMinutes(self::DONE_VISIBLE_MINUTES))))
+                    ->where('ready_at', '>=', today())))
             ->when($branchIds !== null, fn (Builder $query) => $query->whereIn('branch_id', $branchIds))
             ->when($stationCode !== null, fn (Builder $query) => $query->whereHas(
                 'station',
@@ -208,15 +214,52 @@ class KitchenDisplayController extends Controller
             ->orderBy('id')
             ->get();
 
+        [$readyMadeTickets, $cookedTickets] = $tickets
+            ->whereIn('status', [TicketStatus::NEW, TicketStatus::PREPARING])
+            ->partition(fn (KitchenTicket $ticket): bool => $this->isReadyMadeTicketItems($ticket->items));
+
         return [
-            'new' => $tickets->where('status', TicketStatus::NEW)->values(),
-            'preparing' => $tickets->where('status', TicketStatus::PREPARING)->values(),
-            'done' => $tickets->where('status', TicketStatus::READY)->sortByDesc('ready_at')->values(),
+            'new' => $cookedTickets->where('status', TicketStatus::NEW)->values(),
+            'preparing' => $cookedTickets->where('status', TicketStatus::PREPARING)->values(),
+            'quick' => $readyMadeTickets->values(),
+            'done' => $tickets
+                ->where('status', TicketStatus::READY)
+                ->filter(fn (KitchenTicket $ticket): bool => $this->isStillShownAsDone($ticket))
+                ->sortByDesc('ready_at')
+                ->values(),
         ];
     }
 
     /**
-     * @param  array{new: Collection<int, KitchenTicket>, preparing: Collection<int, KitchenTicket>, done: Collection<int, KitchenTicket>}  $columns
+     * Phiếu chỉ gồm đồ có sẵn (nước, quẩy) – không cần nấu.
+     *
+     * @param  Collection<int, KitchenTicketItem>  $ticketItems
+     */
+    private function isReadyMadeTicketItems(Collection $ticketItems): bool
+    {
+        return $ticketItems->isNotEmpty() && $ticketItems->every(
+            fn (KitchenTicketItem $ticketItem): bool => KitchenTicketDispatcher::isReadyMade($ticketItem->orderItem)
+        );
+    }
+
+    /**
+     * Phiếu chưa được phục vụ hết thì luôn hiện; đã phục vụ hết thì chỉ hiện thêm SERVED_VISIBLE_SECONDS.
+     */
+    private function isStillShownAsDone(KitchenTicket $ticket): bool
+    {
+        $orderItems = $ticket->items->map(fn (KitchenTicketItem $ticketItem) => $ticketItem->orderItem);
+        $isFullyServed = $orderItems->isNotEmpty()
+            && $orderItems->every(fn ($orderItem): bool => $orderItem->status === OrderItemStatus::SERVED);
+
+        if (! $isFullyServed) {
+            return true;
+        }
+
+        return $orderItems->max('updated_at')->gte(now()->subSeconds(self::SERVED_VISIBLE_SECONDS));
+    }
+
+    /**
+     * @param  array{new: Collection<int, KitchenTicket>, preparing: Collection<int, KitchenTicket>, quick: Collection<int, KitchenTicket>, done: Collection<int, KitchenTicket>}  $columns
      * @return SupportCollection<int, PrintJob>
      */
     private function printJobsFor(array $columns): SupportCollection
@@ -227,36 +270,29 @@ class KitchenDisplayController extends Controller
     }
 
     /**
-     * Số phiếu đang chờ / đang nấu mà chưa in được (máy in lỗi hoặc quầy chưa gắn máy in).
-     *
-     * @param  array{new: Collection<int, KitchenTicket>, preparing: Collection<int, KitchenTicket>, done: Collection<int, KitchenTicket>}  $columns
-     * @param  SupportCollection<int, PrintJob>  $printJobs
-     */
-    private function unprintedCount(array $columns, SupportCollection $printJobs): int
-    {
-        return $columns['new']->concat($columns['preparing'])
-            ->filter(fn (KitchenTicket $ticket): bool => $printJobs->get($ticket->id)?->status !== PrintJobStatus::PRINTED)
-            ->count();
-    }
-
-    /**
-     * Đếm số quầy đang xem đã được gắn máy in bếp đang hoạt động.
+     * Đếm số bát phở (món của quầy Phở, tính theo số lượng): chưa nấu (Mới + Đang nấu) và đã nấu xong trong hôm nay.
      *
      * @param  list<int>|null  $branchIds
-     * @return array{ready: int, total: int}
+     * @return array{pending: int, done: int}
      */
-    private function printerSummary(?array $branchIds, ?StationCode $stationCode): array
+    private function phoBowlStats(?array $branchIds): array
     {
-        $stations = Station::query()
-            ->with('printer')
-            ->where('is_active', true)
-            ->when($branchIds !== null, fn (Builder $query) => $query->whereIn('branch_id', $branchIds))
-            ->when($stationCode !== null, fn (Builder $query) => $query->where('station_code', $stationCode))
-            ->get();
+        $phoItems = fn () => KitchenTicketItem::query()
+            ->join(ConstantHelper::TABLE_ORDER_ITEMS, ConstantHelper::TABLE_ORDER_ITEMS.'.id', '=', ConstantHelper::TABLE_KITCHEN_TICKET_ITEMS.'.order_item_id')
+            ->whereHas('ticket', fn (Builder $ticketQuery) => $ticketQuery
+                ->when($branchIds !== null, fn (Builder $query) => $query->whereIn('branch_id', $branchIds))
+                ->whereHas('station', fn (Builder $stationQuery) => $stationQuery->where('station_code', StationCode::PHO)));
 
         return [
-            'ready' => $stations->filter(fn (Station $station): bool => $station->printer?->is_active === true)->count(),
-            'total' => $stations->count(),
+            'pending' => (int) $phoItems()
+                ->whereIn(ConstantHelper::TABLE_KITCHEN_TICKET_ITEMS.'.status', [
+                    TicketItemStatus::NEW, TicketItemStatus::SCHEDULED, TicketItemStatus::PREPARING,
+                ])
+                ->sum(ConstantHelper::TABLE_ORDER_ITEMS.'.quantity'),
+            'done' => (int) $phoItems()
+                ->where(ConstantHelper::TABLE_KITCHEN_TICKET_ITEMS.'.status', TicketItemStatus::READY)
+                ->where(ConstantHelper::TABLE_KITCHEN_TICKET_ITEMS.'.ready_at', '>=', today())
+                ->sum(ConstantHelper::TABLE_ORDER_ITEMS.'.quantity'),
         ];
     }
 
@@ -331,6 +367,8 @@ class KitchenDisplayController extends Controller
             fn (TicketItemStatus $status): bool => in_array($status, [TicketItemStatus::PREPARING, TicketItemStatus::READY], true)
         );
 
+        $wasReady = $ticket->status === TicketStatus::READY;
+
         $ticket->update([
             'status' => match (true) {
                 $allReady => TicketStatus::READY,
@@ -340,6 +378,11 @@ class KitchenDisplayController extends Controller
             'ready_at' => $allReady ? now() : null,
             'updated_by' => $user->getKey(),
         ]);
+
+        // INV-17: bếp bấm "Hoàn thành" thì tự in phiếu trả món.
+        if ($allReady && ! $wasReady) {
+            $this->printer->autoPrint($ticket);
+        }
 
         if ($ticket->batch_id !== null) {
             $this->syncBatch($ticket->batch);

@@ -149,7 +149,11 @@ trait BuildsKitchenOrders
                 'category_id' => $category->id,
                 'sku' => Str::upper(Str::random(8)),
                 'name' => $name,
-                'item_type' => ItemType::DISH,
+                'item_type' => match ($stationCode) {
+                    StationCode::DRINK => ItemType::DRINK,
+                    StationCode::SIDE => ItemType::SIDE,
+                    default => ItemType::DISH,
+                },
                 'station_code' => $stationCode,
                 'base_price' => 50000,
                 'tax_rate' => 0,

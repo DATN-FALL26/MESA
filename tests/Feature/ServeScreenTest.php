@@ -9,6 +9,7 @@ use App\Enums\NotificationType;
 use App\Enums\OrderItemStatus;
 use App\Enums\OrderStatus;
 use App\Enums\StationCode;
+use App\Enums\TicketStatus;
 use App\Helpers\ConstantHelper;
 use App\Models\KitchenTicket;
 use App\Models\Order;
@@ -120,8 +121,10 @@ class ServeScreenTest extends TestCase
     private function finishAllTicketsOf(Order $order, User $kitchenUser): void
     {
         KitchenTicket::query()->where('order_id', $order->id)->each(function (KitchenTicket $ticket) use ($kitchenUser): void {
-            $this->actingAs($kitchenUser)->patchJson(route('kitchen.tickets.advance', $ticket))->assertOk();
-            $this->actingAs($kitchenUser)->patchJson(route('kitchen.tickets.advance', $ticket))->assertOk();
+            // Phở cần 2 lần bấm (Bắt đầu nấu, Hoàn thành); nước / quẩy vào thẳng Đang nấu nên chỉ cần 1 lần.
+            while ($ticket->fresh()->status !== TicketStatus::READY) {
+                $this->actingAs($kitchenUser)->patchJson(route('kitchen.tickets.advance', $ticket))->assertOk();
+            }
         });
     }
 }
