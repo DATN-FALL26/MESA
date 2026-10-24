@@ -8,6 +8,7 @@ use App\Enums\BatchStatus;
 use App\Enums\ItemType;
 use App\Enums\OrderItemStatus;
 use App\Enums\OrderStatus;
+use App\Enums\StationCode;
 use App\Enums\TicketItemStatus;
 use App\Enums\TicketStatus;
 use App\Models\KitchenTicket;
@@ -32,7 +33,8 @@ use Illuminate\Validation\ValidationException;
  * - Món được chia theo quầy chế biến (Phở / Nước / Món kèm), mỗi quầy một phiếu.
  * - Gửi nhiều lần trên cùng order: chỉ món chưa từng gửi bếp mới được tạo phiếu, món cũ không bị tạo lại.
  * - Món đã hủy bị bỏ qua.
- * - Phiếu chỉ gồm đồ có sẵn (nước, quẩy) vào thẳng "Đang nấu" để nhân viên chuẩn bị.
+ * - Nước và quẩy của cùng một lần gọi món gộp chung 1 phiếu (đặt ở quầy Nước) và vào thẳng "Đang nấu"
+ *   để nhân viên chuẩn bị, bấm Xong một lần.
  * - Phiếu trả món chỉ được in khi bếp bấm "Hoàn thành" (xem KitchenTicketPrinter).
  */
 class KitchenTicketDispatcher
@@ -61,8 +63,19 @@ class KitchenTicketDispatcher
                 return collect();
             }
 
+            // Đồ có sẵn (nước, quẩy) của cùng một lần gọi món gộp chung 1 phiếu, ưu tiên đặt ở quầy Nước.
+            $readyMadeStationCodes = $unsentItems
+                ->filter(fn (OrderItem $orderItem): bool => self::isReadyMade($orderItem))
+                ->map(fn (OrderItem $orderItem): string => $orderItem->menuItem->station_code->value)
+                ->unique();
+            $readyMadeStationCode = $readyMadeStationCodes->contains(StationCode::DRINK->value)
+                ? StationCode::DRINK->value
+                : $readyMadeStationCodes->first();
+
             $itemsByStation = $unsentItems->groupBy(
-                fn (OrderItem $orderItem): string => $orderItem->menuItem->station_code->value
+                fn (OrderItem $orderItem): string => self::isReadyMade($orderItem)
+                    ? $readyMadeStationCode
+                    : $orderItem->menuItem->station_code->value
             );
             $stations = $this->stationsFor((int) $order->branch_id, $itemsByStation->keys());
             $now = now();

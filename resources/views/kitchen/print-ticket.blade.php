@@ -5,7 +5,9 @@
         ->map(fn ($sessionTable) => $sessionTable->diningTable?->code)
         ->filter()
         ->join(', ');
-    $stationLabel = match ($ticket->station->station_code) {
+    $itemTypes = $ticket->items->map(fn ($ticketItem) => $ticketItem->orderItem->menuItem?->item_type)->filter()->unique();
+    $isDrinkAndSide = $itemTypes->contains(\App\Enums\ItemType::DRINK) && $itemTypes->contains(\App\Enums\ItemType::SIDE);
+    $stationLabel = $isDrinkAndSide ? 'NƯỚC & QUẨY' : match ($ticket->station->station_code) {
         \App\Enums\StationCode::PHO => 'PHỞ',
         \App\Enums\StationCode::DRINK => 'NƯỚC',
         \App\Enums\StationCode::SIDE => 'MÓN KÈM',

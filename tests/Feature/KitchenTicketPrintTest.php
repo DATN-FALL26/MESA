@@ -98,7 +98,8 @@ class KitchenTicketPrintTest extends TestCase
         $kitchenUser = $this->createUserWithRole(ConstantHelper::ROLE_KITCHEN, $branch);
 
         $tickets = KitchenTicket::query()->where('order_id', $order->id)->get();
-        $this->assertCount(2, $tickets);
+        $this->assertCount(1, $tickets);
+        $this->assertCount(2, $tickets->first()->items);
 
         $this->actingAs($kitchenUser)
             ->get(route('kitchen.board'))

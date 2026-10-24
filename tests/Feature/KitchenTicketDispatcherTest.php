@@ -105,6 +105,28 @@ class KitchenTicketDispatcherTest extends TestCase
         $this->assertDatabaseCount('kitchen_ticket_items', 2);
     }
 
+    public function test_drinks_and_sides_of_the_same_batch_share_one_ticket(): void
+    {
+        Station::query()->create([
+            'branch_id' => $this->branch->id,
+            'station_code' => StationCode::SIDE,
+            'name' => 'Quầy SIDE',
+            'is_active' => true,
+        ]);
+        $batch = $this->createBatch();
+        $this->addItem($batch, 'Phở bò tái', StationCode::PHO);
+        $tea = $this->addItem($batch, 'Trà đá', StationCode::DRINK);
+        $quay = $this->addItem($batch, 'Quẩy', StationCode::SIDE);
+
+        $tickets = app(KitchenTicketDispatcher::class)->sendBatch($batch);
+
+        $this->assertCount(2, $tickets);
+
+        $readyMadeTicket = $tickets->first(fn ($ticket) => $ticket->station->station_code === StationCode::DRINK);
+        $this->assertSame(TicketStatus::PREPARING, $readyMadeTicket->status);
+        $this->assertEqualsCanonicalizing([$tea->id, $quay->id], $readyMadeTicket->items()->pluck('order_item_id')->all());
+    }
+
     public function test_cancelled_items_are_not_sent_to_the_kitchen(): void
     {
         $batch = $this->createBatch();
