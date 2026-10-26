@@ -127,6 +127,10 @@
                                 </label>
                             </div>
 
+                            <a href="{{ route('password.request') }}" class="small text-decoration-none">
+                                Quên mật khẩu?
+                            </a>
+
                         </div>
 
 

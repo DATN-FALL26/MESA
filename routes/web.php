@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\PermissionController;
 use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\Auth\RoleController;
@@ -30,6 +31,23 @@ Route::middleware('guest')->group(function () {
 
     // Xử lý đăng nhập 
     Route::post('/login', [AuthController::class, 'login']);
+
+    Route::get('/forgot-password', [ForgotPasswordController::class, 'showRequestForm'])
+        ->name('password.request');
+    Route::post('/forgot-password', [ForgotPasswordController::class, 'sendOtp'])
+        ->middleware('throttle:10,60')
+        ->name('password.email');
+    Route::get('/forgot-password/verify', [ForgotPasswordController::class, 'showVerifyForm'])
+        ->name('password.otp.form');
+    Route::post('/forgot-password/verify', [ForgotPasswordController::class, 'verifyOtp'])
+        ->name('password.otp.verify');
+    Route::post('/forgot-password/resend', [ForgotPasswordController::class, 'resendOtp'])
+        ->middleware('throttle:10,60')
+        ->name('password.otp.resend');
+    Route::get('/forgot-password/reset', [ForgotPasswordController::class, 'showResetForm'])
+        ->name('password.reset.form');
+    Route::put('/forgot-password/reset', [ForgotPasswordController::class, 'resetPassword'])
+        ->name('password.reset');
 
 });
     // Đăng nhập thành công từ link Url , hoặc Qr code
