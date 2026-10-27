@@ -217,4 +217,6 @@ Route::middleware('auth')->prefix('kitchen')->name('kitchen.')->group(function (
         Route::view('/suppliers', 'inventory.suppliers')->name('suppliers');
         Route::view('/recipes', 'inventory.recipes')->name('recipes');
         Route::view('/stock-movements', 'inventory.stock-movements')->name('stock-movements');
+        Route::view('/purchase-orders', 'inventory.purchase-orders')->name('purchase-orders');
+        Route::view('/adjustments', 'inventory.adjustments')->name('adjustments');
     });
