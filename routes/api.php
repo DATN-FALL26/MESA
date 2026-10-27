@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\Inventory\IngredientController;
+use App\Http\Controllers\Api\Inventory\PurchaseOrderController;
 use App\Http\Controllers\Api\Inventory\RecipeController;
+use App\Http\Controllers\Api\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Api\Inventory\StockLedgerController;
 use App\Http\Controllers\Api\Inventory\SupplierController;
 use Illuminate\Support\Facades\Route;
@@ -63,4 +65,46 @@ Route::prefix('v1/inventory')->group(function () {
         ->name('api.inventory.recipes.activate');
     Route::post('/recipes/{recipe}/clone', [RecipeController::class, 'cloneAsDraft'])
         ->name('api.inventory.recipes.clone');
+
+    // ==========================================
+    // 5. ĐƠN ĐẶT & NHẬP HÀNG TỪ NCC (PURCHASE ORDERS)
+    // ==========================================
+    Route::get('/purchase-orders', [PurchaseOrderController::class, 'index'])
+        ->name('api.inventory.purchase-orders.index');
+    Route::post('/purchase-orders', [PurchaseOrderController::class, 'store'])
+        ->name('api.inventory.purchase-orders.store');
+    Route::get('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show'])
+        ->name('api.inventory.purchase-orders.show');
+    Route::put('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'update'])
+        ->name('api.inventory.purchase-orders.update');
+    Route::post('/purchase-orders/{purchaseOrder}/submit', [PurchaseOrderController::class, 'submit'])
+        ->name('api.inventory.purchase-orders.submit');
+    Route::post('/purchase-orders/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])
+        ->name('api.inventory.purchase-orders.approve');
+    Route::post('/purchase-orders/{purchaseOrder}/reject', [PurchaseOrderController::class, 'reject'])
+        ->name('api.inventory.purchase-orders.reject');
+    Route::post('/purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])
+        ->name('api.inventory.purchase-orders.cancel');
+    Route::post('/purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])
+        ->name('api.inventory.purchase-orders.receive');
+
+    // ==========================================
+    // 6. KIỂM KÊ, CÂN ĐỐI & HAO HỤT (STOCK ADJUSTMENTS & WASTE)
+    // ==========================================
+    Route::get('/adjustments', [StockAdjustmentController::class, 'index'])
+        ->name('api.inventory.adjustments.index');
+    Route::post('/adjustments', [StockAdjustmentController::class, 'store'])
+        ->name('api.inventory.adjustments.store');
+    Route::get('/adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'show'])
+        ->name('api.inventory.adjustments.show');
+    Route::put('/adjustments/{stockAdjustment}/items', [StockAdjustmentController::class, 'updateItems'])
+        ->name('api.inventory.adjustments.update-items');
+    Route::post('/adjustments/{stockAdjustment}/submit', [StockAdjustmentController::class, 'submit'])
+        ->name('api.inventory.adjustments.submit');
+    Route::post('/adjustments/{stockAdjustment}/approve', [StockAdjustmentController::class, 'approve'])
+        ->name('api.inventory.adjustments.approve');
+    Route::post('/adjustments/{stockAdjustment}/reject', [StockAdjustmentController::class, 'reject'])
+        ->name('api.inventory.adjustments.reject');
+    Route::post('/waste', [StockAdjustmentController::class, 'waste'])
+        ->name('api.inventory.waste.record');
 });
