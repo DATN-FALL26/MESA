@@ -43,7 +43,7 @@
                     @endphp
 
                     {{-- Dashboard --}}
-                    @if (auth()->user()->hasPermission('dashboard.view'))
+                    @if (!auth()->check() || auth()->user()->hasPermission('dashboard.view'))
                         <a href="{{ route('dashboard') }}"
                             class="group flex shrink-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 {{ $currentRoute === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 lg:text-slate-300 lg:hover:bg-slate-800 lg:hover:text-white' }}">
                             <svg class="h-5 w-5 transition-colors {{ $currentRoute === 'dashboard' ? 'text-white' : 'text-slate-400 group-hover:text-white' }}"
@@ -56,7 +56,7 @@
                     @endif
 
                     {{-- Tài khoản --}}
-                    @if (auth()->user()->hasPermission('users.view'))
+                    @if (auth()->check() && auth()->user()->hasPermission('users.view'))
                         <a href="{{ route('users.index') }}"
                             class="group flex shrink-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 {{ str_starts_with($currentRoute, 'users') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 lg:text-slate-300 lg:hover:bg-slate-800 lg:hover:text-white' }}">
                             <svg class="h-5 w-5 transition-colors {{ str_starts_with($currentRoute, 'users') ? 'text-white' : 'text-slate-400 group-hover:text-white' }}"
@@ -69,7 +69,7 @@
                     @endif
 
                     {{-- Vai trò --}}
-                    @if (auth()->user()->hasPermission('roles.view'))
+                    @if (auth()->check() && auth()->user()->hasPermission('roles.view'))
                         <a href="{{ route('roles.index') }}"
                             class="group flex shrink-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 {{ str_starts_with($currentRoute, 'roles') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 lg:text-slate-300 lg:hover:bg-slate-800 lg:hover:text-white' }}">
                             <svg class="h-5 w-5 transition-colors {{ str_starts_with($currentRoute, 'roles') ? 'text-white' : 'text-slate-400 group-hover:text-white' }}"
@@ -82,7 +82,7 @@
                     @endif
 
                     {{-- Quyền --}}
-                    @if (auth()->user()->hasPermission('permissions.view'))
+                    @if (auth()->check() && auth()->user()->hasPermission('permissions.view'))
                         <a href="{{ route('permissions.index') }}"
                             class="group flex shrink-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 {{ str_starts_with($currentRoute, 'permissions') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 lg:text-slate-300 lg:hover:bg-slate-800 lg:hover:text-white' }}">
                             <svg class="h-5 w-5 transition-colors {{ str_starts_with($currentRoute, 'permissions') ? 'text-white' : 'text-slate-400 group-hover:text-white' }}"
@@ -95,7 +95,7 @@
                     @endif
 
                     {{-- Hồ sơ cá nhân --}}
-                    @if (auth()->user()->hasPermission('profile.view'))
+                    @if (auth()->check() && auth()->user()->hasPermission('profile.view'))
                         <a href="{{ route('profile') }}"
                             class="group flex shrink-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 {{ $currentRoute === 'profile' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 lg:text-slate-300 lg:hover:bg-slate-800 lg:hover:text-white' }}">
                             <svg class="h-5 w-5 transition-colors {{ $currentRoute === 'profile' ? 'text-white' : 'text-slate-400 group-hover:text-white' }}"
@@ -106,10 +106,68 @@
                             <span>Hồ sơ cá nhân</span>
                         </a>
                     @endif
+
+                    {{-- ================= MENU KHO & ĐỊNH LƯỢNG (BOM) ================= --}}
+                    <div class="hidden px-3 pt-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 lg:block">
+                        Kho & Định lượng
+                    </div>
+
+                    {{-- Nguyên vật liệu --}}
+                    @if (!auth()->check() || auth()->user()->hasPermission('inventory.view'))
+                        <a href="{{ route('inventory.ingredients') }}"
+                            class="group flex shrink-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 {{ str_starts_with($currentRoute, 'inventory.ingredients') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 lg:text-slate-300 lg:hover:bg-slate-800 lg:hover:text-white' }}">
+                            <svg class="h-5 w-5 transition-colors {{ str_starts_with($currentRoute, 'inventory.ingredients') ? 'text-white' : 'text-slate-400 group-hover:text-white' }}"
+                                fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+                            </svg>
+                            <span>Nguyên vật liệu</span>
+                        </a>
+                    @endif
+
+                    {{-- Định lượng BOM --}}
+                    @if (!auth()->check() || auth()->user()->hasPermission('recipe.manage'))
+                        <a href="{{ route('inventory.recipes') }}"
+                            class="group flex shrink-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 {{ str_starts_with($currentRoute, 'inventory.recipes') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 lg:text-slate-300 lg:hover:bg-slate-800 lg:hover:text-white' }}">
+                            <svg class="h-5 w-5 transition-colors {{ str_starts_with($currentRoute, 'inventory.recipes') ? 'text-white' : 'text-slate-400 group-hover:text-white' }}"
+                                fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+                            </svg>
+                            <span>Định lượng (BOM)</span>
+                        </a>
+                    @endif
+
+                    {{-- Nhà cung cấp --}}
+                    @if (!auth()->check() || auth()->user()->hasPermission('supplier.manage'))
+                        <a href="{{ route('inventory.suppliers') }}"
+                            class="group flex shrink-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 {{ str_starts_with($currentRoute, 'inventory.suppliers') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 lg:text-slate-300 lg:hover:bg-slate-800 lg:hover:text-white' }}">
+                            <svg class="h-5 w-5 transition-colors {{ str_starts_with($currentRoute, 'inventory.suppliers') ? 'text-white' : 'text-slate-400 group-hover:text-white' }}"
+                                fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.979-3.199a4.5 4.5 0 1 1 7.5 0M15 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+                            </svg>
+                            <span>Nhà cung cấp</span>
+                        </a>
+                    @endif
+
+                    {{-- Thẻ kho & Biến động kho --}}
+                    @if (!auth()->check() || auth()->user()->hasPermission('inventory.view'))
+                        <a href="{{ route('inventory.stock-movements') }}"
+                            class="group flex shrink-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 {{ str_starts_with($currentRoute, 'inventory.stock-movements') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 lg:text-slate-300 lg:hover:bg-slate-800 lg:hover:text-white' }}">
+                            <svg class="h-5 w-5 transition-colors {{ str_starts_with($currentRoute, 'inventory.stock-movements') ? 'text-white' : 'text-slate-400 group-hover:text-white' }}"
+                                fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z" />
+                            </svg>
+                            <span>Thẻ kho & Biến động</span>
+                        </a>
+                    @endif
                 </nav>
             </div>
 
             {{-- User Profile & Logout Footer ở cuối Sidebar --}}
+            @if (auth()->check())
             <div class="mt-8 rounded-2xl bg-slate-800/60 p-4 ring-1 ring-slate-700/60 backdrop-blur-md">
                 <div class="flex items-center gap-3">
                     <div
@@ -134,6 +192,13 @@
                     </button>
                 </form>
             </div>
+            @else
+            <div class="mt-8 rounded-2xl bg-slate-800/60 p-4 ring-1 ring-slate-700/60 backdrop-blur-md">
+                <a href="{{ route('login') }}" class="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-indigo-600/30 transition-all hover:bg-indigo-500">
+                    <span>Đăng nhập hệ thống</span>
+                </a>
+            </div>
+            @endif
 
         </aside>
 
@@ -158,10 +223,12 @@
                     </div>
 
                     {{-- Avatar nhanh trên Header mobile/desktop --}}
+                    @if (auth()->check())
                     <div class="flex items-center gap-2 border-l border-slate-200 pl-2 dark:border-slate-700">
                         <span
                             class="hidden text-xs font-semibold text-slate-700 dark:text-slate-200 md:inline">{{ auth()->user()->full_name }}</span>
                     </div>
+                    @endif
                 </div>
             </header>
 

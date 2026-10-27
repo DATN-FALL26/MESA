@@ -205,3 +205,16 @@ Route::middleware('auth')->prefix('kitchen')->name('kitchen.')->group(function (
         Route::post('/orders/{order}/served', [ServeController::class, 'markServed'])->name('served');
     });
 });
+
+
+/*
+    |--------------------------------------------------------------------------
+    | Phân hệ Kho & Định lượng (Module 07)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('inventory')->name('inventory.')->group(function () {
+        Route::view('/ingredients', 'inventory.ingredients')->name('ingredients');
+        Route::view('/suppliers', 'inventory.suppliers')->name('suppliers');
+        Route::view('/recipes', 'inventory.recipes')->name('recipes');
+        Route::view('/stock-movements', 'inventory.stock-movements')->name('stock-movements');
+    });
