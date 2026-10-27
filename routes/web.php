@@ -13,8 +13,13 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DashboardController;
 // use Symfony\Component\Routing\Router;
 
+
+Route::prefix('admin')->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+    Route::get('/reports', [DashboardController::class, 'reports'])->name('admin.reports');
+    Route::get('/api/revenue', [DashboardController::class, 'getRevenueApi'])->name('admin.api.revenue');
+});
 /*
-|--------------------------------------------------------------------------
 | Root
 |--------------------------------------------------------------------------
 | Điều hướng mặc định khi truy cập hệ thống

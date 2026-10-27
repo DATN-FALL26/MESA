@@ -42,12 +42,26 @@
 
         <!-- Navigation Menu -->
         <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-            <!-- Tổng quan -->
-            <a href="{{ url('/') }}" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors">
+
+            <!-- SECTION: BÁO CÁO & QUẢN TRỊ (MODULE 9 - CỦA THUẬN) -->
+            <div class="pb-1 px-3">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Báo cáo & Thống kê</span>
+            </div>
+
+            <!-- 1. Bảng điều khiển (Dashboard) -->
+            <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg {{ request()->routeIs('admin.dashboard') ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-800/80' }} transition-colors">
                 <svg class="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
                 </svg>
                 <span>Bảng điều khiển</span>
+            </a>
+
+            <!-- 2. Báo cáo chi tiết -->
+            <a href="{{ route('admin.reports') }}" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg {{ request()->routeIs('admin.reports') ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-800/80' }} transition-colors">
+                <svg class="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+                </svg>
+                <span>Báo cáo chi tiết</span>
             </a>
 
             <!-- SECTION: KHO & ĐỊNH LƯỢNG (MODULE 07) -->
@@ -155,10 +169,9 @@
         <!-- TOAST NOTIFICATIONS (TOP-RIGHT) -->
         <x-toast />
 
-
         <!-- MAIN PAGE CONTENT -->
         <main class="flex-1 p-6">
-            {{ $slot }}
+            @yield('content')
         </main>
     </div>
 

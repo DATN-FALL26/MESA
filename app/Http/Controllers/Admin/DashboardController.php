@@ -5,64 +5,99 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Order;
-use App\Models\Table;
-use App\Models\Dish;
 use App\Models\OrderDetail;
+use App\Models\Table;
+use App\Models\Branch;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    // Trang Tổng quan Dashboard (Nhiệm vụ 3 & 4)
-    public function index(Request $request)
-{
-    try {
-        // Dữ liệu thật từ Database (Nếu đã có bảng)
-        $doanhThu = Order::whereDate('created_at', today())->where('status', 'completed')->sum('total_price');
-        $tongDon = Order::whereDate('created_at', today())->count();
-        $soBanDangAn = Table::where('status', 'occupied')->count();
-        $donHangs = Order::with('table')->latest()->take(5)->get();
+    // Trang Tổng quan Dashboard theo chi nhánh
+public function index(Request $request)
+    {
+        $branchId = $request->input('branch_id', 1);
+        $title = 'Tổng quan Dashboard'; // Thêm dòng này
 
-        $caSang = Order::whereDate('created_at', today())->whereTime('created_at', '>=', '06:00:00')->whereTime('created_at', '<', '11:00:00')->where('status', 'completed')->sum('total_price');
-        $caTrua = Order::whereDate('created_at', today())->whereTime('created_at', '>=', '11:00:00')->whereTime('created_at', '<', '17:00:00')->where('status', 'completed')->sum('total_price');
-        $caToi  = Order::whereDate('created_at', today())->whereTime('created_at', '>=', '17:00:00')->whereTime('created_at', '<=', '22:00:00')->where('status', 'completed')->sum('total_price');
-        $chartData = [$caSang, $caTrua, $caToi];
+        try {
+            $doanhThu = Order::where('branch_id', $branchId)
+                             ->whereDate('created_at', today())
+                             ->where('status', 'completed')
+                             ->sum('total_price');
 
-    } catch (\Exception $e) {
-        // Tự động nhảy về dữ liệu mẫu nếu Database chưa có bảng 'orders'
-        $doanhThu = 12850000;
-        $tongDon = 145;
-        $soBanDangAn = 8;
-        $donHangs = collect([]); // Mảng rỗng an toàn
-        $chartData = [3500000, 5200000, 4150000];
+            $tongDon = Order::where('branch_id', $branchId)
+                            ->whereDate('created_at', today())
+                            ->count();
+
+            $danhSachBan = Table::where('branch_id', $branchId)->get();
+            $donHangs = Order::where('branch_id', $branchId)->latest()->take(5)->get();
+
+            $thongKeMon = OrderDetail::select('dish_id', DB::raw('SUM(quantity) as total_qty'))
+                            ->whereHas('order', function($q) use ($branchId) {
+                                $q->where('branch_id', $branchId)->where('status', 'completed');
+                            })
+                            ->with('dish')
+                            ->groupBy('dish_id')
+                            ->orderByDesc('total_qty')
+                            ->get();
+
+            $monBanChay = $thongKeMon->first();
+            $monItOrder = $thongKeMon->last();
+
+            $caSang = Order::where('branch_id', $branchId)->whereDate('created_at', today())->whereTime('created_at', '>=', '06:00:00')->whereTime('created_at', '<', '11:00:00')->sum('total_price');
+            $caTrua = Order::where('branch_id', $branchId)->whereDate('created_at', today())->whereTime('created_at', '>=', '11:00:00')->whereTime('created_at', '<', '17:00:00')->sum('total_price');
+            $caToi  = Order::where('branch_id', $branchId)->whereDate('created_at', today())->whereTime('created_at', '>=', '17:00:00')->whereTime('created_at', '<', '22:00:00')->sum('total_price');
+
+            $chartData = [$caSang, $caTrua, $caToi];
+            $branches = Branch::all();
+
+        } catch (\Exception $e) {
+            $doanhThu = 0;
+            $tongDon = 0;
+            $danhSachBan = collect([]);
+            $donHangs = collect([]);
+            $monBanChay = null;
+            $monItOrder = null;
+            $chartData = [0, 0, 0];
+            $branches = collect([]);
+        }
+
+        return view('admin.dashboard', compact(
+            'doanhThu',
+            'tongDon',
+            'danhSachBan',
+            'donHangs',
+            'monBanChay',
+            'monItOrder',
+            'chartData',
+            'branches',
+            'branchId',
+            'title' // Thêm 'title' vào đây luôn nhé
+        ));
     }
 
-    return view('admin.dashboard', compact('doanhThu', 'tongDon', 'soBanDangAn', 'donHangs', 'chartData'));
-}
+    // Trang Báo cáo chi tiết theo khoảng thời gian
+    public function reports(Request $request)
+    {
+        $request->validate([
+            'from_date' => 'nullable|date',
+            'to_date' => 'nullable|date|after_or_equal:from_date',
+        ]);
 
-    // Trang Báo cáo chi tiết & Validate lọc dữ liệu
-    // Trang Báo cáo chi tiết theo thời gian
-public function reports(Request $request)
-{
-    $request->validate([
-        'from_date' => 'nullable|date',
-        'to_date' => 'nullable|date|after_or_equal:from_date',
-    ]);
+        $fromDate = $request->input('from_date', now()->subDays(7)->toDateString());
+        $toDate = $request->input('to_date', now()->toDateString());
+        $title = 'Báo cáo chi tiết'; // Thêm dòng này
 
-    $fromDate = $request->input('from_date', now()->subDays(7)->toDateString());
-    $toDate = $request->input('to_date', now()->toDateString());
+        try {
+            $tongDoanhThuKy = Order::whereBetween(DB::raw('DATE(created_at)'), [$fromDate, $toDate])
+                                    ->where('status', 'completed')
+                                    ->sum('total_price');
 
-    try {
-        // Dữ liệu thật từ DB (khi team đã gửi CSDL)
-        $tongDoanhThuKy = Order::whereBetween(DB::raw('DATE(created_at)'), [$fromDate, $toDate])
-                                ->where('status', 'completed')
-                                ->sum('total_price');
-
-        $tongSoTo = OrderDetail::whereHas('order', function ($query) use ($fromDate, $toDate) {
+            $tongSoTo = OrderDetail::whereHas('order', function ($query) use ($fromDate, $toDate) {
                         $query->whereBetween(DB::raw('DATE(created_at)'), [$fromDate, $toDate])
                               ->where('status', 'completed');
                     })->sum('quantity');
 
-        $topMonAn = OrderDetail::select('dish_id', DB::raw('SUM(quantity) as total_qty'), DB::raw('SUM(price * quantity) as total_revenue'))
+            $topMonAn = OrderDetail::select('dish_id', DB::raw('SUM(quantity) as total_qty'), DB::raw('SUM(price * quantity) as total_revenue'))
                     ->whereHas('order', function ($query) use ($fromDate, $toDate) {
                         $query->whereBetween(DB::raw('DATE(created_at)'), [$fromDate, $toDate])
                               ->where('status', 'completed');
@@ -72,13 +107,12 @@ public function reports(Request $request)
                     ->orderByDesc('total_qty')
                     ->get();
 
-    } catch (\Exception $e) {
-        // Tự động trả về dữ liệu mẫu khi chưa có bảng 'orders' trong MySQL
-        $tongDoanhThuKy = 34950000;
-        $tongSoTo = 680;
-        $topMonAn = collect([]); // Mảng rỗng an toàn
-    }
+        } catch (\Exception $e) {
+            $tongDoanhThuKy = 0;
+            $tongSoTo = 0;
+            $topMonAn = collect([]);
+        }
 
-    return view('admin.reports', compact('fromDate', 'toDate', 'tongDoanhThuKy', 'tongSoTo', 'topMonAn'));
-}
+        return view('admin.reports', compact('fromDate', 'toDate', 'tongDoanhThuKy', 'tongSoTo', 'topMonAn', 'title')); // Thêm 'title' vào đây
+    }
 }
