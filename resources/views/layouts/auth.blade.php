@@ -189,6 +189,39 @@
                             <span>Kiểm kê & Điều chỉnh</span>
                         </a>
                     @endif
+
+                    {{-- ================= MENU BẾP (MOD04) ================= --}}
+                    @if (auth()->check() && auth()->user()->hasAnyPermission(['kitchen.view', 'order.serve']))
+                        <div class="hidden px-3 pt-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 lg:block">
+                            Bếp
+                        </div>
+                    @endif
+
+                    {{-- Màn hình bếp (KDS) --}}
+                    @if (auth()->check() && auth()->user()->hasPermission('kitchen.view'))
+                        <a href="{{ route('kitchen.index') }}"
+                            class="group flex shrink-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 {{ in_array($currentRoute, ['kitchen.index', 'kitchen.board'], true) ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 lg:text-slate-300 lg:hover:bg-slate-800 lg:hover:text-white' }}">
+                            <svg class="h-5 w-5 transition-colors {{ in_array($currentRoute, ['kitchen.index', 'kitchen.board'], true) ? 'text-white' : 'text-slate-400 group-hover:text-white' }}"
+                                fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z" />
+                            </svg>
+                            <span>Màn hình bếp (KDS)</span>
+                        </a>
+                    @endif
+
+                    {{-- Trang ra món (phục vụ) --}}
+                    @if (auth()->check() && auth()->user()->hasPermission('order.serve'))
+                        <a href="{{ route('kitchen.serve.index') }}"
+                            class="group flex shrink-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 {{ str_starts_with((string) $currentRoute, 'kitchen.serve') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-semibold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 lg:text-slate-300 lg:hover:bg-slate-800 lg:hover:text-white' }}">
+                            <svg class="h-5 w-5 transition-colors {{ str_starts_with((string) $currentRoute, 'kitchen.serve') ? 'text-white' : 'text-slate-400 group-hover:text-white' }}"
+                                fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                            </svg>
+                            <span>Trang ra món</span>
+                        </a>
+                    @endif
                 </nav>
             </div>
 
