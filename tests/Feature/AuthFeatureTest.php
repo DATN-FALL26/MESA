@@ -5,24 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\BranchStatus;
-use App\Enums\ItemType;
-use App\Enums\PaymentStatus;
-use App\Enums\SessionStatus;
-use App\Enums\StationCode;
-use App\Enums\TableShape;
-use App\Enums\TableStatus;
 use App\Enums\UserStatus;
 use App\Helpers\ConstantHelper;
 use App\Models\Branch;
-use App\Models\BranchMenuItem;
-use App\Models\Category;
-use App\Models\DiningSession;
-use App\Models\DiningTable;
-use App\Models\MenuItem;
 use App\Models\Permission;
 use App\Models\Role;
-use App\Models\SessionTable;
-use App\Models\Station;
 use App\Models\User;
 use App\Models\UserRole;
 use Database\Seeders\ReferenceSeeder;
@@ -31,7 +18,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class AuthFeatureTest extends TestCase
@@ -45,219 +31,91 @@ class AuthFeatureTest extends TestCase
         $this->seed(ReferenceSeeder::class);
     }
 
-    public function test_guest_can_open_the_customer_dashboard_without_signing_in(): void
+    public function test_guest_can_open_the_public_dashboard_without_signing_in(): void
     {
-        $this->withoutVite()
-            ->get('/dashboard')
-            ->assertOk()
-            ->assertSee('Quét mã QR tại bàn');
-
-        $this->assertGuest();
-    }
-
-    public function test_guest_can_place_a_signed_qr_order_for_an_open_table(): void
-    {
-        $this->withoutVite();
-
-        $manager = $this->createUser([
-            'username' => 'tablemanager',
-            'full_name' => 'Table Manager',
-            'password' => Hash::make('Password123!'),
-            'status' => UserStatus::ACTIVE,
-        ]);
-        $branch = Branch::query()->create([
-            'code' => 'TEST01',
-            'name' => 'MESA Test Branch',
+        Branch::query()->create([
+            'code' => 'PUBLIC01',
+            'name' => 'MESA Public Branch',
             'timezone' => 'Asia/Ho_Chi_Minh',
             'status' => BranchStatus::ACTIVE,
         ]);
-        $table = DiningTable::query()->create([
-            'branch_id' => $branch->id,
-            'code' => 'A01',
-            'shape' => TableShape::SQUARE,
-            'status' => TableStatus::OCCUPIED,
-            'is_active' => true,
-        ]);
-        $session = DiningSession::query()->create([
-            'branch_id' => $branch->id,
-            'opened_by' => $manager->id,
-            'opened_at' => now(),
-            'status' => SessionStatus::OPEN,
-        ]);
-        SessionTable::query()->create([
-            'session_id' => $session->id,
-            'table_id' => $table->id,
-            'joined_at' => now(),
-        ]);
-        $category = Category::query()->create([
-            'name' => 'Món thử',
-            'is_active' => true,
-        ]);
-        $menuItem = MenuItem::query()->create([
-            'category_id' => $category->id,
-            'sku' => 'TEST-PHO',
-            'name' => 'Phở thử nghiệm',
-            'item_type' => ItemType::DISH,
-            'station_code' => StationCode::PHO,
-            'base_price' => 10000,
-            'tax_rate' => 0,
-            'is_active' => true,
-        ]);
-        BranchMenuItem::query()->create([
-            'branch_id' => $branch->id,
-            'menu_item_id' => $menuItem->id,
-            'price' => 12000,
-            'is_available' => true,
-        ]);
-        Station::query()->create([
-            'branch_id' => $branch->id,
-            'station_code' => StationCode::PHO,
-            'name' => 'Quầy phở',
-            'is_active' => true,
-        ]);
 
-        $signedOrderUrl = URL::signedRoute('customer.orders.store', ['diningTable' => $table->id]);
-
-        $this->post($signedOrderUrl, [
-            'customer_name' => 'Guest Customer',
-            'customer_phone' => '0909000000',
-            'items' => [
-                [
-                    'menu_item_id' => $menuItem->id,
-                    'variant_id' => '',
-                    'quantity' => 2,
-                    'note' => 'Ít hành',
-                ],
-            ],
-        ])->assertRedirect();
-
-        $this->assertDatabaseHas('orders', [
-            'branch_id' => $branch->id,
-            'session_id' => $session->id,
-            'created_by' => null,
-            'customer_name' => 'Guest Customer',
-            'subtotal' => 24000,
-            'status' => 'sent',
-        ]);
-        $this->assertDatabaseHas('order_items', [
-            'menu_item_id' => $menuItem->id,
-            'unit_price_snapshot' => 12000,
-            'quantity' => 2,
-            'line_total' => 24000,
-        ]);
-        $this->assertDatabaseHas('payments', [
-            'branch_id' => $branch->id,
-            'method' => 'cash',
-            'status' => PaymentStatus::PENDING->value,
-            'amount' => 24000,
-        ]);
-        $this->assertDatabaseHas('order_batches', [
-            'batch_no' => 1,
-            'serve_mode' => 'together',
-            'status' => 'sent',
-        ]);
-        $this->assertDatabaseHas('kitchen_tickets', [
-            'branch_id' => $branch->id,
-            'order_id' => DB::table('orders')->where('branch_id', $branch->id)->value('id'),
-            'station_id' => Station::query()->where('branch_id', $branch->id)->value('id'),
-            'status' => 'new',
-        ]);
-        $this->assertDatabaseHas('kitchen_ticket_items', [
-            'order_item_id' => DB::table('order_items')->where('menu_item_id', $menuItem->id)->value('id'),
-            'status' => 'new',
-        ]);
-        $this->assertDatabaseHas('order_status_history', [
-            'to_status' => 'sent',
-            'changed_by' => null,
-            'note' => 'Đặt món qua QR tại bàn A01',
-        ]);
-        $this->assertGuest();
-
-        $session->update(['status' => SessionStatus::CLOSED]);
-
-        $this->post($signedOrderUrl, [
-            'customer_name' => 'Guest Customer',
-            'customer_phone' => '0909000000',
-            'items' => [
-                [
-                    'menu_item_id' => $menuItem->id,
-                    'quantity' => 1,
-                ],
-            ],
-        ])->assertSessionHasErrors('table');
-
-        $this->assertDatabaseCount('orders', 1);
-    }
-
-    public function test_guest_cannot_open_a_table_with_an_unsigned_qr_url(): void
-    {
-        $this->get(route('customer.table', ['diningTable' => 1]))
-            ->assertForbidden();
+        $this->withoutVite()
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('MESA Public Branch')
+            ->assertSee('Đăng nhập nhân viên')
+            ->assertDontSee('Quản lý tài khoản');
 
         $this->assertGuest();
     }
 
-    public function test_guest_can_register_with_default_customer_role_and_permissions(): void
+    public function test_guest_menu_and_table_qr_routes_are_removed(): void
     {
-        $this->withoutVite();
+        $this->get('/menu/1')->assertNotFound();
+        $this->get('/customer/table/1')->assertNotFound();
+        $this->get('/customer/table/1/qr-link')->assertNotFound();
 
-        $this->get('/register')->assertOk();
-
-        $this->post('/register', [
-            'username' => 'newcustomer',
-            'full_name' => 'New Customer',
-            'email' => 'newcustomer@example.com',
-            'password' => 'Password123!',
-            'password_confirmation' => 'Password123!',
-        ])->assertRedirect('/dashboard');
-
-        $user = User::query()->where('username', 'newcustomer')->firstOrFail();
-
-        $this->assertAuthenticatedAs($user);
-        $this->assertTrue(Hash::check('Password123!', $user->password));
-        $customerRole = Role::query()->where('code', ConstantHelper::ROLE_CUSTOMER)->firstOrFail();
-        $this->assertDatabaseHas('user_roles', [
-            'user_id' => $user->id,
-            'role_id' => $customerRole->id,
-            'scope_type' => 'ALL',
-        ]);
-
-        foreach (['profile.view', 'profile.update', 'dashboard.view'] as $permissionCode) {
-            $this->assertTrue($user->hasPermission($permissionCode));
-        }
+        $this->assertGuest();
     }
 
-    public function test_reference_seeder_assigns_customer_role_to_legacy_users_without_an_active_role(): void
+    public function test_customer_registration_endpoints_are_not_available(): void
     {
+        $this->get('/register')->assertNotFound();
+        $this->post('/register')->assertNotFound();
+        $this->assertGuest();
+    }
+
+    public function test_reference_seeder_only_creates_internal_roles(): void
+    {
+        $this->assertEqualsCanonicalizing([
+            ConstantHelper::ROLE_ADMIN,
+            ConstantHelper::ROLE_BRANCH_MANAGER,
+            ConstantHelper::ROLE_CASHIER,
+            ConstantHelper::ROLE_WAITER,
+            ConstantHelper::ROLE_KITCHEN,
+            ConstantHelper::ROLE_WAREHOUSE,
+        ], Role::query()->pluck('code')->all());
+    }
+
+    public function test_reference_seeder_removes_legacy_customer_role_and_disables_customer_only_accounts(): void
+    {
+        $customerRole = Role::query()->create([
+            'code' => 'CUSTOMER',
+            'name' => 'Khách hàng',
+            'is_system' => true,
+        ]);
+        $customerPermission = Permission::query()->create([
+            'code' => 'customer.profile.view',
+            'module' => 'customer',
+            'name' => 'Customer profile view',
+        ]);
+        DB::table('role_permissions')->insert([
+            'role_id' => $customerRole->getKey(),
+            'permission_id' => $customerPermission->getKey(),
+        ]);
         $user = User::query()->create([
             'username' => 'legacyuser',
             'full_name' => 'Legacy User',
             'password' => Hash::make('Password123!'),
             'status' => UserStatus::ACTIVE,
         ]);
+        UserRole::query()->create([
+            'user_id' => $user->getKey(),
+            'role_id' => $customerRole->getKey(),
+            'scope_type' => 'ALL',
+            'scope_id' => null,
+            'valid_from' => now()->subMinute(),
+        ]);
 
         $this->seed(ReferenceSeeder::class);
 
-        $this->assertTrue($user->fresh()->hasRole(ConstantHelper::ROLE_CUSTOMER));
-    }
-
-    public function test_registration_rejects_duplicate_username(): void
-    {
-        $this->createUser([
-            'username' => 'existingcustomer',
-            'full_name' => 'Existing Customer',
-            'password' => Hash::make('Password123!'),
-            'status' => UserStatus::ACTIVE,
-        ]);
-
-        $this->post('/register', [
-            'username' => 'existingcustomer',
-            'full_name' => 'Another Customer',
-            'password' => 'Password123!',
-            'password_confirmation' => 'Password123!',
-        ])->assertSessionHasErrors('username');
-
-        $this->assertGuest();
+        $legacyUser = User::withTrashed()->findOrFail($user->getKey());
+        $this->assertSame(UserStatus::INACTIVE, $legacyUser->status);
+        $this->assertNotNull($legacyUser->deleted_at);
+        $this->assertDatabaseMissing('roles', ['code' => 'CUSTOMER']);
+        $this->assertDatabaseMissing('permissions', ['code' => 'customer.profile.view']);
+        $this->assertDatabaseMissing('user_roles', ['user_id' => $user->getKey()]);
     }
 
     public function test_user_can_login_with_username(): void
@@ -290,6 +148,23 @@ class AuthFeatureTest extends TestCase
 
         $this->post('/login', [
             'login' => 'inactive',
+            'password' => 'Password123!',
+        ])->assertSessionHasErrors('login');
+
+        $this->assertGuest();
+    }
+
+    public function test_user_without_an_active_internal_role_cannot_login(): void
+    {
+        User::query()->create([
+            'username' => 'unassigned',
+            'full_name' => 'Unassigned User',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->post('/login', [
+            'login' => 'unassigned',
             'password' => 'Password123!',
         ])->assertSessionHasErrors('login');
 
@@ -365,6 +240,56 @@ class AuthFeatureTest extends TestCase
         $this->get('/users')->assertOk();
     }
 
+    public function test_user_list_can_be_searched_filtered_and_keeps_filters_in_pagination(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'userfilterviewer',
+            'full_name' => 'User Filter Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'users.view');
+
+        $role = Role::query()->create([
+            'code' => 'FILTER_STAFF',
+            'name' => 'Filter Staff',
+            'is_system' => false,
+        ]);
+
+        for ($index = 1; $index <= 16; $index++) {
+            $user = $this->createUser([
+                'username' => sprintf('filterstaff%02d', $index),
+                'full_name' => sprintf('Staff Person %02d', $index),
+                'email' => sprintf('staff.person.%02d@example.com', $index),
+                'password' => Hash::make('Password123!'),
+                'status' => UserStatus::ACTIVE,
+            ]);
+
+            UserRole::query()->create([
+                'user_id' => $user->id,
+                'role_id' => $role->id,
+                'scope_type' => 'ALL',
+                'scope_id' => null,
+                'valid_from' => now()->subMinute(),
+                'granted_by' => null,
+            ]);
+        }
+
+        $this->withoutVite();
+        $this->actingAs($viewer)
+            ->get('/users?q=staff.person.01%40example.com&role_id='.$role->id.'&status=active')
+            ->assertOk()
+            ->assertSee('filterstaff01')
+            ->assertDontSee('filterstaff02')
+            ->assertSee('Đặt lại');
+
+        $this->get('/users?q=Staff&role_id='.$role->id.'&status=active')
+            ->assertOk()
+            ->assertSee('q=Staff')
+            ->assertSee('role_id='.$role->id)
+            ->assertSee('status=active');
+    }
+
     public function test_user_can_create_account_and_assign_a_role_with_permissions(): void
     {
         $manager = $this->createUser([
@@ -375,12 +300,17 @@ class AuthFeatureTest extends TestCase
         ]);
         $this->grantPermission($manager, 'users.create');
         $this->grantPermission($manager, 'users.assign_roles');
+        $this->grantPermission($manager, 'users.delete');
 
         $role = Role::query()->create([
             'code' => 'TEST_STAFF',
             'name' => 'Test Staff',
             'is_system' => false,
         ]);
+
+        $this->withoutVite();
+        $this->actingAs($manager);
+        $this->get('/users/create')->assertOk();
 
         $this->actingAs($manager)->post('/users', [
             'username' => 'newstaff',
@@ -394,6 +324,59 @@ class AuthFeatureTest extends TestCase
         ])->assertRedirect('/users');
 
         $createdUser = User::query()->where('username', 'newstaff')->firstOrFail();
+        $this->assertDatabaseHas('user_roles', [
+            'user_id' => $createdUser->id,
+            'role_id' => $role->id,
+            'scope_type' => 'ALL',
+            'scope_id' => null,
+        ]);
+
+        $this->delete('/users/'.$createdUser->id)->assertMethodNotAllowed();
+        $this->assertDatabaseHas('users', ['id' => $createdUser->id]);
+    }
+
+    public function test_admin_can_create_an_account_and_assign_a_role(): void
+    {
+        $adminRole = Role::query()->where('code', ConstantHelper::ROLE_ADMIN)->firstOrFail();
+        $admin = $this->createUser([
+            'username' => 'accountadmin',
+            'full_name' => 'Account Admin',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        UserRole::query()->create([
+            'user_id' => $admin->id,
+            'role_id' => $adminRole->id,
+            'scope_type' => 'ALL',
+            'scope_id' => null,
+            'valid_from' => now()->subMinute(),
+            'granted_by' => null,
+        ]);
+
+        $role = Role::query()->create([
+            'code' => 'ADMIN_ASSIGNED_STAFF',
+            'name' => 'Admin Assigned Staff',
+            'is_system' => false,
+        ]);
+
+        $this->withoutVite();
+        $this->actingAs($admin)
+            ->get('/users')
+            ->assertOk()
+            ->assertSee('Thêm tài khoản mới');
+        $this->get('/users/create')->assertOk();
+
+        $this->post('/users', [
+            'username' => 'admincreated',
+            'full_name' => 'Admin Created',
+            'status' => UserStatus::ACTIVE->value,
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'assign_roles' => '1',
+            'role_ids' => [$role->id],
+        ])->assertRedirect('/users');
+
+        $createdUser = User::query()->where('username', 'admincreated')->firstOrFail();
         $this->assertDatabaseHas('user_roles', [
             'user_id' => $createdUser->id,
             'role_id' => $role->id,
@@ -452,6 +435,11 @@ class AuthFeatureTest extends TestCase
             'assign_permissions' => '1',
             'permission_ids' => [$firstPermission->id, $secondPermission->id],
         ])->assertRedirect('/roles');
+
+        $this->post('/roles', [
+            'code' => 'customer',
+            'name' => 'Customer',
+        ])->assertSessionHasErrors('code');
 
         $role = Role::query()->where('code', 'ORDER_VIEWER')->firstOrFail();
         $this->assertDatabaseHas('role_permissions', [
@@ -528,11 +516,11 @@ class AuthFeatureTest extends TestCase
     private function createUser(array $attributes): User
     {
         $user = User::query()->create($attributes);
-        $customerRole = Role::query()->where('code', ConstantHelper::ROLE_CUSTOMER)->firstOrFail();
+        $staffRole = Role::query()->where('code', ConstantHelper::ROLE_WAITER)->firstOrFail();
 
         UserRole::query()->create([
             'user_id' => $user->getKey(),
-            'role_id' => $customerRole->getKey(),
+            'role_id' => $staffRole->getKey(),
             'scope_type' => 'ALL',
             'scope_id' => null,
             'valid_from' => now()->subMinute(),

@@ -20,9 +20,9 @@ class ReferenceSeeder extends Seeder
     {
         $this->seedDepartments();
         $this->seedPermissions();
+        $this->removeLegacyCustomerRole();
         $this->seedRoles();
         $this->seedRolePermissions();
-        $this->assignCustomerRoleToUsersWithoutActiveRole();
     }
 
     // --------------------------------------------------------
@@ -108,12 +108,6 @@ class ReferenceSeeder extends Seeder
                 'code' => ConstantHelper::ROLE_WAREHOUSE,
                 'name' => 'Nhân viên kho',
                 'description' => 'Nhập xuất kho, kiểm kê, quản lý công thức',
-                'is_system' => true,
-            ],
-            [
-                'code' => ConstantHelper::ROLE_CUSTOMER,
-                'name' => 'Khách hàng',
-                'description' => 'Tài khoản khách hàng tự đăng ký',
                 'is_system' => true,
             ],
         ];
@@ -265,71 +259,49 @@ class ReferenceSeeder extends Seeder
                 ConstantHelper::PERM_REPORT_VIEW,
             ],
 
-            // CUSTOMER: quyền cơ bản cho người dùng tự đăng ký.
-            ConstantHelper::ROLE_CUSTOMER => [
-                ConstantHelper::PERM_PROFILE_VIEW,
-                ConstantHelper::PERM_PROFILE_UPDATE,
-                ConstantHelper::PERM_DASHBOARD_VIEW,
-            ],
         ];
     }
 
-    private function assignCustomerRoleToUsersWithoutActiveRole(): void
+    private function removeLegacyCustomerRole(): void
     {
         $roleId = DB::table(ConstantHelper::TABLE_ROLES)
-            ->where('code', ConstantHelper::ROLE_CUSTOMER)
+            ->where('code', 'CUSTOMER')
             ->value('id');
 
         if ($roleId === null) {
-            throw new \RuntimeException('The default customer role was not seeded.');
+            return;
         }
 
-        $usersWithoutActiveRole = DB::table(ConstantHelper::TABLE_USERS)
-            ->whereNull('deleted_at')
-            ->whereNotExists(function ($query): void {
-                $query->selectRaw('1')
-                    ->from(ConstantHelper::TABLE_USER_ROLES)
-                    ->whereColumn('user_roles.user_id', 'users.id')
-                    ->where('user_roles.valid_from', '<=', now())
-                    ->where(function ($validityQuery): void {
-                        $validityQuery
-                            ->whereNull('user_roles.valid_to')
-                            ->orWhere('user_roles.valid_to', '>=', now());
-                    });
-            })
-            ->pluck('id');
+        DB::transaction(function () use ($roleId): void {
+            DB::table(ConstantHelper::TABLE_USERS)
+                ->whereIn('id', function ($query) use ($roleId): void {
+                    $query->select('customer_assignments.user_id')
+                        ->from(ConstantHelper::TABLE_USER_ROLES.' as customer_assignments')
+                        ->where('customer_assignments.role_id', $roleId)
+                        ->whereNotExists(function ($otherRoleQuery) use ($roleId): void {
+                            $otherRoleQuery->selectRaw('1')
+                                ->from(ConstantHelper::TABLE_USER_ROLES.' as internal_assignments')
+                                ->whereColumn('internal_assignments.user_id', 'customer_assignments.user_id')
+                                ->where('internal_assignments.role_id', '!=', $roleId)
+                                ->where('internal_assignments.valid_from', '<=', now())
+                                ->where(fn ($validityQuery) => $validityQuery
+                                    ->whereNull('internal_assignments.valid_to')
+                                    ->orWhere('internal_assignments.valid_to', '>=', now()));
+                        });
+                })
+                ->update([
+                    'status' => 'inactive',
+                    'remember_token' => null,
+                    'deleted_at' => now(),
+                    'updated_at' => now(),
+                ]);
 
-        foreach ($usersWithoutActiveRole as $userId) {
-            $existingAssignment = DB::table(ConstantHelper::TABLE_USER_ROLES)
-                ->where('user_id', $userId)
-                ->where('role_id', $roleId)
-                ->where('scope_type', 'ALL')
-                ->whereNull('scope_id')
-                ->first();
-
-            if ($existingAssignment !== null) {
-                DB::table(ConstantHelper::TABLE_USER_ROLES)
-                    ->where('id', $existingAssignment->id)
-                    ->update([
-                        'valid_from' => now(),
-                        'valid_to' => null,
-                        'updated_at' => now(),
-                    ]);
-
-                continue;
-            }
-
-            DB::table(ConstantHelper::TABLE_USER_ROLES)->insert([
-                'user_id' => $userId,
-                'role_id' => $roleId,
-                'scope_type' => 'ALL',
-                'scope_id' => null,
-                'valid_from' => now(),
-                'valid_to' => null,
-                'granted_by' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
+            DB::table(ConstantHelper::TABLE_USER_ROLES)->where('role_id', $roleId)->delete();
+            DB::table(ConstantHelper::TABLE_PERMISSIONS)
+                ->where('module', 'customer')
+                ->orWhere('code', 'like', 'customer.%')
+                ->delete();
+            DB::table(ConstantHelper::TABLE_ROLES)->where('id', $roleId)->delete();
+        });
     }
 }

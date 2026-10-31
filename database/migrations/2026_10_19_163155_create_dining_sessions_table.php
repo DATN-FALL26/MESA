@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('session_tables')) {
+            return;
+        }
+
         Schema::create('dining_sessions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('table_id')->constrained('tables')->onDelete('cascade');
@@ -30,6 +34,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (Schema::hasTable('session_tables')) {
+            return;
+        }
+
         Schema::dropIfExists('dining_sessions');
     }
 };

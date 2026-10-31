@@ -14,10 +14,10 @@
     <!-- Scripts & Styles -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="h-full font-sans antialiased text-slate-800 bg-slate-50 flex">
+<body class="min-h-screen font-sans antialiased text-slate-800 bg-slate-50 lg:flex">
 
     <!-- SIDEBAR -->
-    <aside class="w-64 bg-slate-900 text-slate-200 flex flex-col shrink-0 min-h-screen border-r border-slate-800">
+    <aside id="mesa-sidebar" class="fixed inset-y-0 left-0 z-50 flex w-72 -translate-x-full flex-col border-r border-slate-800 bg-slate-900 text-slate-200 transition-transform duration-200 lg:static lg:min-h-screen lg:w-64 lg:shrink-0 lg:translate-x-0">
         <!-- Logo & Brand -->
         <div class="h-16 flex items-center gap-3 px-6 border-b border-slate-800/80 bg-slate-950/40">
             <div class="w-9 h-9 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-lg shadow-sm">
@@ -43,7 +43,7 @@
         <!-- Navigation Menu -->
         <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             <!-- Tổng quan -->
-            <a href="{{ url('/') }}" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors">
+            <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors">
                 <svg class="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
                 </svg>
@@ -95,7 +95,7 @@
                 <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Bán hàng & Vận hành</span>
             </div>
 
-            <a href="#" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors">
+            <a href="{{ route('tables.index') }}" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg {{ request()->routeIs('tables.*') ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-800/80' }} transition-colors">
                 <svg class="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
                 </svg>
@@ -114,40 +114,51 @@
         <div class="p-4 border-t border-slate-800 bg-slate-950/40 flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded-full bg-slate-700 text-slate-200 flex items-center justify-center font-semibold text-xs border border-slate-600">
-                    AD
+                    {{ strtoupper(substr(auth()->user()->full_name ?: auth()->user()->username, 0, 2)) }}
                 </div>
                 <div class="flex flex-col">
-                    <span class="text-xs font-semibold text-white">Quản trị viên</span>
-                    <span class="text-[10px] text-slate-400">admin@mesa.vn</span>
+                    <span class="max-w-36 truncate text-xs font-semibold text-white">{{ auth()->user()->full_name }}</span>
+                    <span class="text-[10px] text-slate-400">{{ auth()->user()->username }}</span>
                 </div>
             </div>
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit" class="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white" aria-label="Đăng xuất" title="Đăng xuất">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3-3H9m0 0 3-3m-3 3 3 3" />
+                    </svg>
+                </button>
+            </form>
         </div>
     </aside>
+    <button id="mesa-sidebar-backdrop" type="button" class="fixed inset-0 z-40 hidden bg-slate-950/50 lg:hidden" aria-label="Đóng menu"></button>
 
     <!-- MAIN WRAPPER -->
-    <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+    <div class="flex min-h-screen min-w-0 flex-1 flex-col">
         <!-- TOPBAR -->
-        <header class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+        <header class="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 shadow-2xs sm:px-6">
             <!-- Breadcrumbs / Quick Info -->
-            <div class="flex items-center gap-2 text-sm text-slate-500">
-                <span class="font-medium text-slate-900">{{ $headerTitle ?? 'Hệ thống Quản lý' }}</span>
+            <div class="flex min-w-0 items-center gap-3 text-sm text-slate-500">
+                <button id="mesa-sidebar-toggle" type="button" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 lg:hidden" aria-label="Mở menu" aria-expanded="false" aria-controls="mesa-sidebar">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+                </button>
+                <div class="min-w-0">
+                    <span class="block truncate font-semibold text-slate-900">{{ $headerTitle ?? 'Hệ thống Quản lý' }}</span>
                 @if(isset($headerSubtitle))
-                    <span class="text-slate-300">/</span>
-                    <span class="text-slate-600">{{ $headerSubtitle }}</span>
+                    <span class="hidden text-slate-300 sm:inline">/</span>
+                    <span class="hidden text-slate-600 sm:inline">{{ $headerSubtitle }}</span>
                 @endif
+                </div>
             </div>
 
             <!-- Right Actions: Low Stock Badge, Notifications, Settings -->
-            <div class="flex items-center gap-4">
-                <a href="{{ url('/inventory/ingredients?low_stock=1') }}" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors">
-                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                    <span>Cảnh báo tồn kho: <strong>2 món</strong></span>
-                </a>
-
-                <div class="h-5 w-px bg-slate-200"></div>
-
-                <div class="text-xs text-slate-500">
-                    Múi giờ: <span class="font-mono text-slate-700 font-medium">Asia/Ho_Chi_Minh</span>
+            <div class="flex shrink-0 items-center gap-3">
+                <div class="hidden text-right sm:block">
+                    <p class="text-xs font-semibold text-slate-800">{{ auth()->user()->full_name }}</p>
+                    <p class="text-[11px] text-slate-500">Nhân viên vận hành</p>
+                </div>
+                <div class="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
+                    {{ strtoupper(substr(auth()->user()->full_name ?: auth()->user()->username, 0, 1)) }}
                 </div>
             </div>
         </header>
@@ -157,10 +168,30 @@
 
 
         <!-- MAIN PAGE CONTENT -->
-        <main class="flex-1 p-6">
+        <main class="flex-1 p-4 sm:p-6 xl:p-8">
             {{ $slot }}
         </main>
     </div>
 
+    <script>
+        (() => {
+            const sidebar = document.getElementById('mesa-sidebar');
+            const backdrop = document.getElementById('mesa-sidebar-backdrop');
+            const toggle = document.getElementById('mesa-sidebar-toggle');
+
+            const setSidebarOpen = (open) => {
+                sidebar.classList.toggle('-translate-x-full', !open);
+                backdrop.classList.toggle('hidden', !open);
+                toggle.setAttribute('aria-expanded', String(open));
+            };
+
+            toggle.addEventListener('click', () => setSidebarOpen(toggle.getAttribute('aria-expanded') !== 'true'));
+            backdrop.addEventListener('click', () => setSidebarOpen(false));
+            window.addEventListener('resize', () => {
+                if (window.innerWidth >= 1024) setSidebarOpen(false);
+            });
+        })();
+    </script>
+    @stack('scripts')
 </body>
 </html>

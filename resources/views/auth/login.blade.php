@@ -100,12 +100,6 @@
                                 <label for="password" class="form-label text-secondary fw-semibold small mb-0">
                                     Mật khẩu
                                 </label>
-                                @if (Route::has('password.request'))
-                                    <a href="{{ route('password.request') }}"
-                                        class="text-decoration-none text-muted small hover-dark">
-                                        Quên mật khẩu?
-                                    </a>
-                                @endif
                             </div>
 
                             <div class="input-group">
@@ -132,6 +126,10 @@
                                     Ghi nhớ đăng nhập
                                 </label>
                             </div>
+
+                            <a href="{{ route('password.request') }}" class="small text-decoration-none">
+                                Quên mật khẩu?
+                            </a>
 
                         </div>
 

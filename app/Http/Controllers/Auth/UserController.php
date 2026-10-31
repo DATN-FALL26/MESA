@@ -19,26 +19,47 @@ use Illuminate\View\View;
 
 class UserController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $users = User::query()
-            ->with(['department', 'activeRoles'])
-            ->orderBy('full_name')
-            ->paginate(15);
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:150'],
+            'role_id' => ['nullable', 'integer', Rule::exists(ConstantHelper::TABLE_ROLES, 'id')],
+            'status' => ['nullable', Rule::enum(UserStatus::class)],
+        ]);
 
-        return view('users.index', compact('users'));
+        $query = User::query()
+            ->with(['department', 'activeRoles'])
+            ->when($filters['q'] ?? null, function ($query, string $search): void {
+                $query->where(function ($query) use ($search): void {
+                    $query
+                        ->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('username', 'like', "%{$search}%");
+                });
+            })
+            ->when($filters['role_id'] ?? null, function ($query, $roleId): void {
+                $query->whereHas('activeRoles', fn ($roleQuery) => $roleQuery->where('roles.id', $roleId));
+            })
+            ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
+            ->orderBy('full_name');
+
+        $users = $query->paginate(15)->withQueryString();
+        $roles = Role::query()->orderBy('name')->get(['id', 'name']);
+        $statuses = UserStatus::cases();
+
+        return view('users.index', compact('users', 'roles', 'statuses', 'filters'));
     }
 
     public function create(): View
     {
-        abort_unless(auth()->user()->hasPermission(ConstantHelper::PERM_USERS_ASSIGN_ROLES), 403);
+        abort_unless($this->canCreateAccounts(auth()->user()), 403);
 
         return $this->formView(new User, 'users.form');
     }
 
     public function store(Request $request): RedirectResponse
     {
-        abort_unless($request->user()->hasPermission(ConstantHelper::PERM_USERS_ASSIGN_ROLES), 403);
+        abort_unless($this->canCreateAccounts($request->user()), 403);
 
         $validated = $this->validatedUser($request);
 
@@ -67,7 +88,7 @@ class UserController extends Controller
         $selectedRoleIds = $user->activeRoles()->pluck('roles.id')->all();
 
         if ($selectedRoleIds === []) {
-            abort_unless(auth()->user()->hasPermission(ConstantHelper::PERM_USERS_ASSIGN_ROLES), 403);
+            abort_unless($this->canAssignRoles(auth()->user()), 403);
         }
 
         return $this->formView($user, 'users.form', $selectedRoleIds);
@@ -75,7 +96,7 @@ class UserController extends Controller
 
     public function update(Request $request, User $user): RedirectResponse
     {
-        $canAssignRoles = $request->user()->hasPermission(ConstantHelper::PERM_USERS_ASSIGN_ROLES);
+        $canAssignRoles = $this->canAssignRoles($request->user());
 
         if (! $canAssignRoles && ! $user->activeRoles()->exists()) {
             abort(403);
@@ -116,17 +137,6 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', 'Đã cập nhật tài khoản.');
     }
 
-    public function destroy(Request $request, User $user): RedirectResponse
-    {
-        if ($request->user()->is($user)) {
-            return back()->withErrors(['user' => 'Không thể xóa tài khoản đang đăng nhập.']);
-        }
-
-        $user->delete();
-
-        return redirect()->route('users.index')->with('success', 'Đã xóa tài khoản.');
-    }
-
     /**
      * @param  list<int>|null  $selectedRoleIds
      */
@@ -146,8 +156,21 @@ class UserController extends Controller
             'departments' => $departments,
             'statuses' => UserStatus::cases(),
             'selectedRoleIds' => $selectedRoleIds ?? [],
-            'canAssignRoles' => auth()->user()->hasPermission(ConstantHelper::PERM_USERS_ASSIGN_ROLES),
+            'canAssignRoles' => $this->canAssignRoles(auth()->user()),
         ]);
+    }
+
+    private function canCreateAccounts(User $user): bool
+    {
+        return $user->hasRole(ConstantHelper::ROLE_ADMIN)
+            || ($user->hasPermission(ConstantHelper::PERM_USERS_CREATE)
+                && $user->hasPermission(ConstantHelper::PERM_USERS_ASSIGN_ROLES));
+    }
+
+    private function canAssignRoles(User $user): bool
+    {
+        return $user->hasRole(ConstantHelper::ROLE_ADMIN)
+            || $user->hasPermission(ConstantHelper::PERM_USERS_ASSIGN_ROLES);
     }
 
     /**
