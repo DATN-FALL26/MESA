@@ -1,92 +1,116 @@
-@extends('layouts.app')
+@extends('layouts.auth')
 
 @section('content')
-<div class="container mx-auto px-4 py-6">
-
-    <!-- TIÊU ĐỀ & NÚT QUAY LẠI -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+<div class="space-y-6">
+    <!-- Header Báo cáo -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-gray-800">📈 Báo Cáo Chi Tiết Doanh Thu</h1>
-            <p class="text-xs text-gray-500 mt-1">Thống kê doanh thu, số lượng tô phở và các món bán chạy theo khoảng thời gian</p>
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Báo Cáo Chi Tiết</h1>
+            <p class="text-sm text-gray-500 mt-0.5">Thống kê doanh thu, sản lượng và top món ăn theo khoảng thời gian tùy chọn.</p>
         </div>
-        <a href="{{ route('admin.dashboard') }}" class="bg-gray-800 text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-gray-900 transition shadow-sm">
-            ← Quay lại Dashboard
-        </a>
+        <div class="flex items-center gap-3">
+            <a href="{{ route('admin.dashboard') }}" class="inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold bg-white text-gray-700 border border-gray-200 shadow-sm hover:bg-gray-50 transition">
+                ← Quay lại Dashboard
+            </a>
+        </div>
     </div>
 
-    <!-- FORM LỌC KHOẢNG THỜI GIAN -->
-    <div class="bg-white p-5 rounded-lg shadow-sm border mb-6">
-        <form method="GET" action="{{ route('admin.reports') }}" class="flex flex-wrap items-end gap-4">
-            <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Từ ngày:</label>
-                <input type="date" name="from_date" value="{{ $fromDate }}" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+    <!-- Bộ lọc Khoảng thời gian -->
+    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+        <form action="{{ route('admin.reports') }}" method="GET" class="flex flex-col md:flex-row items-end md:items-center justify-between gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full md:w-auto flex-1">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Từ ngày</label>
+                    <input type="date" name="from_date" value="{{ $fromDate }}"
+                           class="bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Đến ngày</label>
+                    <input type="date" name="to_date" value="{{ $toDate }}"
+                           class="bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 outline-none transition">
+                </div>
             </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Đến ngày:</label>
-                <input type="date" name="to_date" value="{{ $toDate }}" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
-            </div>
-            <div>
-                <button type="submit" class="bg-red-600 text-white px-5 py-2 rounded-lg font-semibold text-sm hover:bg-red-700 transition shadow-sm">
-                    🔍 Lọc dữ liệu
+            <div class="flex items-center gap-2 w-full md:w-auto">
+                <button type="submit" class="w-full md:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl shadow-sm shadow-indigo-100 transition">
+                    Lọc dữ liệu
                 </button>
             </div>
         </form>
     </div>
 
-    <!-- 2 Ô KPI TỔNG QUAN KỲ BÁO CÁO -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-red-600 flex items-center justify-between">
-            <div>
-                <p class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Tổng doanh thu kỳ báo cáo</p>
-                <h2 class="text-3xl font-black text-gray-900 mt-1">{{ number_format($tongDoanhThuKy ?? 0) }} <span class="text-lg font-bold text-gray-600">VND</span></h2>
+    <!-- 2 Thẻ Thống Kê Tổng Quan Kỳ -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-indigo-100 relative overflow-hidden transition hover:shadow-md">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">Tổng Doanh Thu Kỳ</span>
+                <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 text-lg">💰</div>
             </div>
-            <div class="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center text-2xl font-bold">💰</div>
+            <div class="text-3xl font-extrabold text-gray-900">{{ number_format($tongDoanhThuKy ?? 0) }} đ</div>
+            <p class="text-xs text-gray-400 mt-2">Từ ngày {{ date('d/m/Y', strtotime($fromDate)) }} đến {{ date('d/m/Y', strtotime($toDate)) }}</p>
         </div>
 
-        <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-600 flex items-center justify-between">
-            <div>
-                <p class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Tổng số lượng tô phở đã bán</p>
-                <h2 class="text-3xl font-black text-gray-900 mt-1">{{ number_format($tongSoTo ?? 0) }} <span class="text-lg font-bold text-gray-600">tô</span></h2>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 relative overflow-hidden transition hover:shadow-md">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg">Tổng Số Lượng Bán Ra</span>
+                <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 text-lg">🍜</div>
             </div>
-            <div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-2xl font-bold">🍜</div>
+            <div class="text-3xl font-extrabold text-gray-900">{{ number_format($tongSoTo ?? 0) }} <span class="text-lg font-normal text-gray-500">tô</span></div>
+            <p class="text-xs text-gray-400 mt-2">Tổng sản lượng phục vụ trong kỳ</p>
         </div>
     </div>
 
-    <!-- BẢNG TOP MÓN ĂN BÁN CHẠY -->
-    <div class="bg-white p-6 rounded-lg shadow-sm border">
-        <h3 class="font-bold text-gray-800 text-base mb-4 flex items-center gap-2">
-            <span>🏆 Top món ăn bán chạy trong kỳ</span>
-        </h3>
+    <!-- Bảng Chi Tiết Top Món Ăn Trong Kỳ -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h3 class="font-bold text-gray-900 text-base">🔥 Top Món Ăn Bán Chạy Trong Kỳ</h3>
+                <p class="text-xs text-gray-400">Xếp hạng sản phẩm theo số lượng tiêu thụ và doanh thu đóng góp</p>
+            </div>
+        </div>
 
         <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-sm">
+            <table class="w-full text-left border-collapse">
                 <thead>
-                    <tr class="bg-gray-50 border-b text-gray-600">
-                        <th class="p-3 font-semibold">STT</th>
-                        <th class="p-3 font-semibold">Tên món ăn</th>
-                        <th class="p-3 font-semibold text-center">Số lượng bán</th>
-                        <th class="p-3 font-semibold text-right">Tổng doanh thu</th>
+                    <tr class="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        <th class="pb-3 pl-2">Thứ hạng</th>
+                        <th class="pb-3">Tên món ăn</th>
+                        <th class="pb-3">Đơn giá niêm yết</th>
+                        <th class="pb-3">Tổng số lượng bán</th>
+                        <th class="pb-3 text-right pr-2">Tổng doanh thu</th>
                     </tr>
                 </thead>
-                <tbody>
-                    @forelse($topMonAn ?? [] as $index => $item)
-                    <tr class="border-b hover:bg-gray-50/80 transition-colors">
-                        <td class="p-3 font-bold text-gray-500">#{{ $index + 1 }}</td>
-                        <td class="p-3 font-semibold text-gray-900">{{ data_get($item, 'dish.name', 'Món ăn #' . data_get($item, 'dish_id')) }}</td>
-                        <td class="p-3 text-center font-bold text-blue-600">{{ data_get($item, 'total_qty', 0) }} tô</td>
-                        <td class="p-3 text-right font-bold text-red-600">{{ number_format(data_get($item, 'total_revenue', 0)) }} đ</td>
-                    </tr>
+                <tbody class="divide-y divide-gray-50 text-sm">
+                    @forelse($topMonAn as $index => $item)
+                        <tr class="hover:bg-gray-50/50 transition">
+                            <td class="py-3.5 pl-2 font-bold text-gray-700">
+                                @if($index == 0)
+                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-xs">#1</span>
+                                @elseif($index == 1)
+                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 text-gray-700 text-xs">#2</span>
+                                @elseif($index == 2)
+                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-orange-100 text-orange-700 text-xs">#3</span>
+                                @else
+                                    <span class="text-gray-500 pl-2">#{{ $index + 1 }}</span>
+                                @endif
+                            </td>
+                            <td class="py-3.5 font-semibold text-gray-900">{{ $item->dish->name ?? 'Không rõ' }}</td>
+                            <td class="py-3.5 text-gray-600">{{ number_format($item->dish->price ?? 0) }} đ</td>
+                            <td class="py-3.5 font-medium text-indigo-600">{{ number_format($item->total_qty) }} tô</td>
+                            <td class="py-3.5 text-right pr-2 font-bold text-emerald-600">{{ number_format($item->total_revenue) }} đ</td>
+                        </tr>
                     @empty
-                    <tr>
-                        <td colspan="4" class="p-8 text-center text-gray-400 italic">
-                            Chưa có dữ liệu thống kê món ăn trong khoảng thời gian này.
-                        </td>
-                    </tr>
+                        <tr>
+                            <td colspan="5" class="py-12 text-center text-gray-400 text-sm">
+                                <div class="flex flex-col items-center justify-center">
+                                    <span class="text-3xl mb-2">📊</span>
+                                    <span>Không có dữ liệu báo cáo trong khoảng thời gian này.</span>
+                                </div>
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
     </div>
-
 </div>
 @endsection
