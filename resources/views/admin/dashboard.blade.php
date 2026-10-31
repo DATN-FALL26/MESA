@@ -4,10 +4,10 @@
 <div class="space-y-6">
     <!-- Header Dashboard -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
+        <!-- <div>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
             <p class="text-sm text-gray-500 mt-0.5">Hệ thống giám sát kinh doanh và vận hành theo chi nhánh thời gian thực.</p>
-        </div>
+        </div> -->
         <div class="flex items-center gap-3">
             <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
                 <span class="w-2 h-2 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
