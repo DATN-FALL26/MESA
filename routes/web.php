@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\UserController;
 use App\Http\Controllers\Kitchen\KitchenDisplayController;
 use App\Http\Controllers\Kitchen\ServeController;
 use App\Http\Controllers\PublicDashboardController;
+use App\Http\Controllers\table\TableController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DashboardController;
 // use Symfony\Component\Routing\Router;
@@ -79,6 +80,10 @@ Route::get('/dashboard', [PublicDashboardController::class, 'show'])->name('dash
 | Đã đăng nhập
 */
 Route::middleware('auth')->group(function () {
+    Route::get('/tables', [TableController::class, 'index'])
+        ->middleware('permission:table.view')
+        ->name('tables.index');
+
     // Đăng xuất hệ thống
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 

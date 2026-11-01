@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Events\Inventory\OrderItemCancelled;
+use App\Events\Kitchen\KitchenTicketItemStatusChanged;
+use App\Listeners\Inventory\DeductStockWhenKitchenItemReady;
+use App\Listeners\Inventory\ReturnStockWhenOrderItemCancelled;
+use App\Models\OrderItem;
+use App\Observers\OrderItemObserver;
 use App\Repositories\Contracts\IngredientRepositoryInterface;
 use App\Repositories\Contracts\PurchaseOrderRepositoryInterface;
 use App\Repositories\Contracts\RecipeRepositoryInterface;
@@ -18,6 +24,7 @@ use App\Repositories\Eloquent\EloquentStockAdjustmentRepository;
 use App\Repositories\Eloquent\EloquentStockLevelRepository;
 use App\Repositories\Eloquent\EloquentStockMovementRepository;
 use App\Repositories\Eloquent\EloquentSupplierRepository;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 class InventoryServiceProvider extends ServiceProvider
@@ -68,6 +75,18 @@ class InventoryServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Đăng ký Event Listeners cho tự động trừ kho và hoàn kho (Task 6.1 & 6.2)
+        Event::listen(
+            KitchenTicketItemStatusChanged::class,
+            DeductStockWhenKitchenItemReady::class
+        );
+
+        Event::listen(
+            OrderItemCancelled::class,
+            ReturnStockWhenOrderItemCancelled::class
+        );
+
+        // Đăng ký Observer trên OrderItem
+        OrderItem::observe(OrderItemObserver::class);
     }
 }
