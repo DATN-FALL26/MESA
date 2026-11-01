@@ -20,11 +20,12 @@
     $selectedTableStatus = $selectedTable ? $tableStatusValue($selectedTable) : null;
 @endphp
 
-@component('layouts.app', [
-    'title' => 'Quản lý bàn',
-    'headerTitle' => 'Bán hàng & Vận hành',
-    'headerSubtitle' => 'Quản lý sơ đồ bàn',
-])
+@extends('layouts.auth')
+
+@section('title', 'Quản lý bàn | MESA')
+@section('heading', 'Quản lý sơ đồ bàn')
+
+@section('content')
     <div class="mx-auto max-w-[1600px] space-y-6" data-table-manager>
         <section class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -185,9 +186,7 @@
                             <div data-detail-session class="{{ $openSessionsByTableId->has($selectedTable?->id ?? 0) ? '' : 'hidden ' }}mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3">
                                 <p class="text-sm font-semibold text-emerald-950">Phiên #<span data-detail-session-id>{{ $openSessionsByTableId->get($selectedTable?->id ?? 0)?->id }}</span></p>
                                 <p class="mt-1 text-xs text-emerald-900"><span data-detail-guest-count>{{ $openSessionsByTableId->get($selectedTable?->id ?? 0)?->guest_count }}</span> khách · Nhân viên: <span data-detail-employee>{{ $openSessionsByTableId->get($selectedTable?->id ?? 0)?->openedByUser?->full_name ?? '—' }}</span></p>
-                                <button type="button" data-transfer-table class="mt-3 w-full rounded-lg border border-emerald-800 px-3 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-100">Chuyển sang bàn khác</button>
-                                <button type="button" data-close-session class="mt-3 w-full rounded-lg bg-emerald-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-950 disabled:cursor-wait disabled:opacity-60">Đóng phiên, trả bàn trống</button>
-                                <p data-session-error class="mt-2 hidden text-xs font-medium text-rose-700" role="alert"></p>
+                                <p class="mt-2 text-xs text-emerald-800">Nhân viên phục vụ quản lý phiên dùng bữa.</p>
                             </div>
                             <div data-transfer-history class="mt-4 border-t border-slate-200 pt-3">
                                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-800">Lịch sử chuyển bàn gần đây</p>
@@ -217,10 +216,8 @@
                             </div>
                             <div class="mt-2 grid grid-cols-2 gap-2">
                                 <button type="button" data-edit-table class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Chỉnh sửa</button>
-                                <button type="button" data-open-table class="{{ $selectedTable && $selectedTable->status === \App\Enums\TableStatus::AVAILABLE ? '' : 'hidden ' }}rounded-xl bg-emerald-800 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-900">Mở phiên</button>
                             </div>
                         </div>
-                        <p class="mt-3 text-xs leading-5 text-slate-500">Bàn đang sử dụng hoặc đã đặt không thể mở phiên mới.</p>
                     </div>
 
                     <div data-detail-empty @class(['hidden' => (bool) $selectedTable]) class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
@@ -233,8 +230,6 @@
     </div>
 
     @include('tables.admin.partials.table-form-modal')
-    @include('tables.pos.partials.open-session-modal')
-    @include('tables.pos.partials.transfer-session-modal')
 
     @push('scripts')
         <script>
@@ -250,12 +245,7 @@
                 const detail = manager.querySelector('[data-table-detail]');
                 const detailEmpty = manager.querySelector('[data-detail-empty]');
                 const formModal = document.querySelector('[data-modal="table-form"]');
-                const openModal = document.querySelector('[data-modal="open-session"]');
-                const transferModal = document.querySelector('[data-modal="transfer-session"]');
                 const tableForm = formModal.querySelector('[data-table-form]');
-                const openSessionForm = openModal.querySelector('[data-open-session-form]');
-                const transferForm = transferModal.querySelector('[data-transfer-form]');
-                const transferTarget = transferForm.elements.namedItem('target_table_id');
                 const statusLabels = {
                     available: 'Trống',
                     occupied: 'Đang dùng',
@@ -288,9 +278,7 @@
                 const hideModal = (modal) => {
                     modal.classList.add('hidden');
                     modal.classList.remove('flex');
-                    if ([formModal, openModal, transferModal].every((item) => item.classList.contains('hidden'))) {
-                        document.body.classList.remove('overflow-hidden');
-                    }
+                    document.body.classList.remove('overflow-hidden');
                 };
 
                 const setError = (element, message = '') => {
@@ -383,7 +371,6 @@
                         historyList.append(item);
                     });
                     historyEmpty.classList.toggle('hidden', transferHistory.length > 0);
-                    detail.querySelector('[data-open-table]').classList.toggle('hidden', card.dataset.status !== 'available');
                 };
 
                 const applyFilters = () => {
@@ -442,48 +429,6 @@
                     return payload;
                 };
 
-                const openSessionForTable = async (card) => {
-                    if (!card || card.dataset.status !== 'available') return;
-                    updateDetail(card);
-                    openSessionForm.reset();
-                    openSessionForm.elements.namedItem('guest_count').value = 2;
-                    setError(openModal.querySelector('[data-open-error]'));
-                    openModal.querySelector('[data-open-title]').textContent = `Mở phiên - bàn ${card.dataset.code}`;
-                    showModal(openModal);
-                    const employeeSelect = openSessionForm.elements.namedItem('opened_by');
-                    employeeSelect.innerHTML = '<option value="">Tài khoản đang đăng nhập</option>';
-                    try {
-                        const response = await fetch(@json(route('api.dining-sessions.employees')), { headers: { Accept: 'application/json' } });
-                        const result = await readJson(response);
-                        result.data.forEach((employee) => {
-                            const option = document.createElement('option');
-                            option.value = employee.id;
-                            option.textContent = employee.full_name;
-                            employeeSelect.append(option);
-                        });
-                    } catch (error) {
-                        setError(openModal.querySelector('[data-open-error]'), error.message);
-                    }
-                };
-
-                const openTransferForTable = (card) => {
-                    if (!card?.dataset.sessionId) return;
-                    transferForm.reset();
-                    setError(transferModal.querySelector('[data-transfer-error]'));
-                    transferModal.querySelector('[data-transfer-title]').textContent = `Chuyển phiên #${card.dataset.sessionId} từ bàn ${card.dataset.code}`;
-                    transferTarget.replaceChildren(new Option('Chọn bàn đích', ''));
-                    const availableTables = cards.filter((item) => item !== card && item.dataset.status === 'available');
-                    availableTables.forEach((table) => {
-                        transferTarget.append(new Option(
-                            `${table.dataset.code} · ${table.dataset.seats} chỗ · ${table.dataset.areaName}`,
-                            table.dataset.tableId,
-                        ));
-                    });
-                    transferModal.querySelector('[data-transfer-no-target]').classList.toggle('hidden', availableTables.length > 0);
-                    transferModal.querySelector('[data-transfer-submit]').disabled = availableTables.length === 0;
-                    showModal(transferModal);
-                };
-
                 areaFilters.forEach((button) => button.addEventListener('click', () => {
                     activeArea = button.dataset.areaFilter;
                     areaFilters.forEach((item) => {
@@ -507,48 +452,6 @@
                 manager.querySelectorAll('[data-add-table]').forEach((button) => button.addEventListener('click', () => openFormForTable()));
                 manager.querySelector('[data-edit-table]')?.addEventListener('click', () => {
                     if (selectedCard) openFormForTable(selectedCard);
-                });
-                manager.querySelector('[data-open-table]')?.addEventListener('click', () => openSessionForTable(selectedCard));
-                detail.querySelector('[data-transfer-table]').addEventListener('click', () => openTransferForTable(selectedCard));
-                detail.querySelector('[data-close-session]').addEventListener('click', async (event) => {
-                    if (!selectedCard?.dataset.sessionId) return;
-                    if (!window.confirm(`Đóng phiên #${selectedCard.dataset.sessionId} và trả bàn ${selectedCard.dataset.code} về trạng thái Trống?`)) return;
-                    const button = event.currentTarget;
-                    button.disabled = true;
-                    setError(detail.querySelector('[data-session-error]'));
-                    try {
-                        const response = await fetch(`/api/tables/${selectedCard.dataset.tableId}/dining-session/close`, {
-                            method: 'POST',
-                            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                        });
-                        await readJson(response);
-                        window.location.reload();
-                    } catch (error) {
-                        setError(detail.querySelector('[data-session-error]'), error.message);
-                    } finally {
-                        button.disabled = false;
-                    }
-                });
-
-                transferForm.addEventListener('submit', async (event) => {
-                    event.preventDefault();
-                    if (!selectedCard?.dataset.sessionId || !transferTarget.value) return;
-                    const submitButton = transferModal.querySelector('[data-transfer-submit]');
-                    submitButton.disabled = true;
-                    setError(transferModal.querySelector('[data-transfer-error]'));
-                    try {
-                        const response = await fetch(`/api/tables/${selectedCard.dataset.tableId}/dining-session/transfer`, {
-                            method: 'POST',
-                            headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                            body: JSON.stringify({ target_table_id: Number(transferTarget.value) }),
-                        });
-                        await readJson(response);
-                        window.location.reload();
-                    } catch (error) {
-                        setError(transferModal.querySelector('[data-transfer-error]'), error.message);
-                    } finally {
-                        submitButton.disabled = transferTarget.options.length <= 1;
-                    }
                 });
 
                 manager.querySelector('[data-refresh-tables]').addEventListener('click', async (event) => {
@@ -628,43 +531,14 @@
                     }
                 });
 
-                openSessionForm.addEventListener('submit', async (event) => {
-                    event.preventDefault();
-                    if (!selectedCard) return;
-                    const submitButton = openModal.querySelector('[data-open-submit]');
-                    submitButton.disabled = true;
-                    setError(openModal.querySelector('[data-open-error]'));
-                    try {
-                        const response = await fetch(@json(route('api.dining-sessions.store')), {
-                            method: 'POST',
-                            headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                            body: JSON.stringify({
-                                table_id: Number(selectedCard.dataset.tableId),
-                                guest_count: Number(openSessionForm.elements.namedItem('guest_count').value),
-                                opened_by: openSessionForm.elements.namedItem('opened_by').value || null,
-                            }),
-                        });
-                        await readJson(response);
-                        window.location.reload();
-                    } catch (error) {
-                        setError(openModal.querySelector('[data-open-error]'), error.message);
-                    } finally {
-                        submitButton.disabled = false;
-                    }
-                });
-
                 document.querySelectorAll('[data-modal-close]').forEach((button) => button.addEventListener('click', () => {
                     hideModal(button.closest('[data-modal]'));
                 }));
-                [formModal, openModal, transferModal].forEach((modal) => modal.addEventListener('click', (event) => {
-                    if (event.target === modal) hideModal(modal);
-                }));
+                formModal.addEventListener('click', (event) => {
+                    if (event.target === formModal) hideModal(formModal);
+                });
                 document.addEventListener('keydown', (event) => {
-                    if (event.key === 'Escape') {
-                        hideModal(formModal);
-                        hideModal(openModal);
-                        hideModal(transferModal);
-                    }
+                    if (event.key === 'Escape') hideModal(formModal);
                 });
 
                 updateDetail(selectedCard);
@@ -673,4 +547,4 @@
             })();
         </script>
     @endpush
-@endcomponent
+@endsection

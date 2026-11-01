@@ -448,7 +448,7 @@ class SampleDataSeeder extends Seeder
             ],
         ];
 
-        $hashedPassword = Hash::make('password');
+        $hashedPassword = Hash::make('12345678');
         $pinHash = Hash::make('123456');
 
         foreach ($users as $userData) {

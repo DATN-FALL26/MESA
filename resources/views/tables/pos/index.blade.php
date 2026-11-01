@@ -20,11 +20,12 @@
     $selectedTableStatus = $selectedTable ? $tableStatusValue($selectedTable) : null;
 @endphp
 
-@component('layouts.app', [
-    'title' => 'Bàn phục vụ',
-    'headerTitle' => 'Bán hàng & Vận hành',
-    'headerSubtitle' => 'Điểm bán hàng cho nhân viên',
-])
+@extends('layouts.auth')
+
+@section('title', 'Bàn phục vụ | MESA')
+@section('heading', 'Bàn phục vụ')
+
+@section('content')
     <div class="mx-auto max-w-[1600px] space-y-6" data-table-manager>
         <section class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -588,4 +589,4 @@
             })();
         </script>
     @endpush
-@endcomponent
+@endsection

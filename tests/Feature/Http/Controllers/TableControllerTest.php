@@ -46,6 +46,11 @@ class TableControllerTest extends TestCase
             ->assertSeeText('A01')
             ->assertSeeText('Khu A')
             ->assertSeeText('Mở phiên')
+            ->assertSeeText('Bàn phục vụ')
+            ->assertSeeText('Quản trị hệ thống')
+            ->assertSee(route('tables.index'), false)
+            ->assertSee('name="csrf-token"', false)
+            ->assertDontSeeText('MESA POS')
             ->assertDontSee('data-modal="table-form"', false);
     }
 
@@ -59,7 +64,29 @@ class TableControllerTest extends TestCase
             ->get('/tables')
             ->assertOk()
             ->assertViewIs('tables.admin.index')
+            ->assertSeeText('Quản lý sơ đồ bàn')
+            ->assertSeeText('Quản trị hệ thống')
+            ->assertSee(route('tables.index'), false)
+            ->assertSee('name="csrf-token"', false)
+            ->assertDontSeeText('MESA POS')
+            ->assertDontSeeText('Mở phiên')
+            ->assertDontSeeText('Đóng phiên, trả bàn trống')
+            ->assertDontSeeText('Chuyển sang bàn khác')
             ->assertSee('data-modal="table-form"', false);
+    }
+
+    public function test_table_map_is_linked_from_the_inventory_layout(): void
+    {
+        $table = $this->createTable('A01');
+        $admin = $this->createAdmin($table->branch);
+
+        $this->actingAs($admin)
+            ->withSession(['branch_id' => $table->branch_id])
+            ->withoutVite()
+            ->get('/inventory/adjustments')
+            ->assertOk()
+            ->assertSeeText('POS & Sơ đồ bàn')
+            ->assertSee(route('tables.index'), false);
     }
 
     public function test_table_map_reports_open_sessions_as_occupied(): void
@@ -75,11 +102,34 @@ class TableControllerTest extends TestCase
             ->assertOk()
             ->assertSeeText('Phiên #'.$session->id)
             ->assertSeeText('2 khách')
+            ->assertSeeText('Chuyển sang bàn khác')
+            ->assertSeeText('Đóng phiên, trả bàn trống')
             ->assertViewHas('tables', function ($areas) use ($table): bool {
                 $renderedTable = $areas->flatten()->firstWhere('id', $table->id);
 
                 return $renderedTable?->status === TableStatus::OCCUPIED;
             });
+    }
+
+    public function test_admin_can_view_an_open_session_without_session_actions(): void
+    {
+            $table = $this->createTable('A01');
+            $waiter = $this->createWaiter($table->branch);
+            $session = $this->createOpenSession($table, $waiter);
+            $admin = $this->createAdmin($table->branch);
+
+            $this->actingAs($admin)
+                ->withSession(['branch_id' => $table->branch_id])
+                ->withoutVite()
+                ->get('/tables')
+                ->assertOk()
+                ->assertSeeText('Phiên #'.$session->id)
+                ->assertSeeText($waiter->full_name)
+                ->assertDontSeeText('Mở phiên')
+                ->assertDontSeeText('Đóng phiên, trả bàn trống')
+                ->assertDontSeeText('Chuyển sang bàn khác')
+                ->assertDontSee('data-modal="open-session"', false)
+                ->assertDontSee('data-modal="transfer-session"', false);
     }
 
     public function test_table_map_shows_closed_session_transfer_history_and_hides_other_branches(): void

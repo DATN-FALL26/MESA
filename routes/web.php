@@ -12,11 +12,15 @@ use App\Http\Controllers\PublicDashboardController;
 use App\Http\Controllers\table\TableController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DashboardController;
-
 // use Symfony\Component\Routing\Router;
 
+
+Route::prefix('admin')->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+    Route::get('/reports', [DashboardController::class, 'reports'])->name('admin.reports');
+    Route::get('/api/revenue', [DashboardController::class, 'getRevenueApi'])->name('admin.api.revenue');
+});
 /*
-|--------------------------------------------------------------------------
 | Root
 |--------------------------------------------------------------------------
 | Điều hướng mặc định khi truy cập hệ thống
@@ -206,3 +210,18 @@ Route::middleware('auth')->prefix('kitchen')->name('kitchen.')->group(function (
         Route::post('/orders/{order}/served', [ServeController::class, 'markServed'])->name('served');
     });
 });
+
+
+/*
+    |--------------------------------------------------------------------------
+    | Phân hệ Kho & Định lượng (Module 07)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('inventory')->name('inventory.')->group(function () {
+        Route::view('/ingredients', 'inventory.ingredients')->name('ingredients');
+        Route::view('/suppliers', 'inventory.suppliers')->name('suppliers');
+        Route::view('/recipes', 'inventory.recipes')->name('recipes');
+        Route::view('/stock-movements', 'inventory.stock-movements')->name('stock-movements');
+        Route::view('/purchase-orders', 'inventory.purchase-orders')->name('purchase-orders');
+        Route::view('/adjustments', 'inventory.adjustments')->name('adjustments');
+    });
