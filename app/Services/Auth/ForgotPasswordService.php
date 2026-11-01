@@ -7,6 +7,7 @@ namespace App\Services\Auth;
 use App\Enums\UserStatus;
 use App\Mail\Auth\ForgotPasswordOtpMail;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -30,6 +31,22 @@ class ForgotPasswordService
     private const SEND_IP_TTL_SECONDS = 3600;
 
     private const RESET_TICKET_TTL_SECONDS = 600;
+
+    public function otpExpiresAt(string $email): ?int
+    {
+        $email = mb_strtolower(trim($email));
+        $resetRecord = DB::table('password_reset_tokens')
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->first(['created_at']);
+
+        if (! $resetRecord?->created_at) {
+            return null;
+        }
+
+        return Carbon::parse($resetRecord->created_at)
+            ->addSeconds(self::OTP_TTL_SECONDS)
+            ->getTimestampMs();
+    }
 
     public function sendOtp(string $email, string $ipAddress): void
     {

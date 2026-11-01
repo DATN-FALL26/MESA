@@ -57,6 +57,8 @@ Route::middleware('guest')->group(function () {
         ->name('password.reset.form');
     Route::put('/forgot-password/reset', [ForgotPasswordController::class, 'resetPassword'])
         ->name('password.reset');
+    Route::get('/forgot-password/result', [ForgotPasswordController::class, 'showResetResult'])
+        ->name('password.reset.result');
 
 });
     // Đăng nhập thành công từ link Url , hoặc Qr code

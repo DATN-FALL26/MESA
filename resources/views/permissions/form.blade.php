@@ -5,7 +5,8 @@
 
 @section('content')
     @php($isEditing = $permission->exists)
-    <form method="POST" action="{{ $isEditing ? route('permissions.update', $permission) : route('permissions.store') }}" class="space-y-6">
+    <form method="POST" action="{{ $isEditing ? route('permissions.update', $permission) : route('permissions.store') }}"
+        class="space-y-6">
         @csrf
         @if ($isEditing)
             @method('PUT')
@@ -14,30 +15,39 @@
         <section class="grid gap-5 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 md:grid-cols-2">
             <div>
                 <label for="code" class="mb-1 block text-sm font-medium text-slate-700">Mã quyền</label>
-                <input id="code" name="code" value="{{ old('code', $permission->code) }}" required maxlength="80" placeholder="users.view" 
+                <input id="code" name="code" value="{{ old('code', $permission->code) }}" required maxlength="80"
+                    placeholder="users.view"
                     class="w-full rounded-lg border border-slate-300 px-3.5 py-2 text-sm text-slate-900 shadow-sm transition duration-200 placeholder:text-slate-400 hover:border-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/20">
                 <p class="mt-1 text-xs text-slate-500">Dùng chữ thường và dấu chấm, ví dụ users.view.</p>
             </div>
             <div>
                 <label for="module" class="mb-1 block text-sm font-medium text-slate-700">Module</label>
-                <input id="module" name="module" value="{{ old('module', $permission->module) }}" required maxlength="50" placeholder="auth_user" 
+                <input id="module" name="module" value="{{ old('module', $permission->module) }}" required
+                    maxlength="50" placeholder="auth_user"
                     class="w-full rounded-lg border border-slate-300 px-3.5 py-2 text-sm text-slate-900 shadow-sm transition duration-200 placeholder:text-slate-400 hover:border-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/20">
+                <p class="mt-1 text-xs text-slate-500">Nhập module mà quyền thuộc về, ví dụ auth_user.</p>
             </div>
             <div>
                 <label for="name" class="mb-1 block text-sm font-medium text-slate-700">Tên quyền</label>
-                <input id="name" name="name" value="{{ old('name', $permission->name) }}" required maxlength="150" 
+                <input id="name" name="name" value="{{ old('name', $permission->name) }}" required maxlength="150"
                     class="w-full rounded-lg border border-slate-300 px-3.5 py-2 text-sm text-slate-900 shadow-sm transition duration-200 hover:border-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/20">
+                <p class="mt-1 text-xs text-slate-500">Nhập tên hiển thị của quyền trong hệ thống (ví dụ: Xem người dùng).</p>
             </div>
             <div>
                 <label for="description" class="mb-1 block text-sm font-medium text-slate-700">Mô tả</label>
-                <input id="description" name="description" value="{{ old('description', $permission->description) }}" maxlength="255" 
+                <input id="description" name="description" value="{{ old('description', $permission->description) }}"
+                    maxlength="255"
                     class="w-full rounded-lg border border-slate-300 px-3.5 py-2 text-sm text-slate-900 shadow-sm transition duration-200 hover:border-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/20">
+                                           <p class="mt-1 text-xs text-slate-500">Nhập mô tả cho quyền (ví dụ: Cho phép xem thông tin người dùng).</p>
             </div>
         </section>
 
         <div class="flex justify-end gap-3">
-            <a href="{{ route('permissions.index') }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-white">Hủy</a>
-            <button type="submit" class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Lưu quyền</button>
+            <a href="{{ route('permissions.index') }}"
+                class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-white">Hủy</a>
+            <button type="submit"
+                class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Lưu
+                quyền</button>
         </div>
     </form>
 @endsection

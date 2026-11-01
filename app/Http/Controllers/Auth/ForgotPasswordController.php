@@ -48,6 +48,9 @@ class ForgotPasswordController extends Controller
 
         return view('auth.verify-otp', [
             'email' => $request->session()->get('password_reset_email'),
+            'otpExpiresAt' => $this->forgotPasswordService->otpExpiresAt(
+                (string) $request->session()->get('password_reset_email'),
+            ),
         ]);
     }
 
@@ -97,6 +100,21 @@ class ForgotPasswordController extends Controller
         return view('auth.reset-password');
     }
 
+    public function showResetResult(Request $request): View|RedirectResponse
+    {
+        $result = $request->session()->get('password_reset_result');
+
+        if (! is_array($result)
+            || ! is_bool($result['success'] ?? null)
+            || ! is_string($result['message'] ?? null)
+            || ! is_string($result['redirectUrl'] ?? null)
+            || ! is_string($result['destination'] ?? null)) {
+            return redirect()->route('password.request');
+        }
+
+        return view('auth.password-reset-result', $result);
+    }
+
     public function resetPassword(ResetPasswordRequest $request): RedirectResponse
     {
         $ticket = $request->session()->get('password_reset_ticket');
@@ -105,15 +123,21 @@ class ForgotPasswordController extends Controller
             || ! $this->forgotPasswordService->resetPassword($ticket, $request->validated('password'))) {
             $request->session()->forget(['password_reset_ticket', 'password_reset_email']);
 
-            return redirect()
-                ->route('password.request')
-                ->withErrors(['email' => 'Yêu cầu khôi phục mật khẩu đã hết hạn. Vui lòng thực hiện lại.']);
+            return redirect()->route('password.reset.result')->with('password_reset_result', [
+                'success' => false,
+                'message' => 'Không thể cập nhật mật khẩu. Yêu cầu khôi phục đã hết hạn; vui lòng thực hiện lại.',
+                'redirectUrl' => route('password.request'),
+                'destination' => 'trang quên mật khẩu',
+            ]);
         }
 
         $request->session()->forget(['password_reset_ticket', 'password_reset_email']);
 
-        return redirect()
-            ->route('login')
-            ->with('status', 'Mật khẩu đã được đặt lại thành công. Vui lòng đăng nhập lại.');
+        return redirect()->route('password.reset.result')->with('password_reset_result', [
+            'success' => true,
+            'message' => 'Cập nhật mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.',
+            'redirectUrl' => route('login'),
+            'destination' => 'trang đăng nhập',
+        ]);
     }
 }
