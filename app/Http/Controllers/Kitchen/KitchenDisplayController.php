@@ -10,6 +10,7 @@ use App\Enums\OrderItemStatus;
 use App\Enums\StationCode;
 use App\Enums\TicketItemStatus;
 use App\Enums\TicketStatus;
+use App\Events\Kitchen\KitchenTicketItemStatusChanged;
 use App\Helpers\ConstantHelper;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Kitchen\Concerns\ResolvesBranchScope;
@@ -350,6 +351,8 @@ class KitchenDisplayController extends Controller
             'note' => 'KDS: '.$orderItem->item_name_snapshot,
             'created_at' => $now,
         ]);
+
+        KitchenTicketItemStatusChanged::dispatch($item, $previousStatus, $user);
     }
 
     /**
