@@ -8,7 +8,29 @@ use App\Http\Controllers\Api\Inventory\RecipeController;
 use App\Http\Controllers\Api\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Api\Inventory\StockLedgerController;
 use App\Http\Controllers\Api\Inventory\SupplierController;
+use App\Http\Controllers\table\DiningSessionController;
+use App\Http\Controllers\table\TableController;
 use Illuminate\Support\Facades\Route;
+
+Route::middleware(['web', 'auth', 'permission:table.view'])->group(function (): void {
+    Route::get('/tables/status', [TableController::class, 'status'])->name('api.tables.status');
+
+    Route::middleware('permission:table.layout.manage')->group(function (): void {
+        Route::post('/tables', [TableController::class, 'store'])->name('api.tables.store');
+        Route::put('/tables/{id}', [TableController::class, 'update'])->name('api.tables.update');
+        Route::delete('/tables/{id}', [TableController::class, 'destroy'])->name('api.tables.destroy');
+    });
+
+    Route::post('/dining-sessions', [DiningSessionController::class, 'store'])->name('api.dining-sessions.store');
+    Route::post('/tables/{tableId}/dining-session/close', [DiningSessionController::class, 'closeByTable'])
+        ->name('api.tables.dining-session.close');
+    Route::post('/tables/{tableId}/dining-session/transfer', [DiningSessionController::class, 'transferTable'])
+        ->name('api.tables.dining-session.transfer');
+    Route::get('/dining-sessions/employees', [DiningSessionController::class, 'employees'])
+        ->name('api.dining-sessions.employees');
+    Route::get('/tables/{tableId}/dining-session', [DiningSessionController::class, 'showByTable'])
+        ->name('api.tables.dining-session.show');
+});
 
 /*
 |--------------------------------------------------------------------------
