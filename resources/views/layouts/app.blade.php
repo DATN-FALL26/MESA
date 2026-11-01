@@ -48,7 +48,7 @@
         <!-- Navigation Menu -->
         <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
 
-            <!-- SECTION: BÁO CÁO & QUẢN TRỊ (MODULE 9 - CỦA THUẬN) -->
+            <!-- SECTION: BÁO CÁO & QUẢN TRỊ (MODULE 9 ) -->
             <div class="pb-1 px-3">
                 <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Báo cáo & Thống kê</span>
             </div>

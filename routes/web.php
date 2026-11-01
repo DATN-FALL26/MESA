@@ -26,6 +26,16 @@ Route::prefix('admin')->group(function () {
     Route::get('/reports', [DashboardController::class, 'reports'])->name('admin.reports');
     Route::get('/api/revenue', [DashboardController::class, 'getRevenueApi'])->name('admin.api.revenue');
 });
+
+Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
+    // Route API cho biểu đồ Dashboard (Thanh toán & Khung giờ)
+    Route::get('/dashboard/api-payment-stats', [DashboardController::class, 'getPaymentMethodStats'])->name('dashboard.payment_stats');
+    Route::get('/dashboard/api-hourly-traffic', [DashboardController::class, 'getHourlyTrafficStats'])->name('dashboard.hourly_traffic');
+
+    // Route báo cáo kho & hạn sử dụng
+    Route::get('/reports/storage-status', [DashboardController::class, 'getFoodStorageReport'])->name('reports.storage');
+});
+
 /*
 | Root
 |--------------------------------------------------------------------------
