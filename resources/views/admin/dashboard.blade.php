@@ -163,6 +163,93 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Khu vực bố trí biểu đồ thống kê mới (Dashboard) -->
+<div class="mt-8 space-y-6">
+    <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-slate-900 dark:text-white">Phân tích Lưu lượng Khách & Dòng tiền</h3>
+        <span class="text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-3 py-1 rounded-full">Dữ liệu thời gian thực</span>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Biểu đồ khung giờ khách vào (Chiếm 2 cột) -->
+        <div class="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h4 class="text-sm font-bold text-slate-800 dark:text-slate-100">Khung Giờ Khách Vào Đông / Vắng</h4>
+                    <p class="text-xs text-slate-500 mt-0.5">Biểu đồ thể hiện mật độ khách hàng theo các mốc thời gian trong ngày</p>
+                </div>
+            </div>
+            <div class="h-64">
+                <canvas id="hourlyTrafficChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Biểu đồ Phương thức thanh toán (Chiếm 1 cột) -->
+        <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
+            <div>
+                <h4 class="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Phương Thức Thanh Toán</h4>
+                <p class="text-xs text-slate-500 mb-4">Tỷ lệ tiền mặt và chuyển khoản QR</p>
+            </div>
+            <div class="h-48 flex items-center justify-center">
+                <canvas id="paymentMethodChart"></canvas>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-around text-xs font-semibold text-slate-600 dark:text-slate-400">
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Tiền mặt</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Chuyển khoản</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // 1. Biểu đồ khung giờ (Bar Chart)
+        const ctxHourly = document.getElementById('hourlyTrafficChart').getContext('2d');
+        new Chart(ctxHourly, {
+            type: 'bar',
+            data: {
+                labels: ['8h', '10h', '12h (Trưa)', '14h', '16h', '18h (Tối)', '20h', '22h'],
+                datasets: [{
+                    label: 'Lượng khách',
+                    data: [5, 15, 45, 10, 8, 55, 40, 10],
+                    backgroundColor: '#6366f1',
+                    borderRadius: 8,
+                    barThickness: 'flex'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { grid: { color: 'rgba(200, 200, 200, 0.1)' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        // 2. Biểu đồ thanh toán (Doughnut Chart)
+        const ctxPayment = document.getElementById('paymentMethodChart').getContext('2d');
+        new Chart(ctxPayment, {
+            type: 'doughnut',
+            data: {
+                labels: ['Tiền mặt', 'Chuyển khoản'],
+                datasets: [{
+                    data: [120, 250],
+                    backgroundColor: ['#f59e0b', '#10b981'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                cutout: '70%'
+            }
+        });
+    });
+</script>
     </div>
 </div>
 

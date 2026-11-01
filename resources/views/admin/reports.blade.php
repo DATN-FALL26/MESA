@@ -112,5 +112,70 @@
             </table>
         </div>
     </div>
+        <!-- Khu vực Báo cáo Tình trạng Bảo quản & Hạn sử dụng (Reports) -->
+<div class="mt-8 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+    <!-- Header của Card -->
+    <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h3 class="text-base font-bold text-slate-900 dark:text-white">Báo Cáo Tình Trạng Bảo Quản & Hạn Sử Dụng</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Theo dõi thời gian nhập kho, tồn kho và hạn sử dụng thực phẩm trong nhà hàng</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> Cần xử lý gấp
+            </span>
+        </div>
+    </div>
+
+    <!-- Bảng dữ liệu được bố trí gọn gàng, chuyên nghiệp -->
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-slate-50/75 dark:bg-slate-800/50 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    <th class="py-3.5 px-6">Tên Nguyên Liệu</th>
+                    <th class="py-3.5 px-6">Tồn Kho</th>
+                    <th class="py-3.5 px-6">Thời Gian Nhập</th>
+                    <th class="py-3.5 px-6">Hạn Sử Dụng</th>
+                    <th class="py-3.5 px-6">Trạng Thái Chất Lượng</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
+                @isset($ingredients)
+                    @foreach($ingredients as $item)
+                    <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                        <td class="py-4 px-6 font-semibold text-slate-800 dark:text-slate-200">
+                            {{ $item->name }}
+                        </td>
+                        <td class="py-4 px-6 text-slate-600 dark:text-slate-400 font-medium">
+                            {{ $item->stock_quantity }} <span class="text-xs text-slate-400">{{ $item->unit }}</span>
+                        </td>
+                        <td class="py-4 px-6 text-slate-600 dark:text-slate-400 text-xs font-mono">
+                            {{ $item->import_date }}
+                        </td>
+                        <td class="py-4 px-6 text-slate-600 dark:text-slate-400 text-xs font-mono">
+                            {{ $item->expiry_date }}
+                        </td>
+                        <td class="py-4 px-6">
+                            @if($item->quality_status == 'Sắp hết hạn')
+                                <span class="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-lg bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 ring-1 ring-red-500/20">
+                                    ⚠️ Sắp hết hạn
+                                </span>
+                            @elseif($item->quality_status == 'Cần lưu ý')
+                                <span class="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 ring-1 ring-amber-500/20">
+                                    ⚡ Cần lưu ý
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 ring-1 ring-emerald-500/20">
+                                    ✅ Tốt / An toàn
+                                </span>
+                            @endif
+                        </td>
+                    </tr>
+                    @endforeach
+                @endisset
+            </tbody>
+        </table>
+    </div>
+</div>
 </div>
 @endsection
