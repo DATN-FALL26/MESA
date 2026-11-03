@@ -177,6 +177,13 @@
                             <div data-detail-session class="{{ $openSessionsByTableId->has($selectedTable?->id ?? 0) ? '' : 'hidden ' }}mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3">
                                 <p class="text-sm font-semibold text-emerald-950">Phiên #<span data-detail-session-id>{{ $openSessionsByTableId->get($selectedTable?->id ?? 0)?->id }}</span></p>
                                 <p class="mt-1 text-xs text-emerald-900"><span data-detail-guest-count>{{ $openSessionsByTableId->get($selectedTable?->id ?? 0)?->guest_count }}</span> khách · Nhân viên: <span data-detail-employee>{{ $openSessionsByTableId->get($selectedTable?->id ?? 0)?->openedByUser?->full_name ?? '—' }}</span></p>
+                                <button
+    type="button"
+    data-order-session
+    class="mt-3 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+>
+    Gọi món
+</button>
                                 <button type="button" data-transfer-table class="mt-3 w-full rounded-lg border border-emerald-800 px-3 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-100">Chuyển sang bàn khác</button>
                                 <button type="button" data-close-session class="mt-3 w-full rounded-lg bg-emerald-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-950 disabled:cursor-wait disabled:opacity-60">Đóng phiên, trả bàn trống</button>
                                 <p data-session-error class="mt-2 hidden text-xs font-medium text-rose-700" role="alert"></p>
@@ -475,6 +482,11 @@
                 });
 
                 manager.querySelector('[data-open-table]')?.addEventListener('click', () => openSessionForTable(selectedCard));
+                detail.querySelector('[data-order-session]')?.addEventListener('click', () => {
+    if (!selectedCard?.dataset.sessionId) return;
+
+    window.location.href = `/orders/session/${selectedCard.dataset.sessionId}`;
+});
                 detail.querySelector('[data-transfer-table]').addEventListener('click', () => openTransferForTable(selectedCard));
                 detail.querySelector('[data-close-session]').addEventListener('click', async (event) => {
                     if (!selectedCard?.dataset.sessionId) return;
