@@ -133,7 +133,7 @@ class AuthFeatureTest extends TestCase
             'password' => 'Password123!',
         ]);
 
-        $response->assertRedirect('/dashboard');
+        $response->assertRedirect('/admin/dashboard');
         $this->assertAuthenticatedAs(User::first());
     }
 
@@ -189,7 +189,7 @@ class AuthFeatureTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_authenticated_user_can_access_the_shared_dashboard(): void
+    public function test_authenticated_user_is_redirected_to_the_combined_dashboard(): void
     {
         $user = $this->createUser([
             'username' => 'diana',
@@ -202,7 +202,32 @@ class AuthFeatureTest extends TestCase
         $this->actingAs($user);
         $this->withoutVite();
 
-        $this->get('/dashboard')->assertOk();
+        $this->get('/dashboard')->assertRedirect(route('admin.dashboard'));
+
+        $this->get('/admin/dashboard')
+            ->assertOk()
+            ->assertSee('Tổng quan hệ thống')
+            ->assertSee('Doanh thu hôm nay')
+            ->assertSee('Hoạt động hệ thống gần đây');
+    }
+
+    public function test_guest_cannot_access_the_admin_dashboard(): void
+    {
+        $this->get('/admin/dashboard')->assertRedirect('/login');
+    }
+
+    public function test_user_without_dashboard_permission_cannot_access_the_admin_dashboard(): void
+    {
+        $user = User::query()->create([
+            'username' => 'limiteddashboard',
+            'full_name' => 'Limited Dashboard',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->actingAs($user)
+            ->get('/admin/dashboard')
+            ->assertForbidden();
     }
 
     public function test_user_without_permission_cannot_manage_users(): void
@@ -234,10 +259,29 @@ class AuthFeatureTest extends TestCase
         $this->withoutVite();
         $this->actingAs($user)
             ->get('/dashboard')
+            ->assertRedirect(route('admin.dashboard'));
+
+        $this->get('/admin/dashboard')
             ->assertOk()
             ->assertSee('Quản lý tài khoản');
 
         $this->get('/users')->assertOk();
+    }
+
+    public function test_dashboard_view_permission_is_required_for_admin_reports(): void
+    {
+        $user = $this->createUser([
+            'username' => 'reportviewer',
+            'full_name' => 'Report Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->withoutVite();
+
+        $this->actingAs($user)
+            ->get('/admin/reports?from_date=2026-10-01&to_date=2026-10-16')
+            ->assertOk();
     }
 
     public function test_user_list_can_be_searched_filtered_and_keeps_filters_in_pagination(): void

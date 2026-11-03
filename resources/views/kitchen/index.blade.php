@@ -59,7 +59,7 @@
                         <x-button :href="route('kitchen.serve.index')" variant="ghost" size="sm">Trang ra món</x-button>
                     @endif
                     @if (auth()->user()->hasPermission('dashboard.view'))
-                        <x-button :href="route('dashboard')" variant="ghost" size="sm">Quản trị</x-button>
+                        <x-button :href="route('admin.dashboard')" variant="ghost" size="sm">Quản trị</x-button>
                     @endif
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf

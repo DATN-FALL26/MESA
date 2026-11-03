@@ -38,7 +38,10 @@ class ForgotPasswordTest extends TestCase
         $this->get(route('password.otp.form'))
             ->assertOk()
             ->assertViewIs('auth.verify-otp')
-            ->assertViewHas('otpExpiresAt', fn (?int $expiry): bool => $expiry !== null);
+            ->assertSee('01:00')
+            ->assertViewHas('otpExpiresAt', fn (?int $expiry): bool => $expiry !== null
+                && $expiry > now()->getTimestampMs()
+                && $expiry <= now()->addSeconds(60)->getTimestampMs());
 
         $otp = null;
         Mail::assertSent(ForgotPasswordOtpMail::class, function (ForgotPasswordOtpMail $mail) use (&$otp): bool {
@@ -107,7 +110,7 @@ class ForgotPasswordTest extends TestCase
             return true;
         });
 
-        $this->travel(6)->minutes();
+        $this->travel(2)->minutes();
 
         $this->withSession(['password_reset_email' => $user->email])
             ->post(route('password.otp.verify'), ['otp' => $otp])
@@ -160,6 +163,18 @@ class ForgotPasswordTest extends TestCase
             ->assertViewIs('auth.password-reset-result')
             ->assertViewHas('success', false)
             ->assertSee('Không thể cập nhật mật khẩu.');
+    }
+
+    public function test_reset_password_requires_uppercase_first_letter_lowercase_number_and_symbol(): void
+    {
+        foreach (['lowercase123!', 'Uppercase123', 'Uppercase!abc', 'UPPERCASE123!'] as $password) {
+            $this->withSession(['password_reset_ticket' => 'test-ticket'])
+                ->put(route('password.reset'), [
+                    'password' => $password,
+                    'password_confirmation' => $password,
+                ])
+                ->assertSessionHasErrors('password');
+        }
     }
 
     /**

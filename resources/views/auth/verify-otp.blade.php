@@ -18,7 +18,7 @@
 
                 <div class="alert alert-warning py-2" role="timer" aria-live="polite">
                     Mã OTP còn hiệu lực:
-                    <strong id="otp-countdown">{{ $otpExpiresAt ? '05:00' : 'Đang chờ mã' }}</strong>
+                    <strong id="otp-countdown">{{ $otpExpiresAt ? '01:00' : 'Đang chờ mã' }}</strong>
                 </div>
 
                 @if (session('status'))

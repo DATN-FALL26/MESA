@@ -1,7 +1,12 @@
 @extends('layouts.auth')
 
+@section('title', 'Dashboard | MESA')
+@section('heading', 'Dashboard tổng hợp')
+
 @section('content')
-<div class="space-y-6">
+    @include('admin.partials.system-overview')
+
+<div class="mt-8 space-y-6">
     <!-- Header Dashboard -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <!-- <div>

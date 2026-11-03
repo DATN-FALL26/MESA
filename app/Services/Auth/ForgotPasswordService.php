@@ -20,7 +20,7 @@ use Throwable;
 
 class ForgotPasswordService
 {
-    private const OTP_TTL_SECONDS = 300;
+    private const OTP_TTL_SECONDS = 60;
 
     private const RESEND_TTL_SECONDS = 60;
 

@@ -17,12 +17,10 @@ class DashboardTest extends TestCase
     }
 
     /** @test */
-    public function trang_bao_cao_truy_cap_thanh_cong()
+    public function guest_khong_duoc_truy_cap_bao_cao_quan_tri()
     {
-        // Gửi yêu cầu GET tới đường dẫn /admin/reports kèm theo bộ lọc ngày hợp lệ
         $response = $this->get('/admin/reports?from_date=2026-10-01&to_date=2026-10-16');
 
-        // Xác thực trang báo cáo phản hồi thành công
-        $response->assertStatus(200);
+        $response->assertRedirect('/login');
     }
 }
