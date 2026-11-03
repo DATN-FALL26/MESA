@@ -334,6 +334,144 @@ class AuthFeatureTest extends TestCase
             ->assertSee('status=active');
     }
 
+    public function test_newly_created_accounts_appear_first_in_the_account_list(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'newestaccountviewer',
+            'full_name' => 'Newest Account Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'users.view');
+
+        $olderAccount = $this->createUser([
+            'username' => 'zolderaccount',
+            'full_name' => 'Z Older Account',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $newerAccount = $this->createUser([
+            'username' => 'aneweraccount',
+            'full_name' => 'A Newer Account',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->withoutVite();
+
+        $response = $this->actingAs($viewer)->get('/users')->assertOk();
+
+        $this->assertSame(
+            [$newerAccount->id, $olderAccount->id],
+            $response->viewData('users')->take(2)->pluck('id')->all(),
+        );
+    }
+
+    public function test_roles_can_be_searched_and_filtered_by_role_type(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'rolefilterviewer',
+            'full_name' => 'Role Filter Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'roles.view');
+
+        Role::query()->create([
+            'code' => 'FILTER_SYSTEM_ALPHA',
+            'name' => 'Alpha System Role',
+            'description' => 'Searchable system role',
+            'is_system' => true,
+        ]);
+        Role::query()->create([
+            'code' => 'FILTER_CUSTOM_ALPHA',
+            'name' => 'Alpha Custom Role',
+            'description' => 'Searchable custom role',
+            'is_system' => false,
+        ]);
+
+        $this->withoutVite();
+
+        $this->actingAs($viewer)
+            ->get('/roles?q=Alpha&type=system')
+            ->assertOk()
+            ->assertSee('FILTER_SYSTEM_ALPHA')
+            ->assertDontSee('FILTER_CUSTOM_ALPHA')
+            ->assertSee('value="system" selected');
+    }
+
+    public function test_permissions_can_be_searched_and_filtered_by_module_and_role_assignment(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'permissionfilterviewer',
+            'full_name' => 'Permission Filter Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'permissions.view');
+
+        $assignedPermission = Permission::query()->create([
+            'code' => 'filter.orders.read',
+            'module' => 'filter_orders',
+            'name' => 'Read filtered orders',
+        ]);
+        Permission::query()->create([
+            'code' => 'filter.orders.write',
+            'module' => 'filter_orders',
+            'name' => 'Write filtered orders',
+        ]);
+        Permission::query()->create([
+            'code' => 'filter.stock.read',
+            'module' => 'filter_stock',
+            'name' => 'Read filtered stock',
+        ]);
+        $role = Role::query()->create([
+            'code' => 'FILTER_PERMISSION_ROLE',
+            'name' => 'Filter Permission Role',
+            'is_system' => false,
+        ]);
+        $role->permissions()->attach($assignedPermission);
+
+        $this->withoutVite();
+
+        $this->actingAs($viewer)
+            ->get('/permissions?q=filter&module=filter_orders&usage=assigned')
+            ->assertOk()
+            ->assertSee('filter.orders.read')
+            ->assertDontSee('filter.orders.write')
+            ->assertDontSee('filter.stock.read')
+            ->assertSee('value="filter_orders" selected')
+            ->assertSee('value="assigned" selected');
+    }
+
+    public function test_newly_created_permissions_appear_first_in_the_permission_list(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'newestpermissionviewer',
+            'full_name' => 'Newest Permission Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'permissions.view');
+
+        Permission::query()->create([
+            'code' => 'old.permission',
+            'module' => 'old_module',
+            'name' => 'Old permission',
+        ]);
+        $newPermission = Permission::query()->create([
+            'code' => 'new.permission',
+            'module' => 'new_module',
+            'name' => 'New permission',
+        ]);
+
+        $this->withoutVite();
+
+        $response = $this->actingAs($viewer)->get('/permissions')->assertOk();
+
+        $this->assertSame($newPermission->id, $response->viewData('permissions')->first()->id);
+    }
+
     public function test_user_can_create_account_and_assign_a_role_with_permissions(): void
     {
         $manager = $this->createUser([
