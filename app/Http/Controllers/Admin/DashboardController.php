@@ -239,39 +239,7 @@ class DashboardController extends Controller
         }
     }
 
-    /**
-     * Thống kê khung giờ khách vào đông/vắng (Hourly Traffic) cho Dashboard
-     */
-    public function getHourlyTrafficStats(Request $request)
-    {
-        try {
-            $hourlyData = Order::select(DB::raw('HOUR(created_at) as hour'), DB::raw('COUNT(*) as count'))
-                ->whereDate('created_at', today())
-                ->groupBy('hour')
-                ->pluck('count', 'hour');
-
-            $result = [];
-            for ($i = 8; $i <= 22; $i++) {
-                $result[$i . ':00'] = $hourlyData[$i] ?? rand(2, 15);
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $result
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'success',
-                'data' => [
-                    '8:00' => 5, '9:00' => 8, '10:00' => 12, '11:00' => 35,
-                    '12:00' => 45, '13:00' => 20, '14:00' => 8, '15:00' => 6,
-                    '16:00' => 10, '17:00' => 25, '18:00' => 50, '19:00' => 60,
-                    '20:00' => 40, '21:00' => 15, '22:00' => 5
-                ]
-            ]);
-        }
-    }
-
+   
     /**
      * Báo cáo tình trạng bảo quản thực phẩm dự phòng riêng nếu cần gọi API
      */
