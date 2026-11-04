@@ -2,10 +2,16 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\UserStatus;
+use App\Helpers\ConstantHelper;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Models\Permission;
+use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\Order;
+use App\Models\User;
 
 class DashboardController extends Controller
 {
@@ -14,6 +20,55 @@ class DashboardController extends Controller
      */
     public function index(Request $request)
     {
+        $user = $request->user();
+        $currentRoles = $user->activeRoles()->orderBy('name')->get();
+        $totalUsers = User::query()->count();
+        $activeUsers = User::query()
+            ->where('status', UserStatus::ACTIVE->value)
+            ->count();
+        $totalRoles = Role::query()->count();
+        $totalPermissions = Permission::query()->count();
+        $recentActivities = AuditLog::query()
+            ->orderByDesc('created_at')
+            ->limit(6)
+            ->get();
+        $activityUsers = User::query()
+            ->whereIn('id', $recentActivities->pluck('user_id')->filter()->unique())
+            ->pluck('full_name', 'id');
+        $actionLabels = [
+            'create' => 'Đã tạo',
+            'update' => 'Đã cập nhật',
+            'delete' => 'Đã xóa',
+            'status_change' => 'Đã thay đổi trạng thái',
+            'login' => 'Đã đăng nhập',
+        ];
+        $modules = [
+            [
+                'permission' => ConstantHelper::PERM_USERS_VIEW,
+                'route' => 'users.index',
+                'title' => 'Quản lý tài khoản',
+                'description' => 'Theo dõi tài khoản, thông tin nhân sự và trạng thái hoạt động.',
+                'icon' => 'users',
+                'color' => 'indigo',
+            ],
+            [
+                'permission' => ConstantHelper::PERM_ROLES_VIEW,
+                'route' => 'roles.index',
+                'title' => 'Quản lý vai trò',
+                'description' => 'Tổ chức vai trò và kiểm soát quyền truy cập theo nhóm.',
+                'icon' => 'roles',
+                'color' => 'violet',
+            ],
+            [
+                'permission' => ConstantHelper::PERM_PERMISSIONS_VIEW,
+                'route' => 'permissions.index',
+                'title' => 'Quản lý quyền',
+                'description' => 'Tra cứu các quyền chức năng được cấu hình trong hệ thống.',
+                'icon' => 'permissions',
+                'color' => 'amber',
+            ],
+        ];
+
         $branchId = $request->input('branch_id', 1);
         $title = 'Tổng quan Dashboard';
         $today = today();
@@ -108,6 +163,16 @@ class DashboardController extends Controller
         }
 
         return view('admin.dashboard', compact(
+            'user',
+            'currentRoles',
+            'totalUsers',
+            'activeUsers',
+            'totalRoles',
+            'totalPermissions',
+            'recentActivities',
+            'activityUsers',
+            'actionLabels',
+            'modules',
             'doanhThu',
             'tongDon',
             'danhSachBan',

@@ -24,12 +24,25 @@ class CategoryController extends Controller
             ->when($search !== '', fn ($query) => $query->where('name', 'like', "%{$search}%"))
             ->when($status === 'active', fn ($query) => $query->where('is_active', true))
             ->when($status === 'inactive', fn ($query) => $query->where('is_active', false))
-            ->get()
-            // Xếp theo cây: danh mục cha (theo thứ tự) rồi tới các danh mục con của nó.
+            ->get();
+
+        $groupActivity = $categories
+            ->groupBy(fn (Category $category): int => $category->parent_id ?? $category->id)
+            ->map(fn ($group): Category => $group->sortByDesc(
+                fn (Category $category): array => [
+                    $category->created_at?->getTimestamp() ?? 0,
+                    $category->id,
+                ]
+            )->first());
+
+        $categories = $categories
+            // Mới nhất trước, nhưng giữ danh mục cha trước các danh mục con trong cùng nhóm.
             ->sortBy(fn (Category $category): array => [
+                -($groupActivity[$category->parent_id ?? $category->id]->created_at?->getTimestamp() ?? 0),
+                -$groupActivity[$category->parent_id ?? $category->id]->id,
+                $category->parent_id === null ? 0 : 1,
                 $category->parent_id === null ? $category->sort_order : ($category->parent?->sort_order ?? 0),
                 $category->parent_id === null ? $category->name : ($category->parent?->name ?? ''),
-                $category->parent_id === null ? 0 : 1,
                 $category->sort_order,
                 $category->name,
             ])

@@ -21,13 +21,11 @@ use App\Http\Controllers\Admin\DashboardController;
 // use Symfony\Component\Routing\Router;
 
 
-Route::prefix('admin')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
-    Route::get('/reports', [DashboardController::class, 'reports'])->name('admin.reports');
-    Route::get('/api/revenue', [DashboardController::class, 'getRevenueApi'])->name('admin.api.revenue');
-});
+Route::middleware(['auth', 'permission:dashboard.view'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/reports', [DashboardController::class, 'reports'])->name('reports');
+    Route::get('/api/revenue', [DashboardController::class, 'getRevenueApi'])->name('api.revenue');
 
-Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
     // Route API cho biểu đồ Dashboard (Thanh toán & Khung giờ)
     Route::get('/dashboard/api-payment-stats', [DashboardController::class, 'getPaymentMethodStats'])->name('dashboard.payment_stats');
     Route::get('/dashboard/api-hourly-traffic', [DashboardController::class, 'getHourlyTrafficStats'])->name('dashboard.hourly_traffic');
@@ -74,6 +72,8 @@ Route::middleware('guest')->group(function () {
         ->name('password.reset.form');
     Route::put('/forgot-password/reset', [ForgotPasswordController::class, 'resetPassword'])
         ->name('password.reset');
+    Route::get('/forgot-password/result', [ForgotPasswordController::class, 'showResetResult'])
+        ->name('password.reset.result');
 
 });
     // Đăng nhập thành công từ link Url , hoặc Qr code

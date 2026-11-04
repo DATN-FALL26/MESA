@@ -5,18 +5,16 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\BranchStatus;
-use App\Helpers\ConstantHelper;
 use App\Models\Branch;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
 class PublicDashboardController extends Controller
 {
-    public function show(): View
+    public function show(): View|RedirectResponse
     {
         if (auth()->check()) {
-            abort_unless(auth()->user()->hasPermission(ConstantHelper::PERM_DASHBOARD_VIEW), 403);
-
-            return view('dashboard');
+            return redirect()->route('admin.dashboard');
         }
 
         return view('customer.dashboard', [

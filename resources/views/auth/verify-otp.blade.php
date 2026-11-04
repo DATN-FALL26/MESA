@@ -16,6 +16,11 @@
                 <h1 class="h4 fw-bold">Xác thực OTP</h1>
                 <p class="text-muted">Nếu email hợp lệ, mã xác thực sẽ được gửi đến địa chỉ đã đăng ký.</p>
 
+                <div class="alert alert-warning py-2" role="timer" aria-live="polite">
+                    Mã OTP còn hiệu lực:
+                    <strong id="otp-countdown">{{ $otpExpiresAt ? '01:00' : 'Đang chờ mã' }}</strong>
+                </div>
+
                 @if (session('status'))
                     <div class="alert alert-info" role="status">{{ session('status') }}</div>
                 @endif
@@ -48,6 +53,33 @@
             </div>
         </div>
     </main>
+
+    @if ($otpExpiresAt)
+        <script>
+            (() => {
+                const countdown = document.getElementById('otp-countdown');
+                const expiresAt = Number(@json($otpExpiresAt));
+                let timer;
+
+                const updateCountdown = () => {
+                    const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+                    const minutes = String(Math.floor(remaining / 60)).padStart(2, '0');
+                    const seconds = String(remaining % 60).padStart(2, '0');
+
+                    countdown.textContent = remaining > 0 ? `${minutes}:${seconds}` : 'Đã hết hạn';
+
+                    if (remaining === 0) {
+                        clearInterval(timer);
+                    }
+                };
+
+                updateCountdown();
+                if (expiresAt > Date.now()) {
+                    timer = setInterval(updateCountdown, 1000);
+                }
+            })();
+        </script>
+    @endif
 </body>
 
 </html>

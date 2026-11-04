@@ -1,61 +1,4 @@
-@extends('layouts.auth')
-
-@section('title', 'Dashboard | MESA')
-@section('heading', 'Tổng quan hệ thống')
-
-@section('content')
-    @php
-        $user = auth()->user();
-        $currentRoles = $user->activeRoles()->orderBy('name')->get();
-        $totalUsers = \App\Models\User::query()->count();
-        $activeUsers = \App\Models\User::query()
-            ->where('status', \App\Enums\UserStatus::ACTIVE->value)
-            ->count();
-        $totalRoles = \App\Models\Role::query()->count();
-        $totalPermissions = \App\Models\Permission::query()->count();
-        $recentActivities = \App\Models\AuditLog::query()
-            ->orderByDesc('created_at')
-            ->limit(6)
-            ->get();
-        $activityUsers = \App\Models\User::query()
-            ->whereIn('id', $recentActivities->pluck('user_id')->filter()->unique())
-            ->pluck('full_name', 'id');
-        $actionLabels = [
-            'create' => 'Đã tạo',
-            'update' => 'Đã cập nhật',
-            'delete' => 'Đã xóa',
-            'status_change' => 'Đã thay đổi trạng thái',
-            'login' => 'Đã đăng nhập',
-        ];
-        $modules = [
-            [
-                'permission' => \App\Helpers\ConstantHelper::PERM_USERS_VIEW,
-                'route' => 'users.index',
-                'title' => 'Quản lý tài khoản',
-                'description' => 'Theo dõi tài khoản, thông tin nhân sự và trạng thái hoạt động.',
-                'icon' => 'users',
-                'color' => 'indigo',
-            ],
-            [
-                'permission' => \App\Helpers\ConstantHelper::PERM_ROLES_VIEW,
-                'route' => 'roles.index',
-                'title' => 'Quản lý vai trò',
-                'description' => 'Tổ chức vai trò và kiểm soát quyền truy cập theo nhóm.',
-                'icon' => 'roles',
-                'color' => 'violet',
-            ],
-            [
-                'permission' => \App\Helpers\ConstantHelper::PERM_PERMISSIONS_VIEW,
-                'route' => 'permissions.index',
-                'title' => 'Quản lý quyền',
-                'description' => 'Tra cứu các quyền chức năng được cấu hình trong hệ thống.',
-                'icon' => 'permissions',
-                'color' => 'amber',
-            ],
-        ];
-    @endphp
-
-    <div class="space-y-8 sm:space-y-10">
+<div class="space-y-8 sm:space-y-10">
         <section class="relative isolate overflow-hidden rounded-3xl bg-slate-950 px-5 py-7 text-white shadow-xl shadow-slate-900/10 sm:px-8 sm:py-9 lg:px-10">
             <div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
                 <div class="absolute -right-16 -top-28 h-72 w-72 rounded-full bg-indigo-500/25 blur-3xl"></div>
@@ -247,4 +190,3 @@
             @endif
         </section>
     </div>
-@endsection

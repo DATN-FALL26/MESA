@@ -41,7 +41,8 @@ class UserController extends Controller
                 $query->whereHas('activeRoles', fn ($roleQuery) => $roleQuery->where('roles.id', $roleId));
             })
             ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
-            ->orderBy('full_name');
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
 
         $users = $query->paginate(15)->withQueryString();
         $roles = Role::query()->orderBy('name')->get(['id', 'name']);

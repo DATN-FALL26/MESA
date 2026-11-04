@@ -133,7 +133,7 @@ class AuthFeatureTest extends TestCase
             'password' => 'Password123!',
         ]);
 
-        $response->assertRedirect('/dashboard');
+        $response->assertRedirect('/admin/dashboard');
         $this->assertAuthenticatedAs(User::first());
     }
 
@@ -189,7 +189,7 @@ class AuthFeatureTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_authenticated_user_can_access_the_shared_dashboard(): void
+    public function test_authenticated_user_is_redirected_to_the_combined_dashboard(): void
     {
         $user = $this->createUser([
             'username' => 'diana',
@@ -202,7 +202,32 @@ class AuthFeatureTest extends TestCase
         $this->actingAs($user);
         $this->withoutVite();
 
-        $this->get('/dashboard')->assertOk();
+        $this->get('/dashboard')->assertRedirect(route('admin.dashboard'));
+
+        $this->get('/admin/dashboard')
+            ->assertOk()
+            ->assertSee('Tổng quan hệ thống')
+            ->assertSee('Doanh thu hôm nay')
+            ->assertSee('Hoạt động hệ thống gần đây');
+    }
+
+    public function test_guest_cannot_access_the_admin_dashboard(): void
+    {
+        $this->get('/admin/dashboard')->assertRedirect('/login');
+    }
+
+    public function test_user_without_dashboard_permission_cannot_access_the_admin_dashboard(): void
+    {
+        $user = User::query()->create([
+            'username' => 'limiteddashboard',
+            'full_name' => 'Limited Dashboard',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->actingAs($user)
+            ->get('/admin/dashboard')
+            ->assertForbidden();
     }
 
     public function test_user_without_permission_cannot_manage_users(): void
@@ -234,10 +259,29 @@ class AuthFeatureTest extends TestCase
         $this->withoutVite();
         $this->actingAs($user)
             ->get('/dashboard')
+            ->assertRedirect(route('admin.dashboard'));
+
+        $this->get('/admin/dashboard')
             ->assertOk()
             ->assertSee('Quản lý tài khoản');
 
         $this->get('/users')->assertOk();
+    }
+
+    public function test_dashboard_view_permission_is_required_for_admin_reports(): void
+    {
+        $user = $this->createUser([
+            'username' => 'reportviewer',
+            'full_name' => 'Report Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->withoutVite();
+
+        $this->actingAs($user)
+            ->get('/admin/reports?from_date=2026-10-01&to_date=2026-10-16')
+            ->assertOk();
     }
 
     public function test_user_list_can_be_searched_filtered_and_keeps_filters_in_pagination(): void
@@ -288,6 +332,144 @@ class AuthFeatureTest extends TestCase
             ->assertSee('q=Staff')
             ->assertSee('role_id='.$role->id)
             ->assertSee('status=active');
+    }
+
+    public function test_newly_created_accounts_appear_first_in_the_account_list(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'newestaccountviewer',
+            'full_name' => 'Newest Account Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'users.view');
+
+        $olderAccount = $this->createUser([
+            'username' => 'zolderaccount',
+            'full_name' => 'Z Older Account',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $newerAccount = $this->createUser([
+            'username' => 'aneweraccount',
+            'full_name' => 'A Newer Account',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->withoutVite();
+
+        $response = $this->actingAs($viewer)->get('/users')->assertOk();
+
+        $this->assertSame(
+            [$newerAccount->id, $olderAccount->id],
+            $response->viewData('users')->take(2)->pluck('id')->all(),
+        );
+    }
+
+    public function test_roles_can_be_searched_and_filtered_by_role_type(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'rolefilterviewer',
+            'full_name' => 'Role Filter Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'roles.view');
+
+        Role::query()->create([
+            'code' => 'FILTER_SYSTEM_ALPHA',
+            'name' => 'Alpha System Role',
+            'description' => 'Searchable system role',
+            'is_system' => true,
+        ]);
+        Role::query()->create([
+            'code' => 'FILTER_CUSTOM_ALPHA',
+            'name' => 'Alpha Custom Role',
+            'description' => 'Searchable custom role',
+            'is_system' => false,
+        ]);
+
+        $this->withoutVite();
+
+        $this->actingAs($viewer)
+            ->get('/roles?q=Alpha&type=system')
+            ->assertOk()
+            ->assertSee('FILTER_SYSTEM_ALPHA')
+            ->assertDontSee('FILTER_CUSTOM_ALPHA')
+            ->assertSee('value="system" selected');
+    }
+
+    public function test_permissions_can_be_searched_and_filtered_by_module_and_role_assignment(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'permissionfilterviewer',
+            'full_name' => 'Permission Filter Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'permissions.view');
+
+        $assignedPermission = Permission::query()->create([
+            'code' => 'filter.orders.read',
+            'module' => 'filter_orders',
+            'name' => 'Read filtered orders',
+        ]);
+        Permission::query()->create([
+            'code' => 'filter.orders.write',
+            'module' => 'filter_orders',
+            'name' => 'Write filtered orders',
+        ]);
+        Permission::query()->create([
+            'code' => 'filter.stock.read',
+            'module' => 'filter_stock',
+            'name' => 'Read filtered stock',
+        ]);
+        $role = Role::query()->create([
+            'code' => 'FILTER_PERMISSION_ROLE',
+            'name' => 'Filter Permission Role',
+            'is_system' => false,
+        ]);
+        $role->permissions()->attach($assignedPermission);
+
+        $this->withoutVite();
+
+        $this->actingAs($viewer)
+            ->get('/permissions?q=filter&module=filter_orders&usage=assigned')
+            ->assertOk()
+            ->assertSee('filter.orders.read')
+            ->assertDontSee('filter.orders.write')
+            ->assertDontSee('filter.stock.read')
+            ->assertSee('value="filter_orders" selected')
+            ->assertSee('value="assigned" selected');
+    }
+
+    public function test_newly_created_permissions_appear_first_in_the_permission_list(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'newestpermissionviewer',
+            'full_name' => 'Newest Permission Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'permissions.view');
+
+        Permission::query()->create([
+            'code' => 'old.permission',
+            'module' => 'old_module',
+            'name' => 'Old permission',
+        ]);
+        $newPermission = Permission::query()->create([
+            'code' => 'new.permission',
+            'module' => 'new_module',
+            'name' => 'New permission',
+        ]);
+
+        $this->withoutVite();
+
+        $response = $this->actingAs($viewer)->get('/permissions')->assertOk();
+
+        $this->assertSame($newPermission->id, $response->viewData('permissions')->first()->id);
     }
 
     public function test_user_can_create_account_and_assign_a_role_with_permissions(): void
