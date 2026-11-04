@@ -357,6 +357,9 @@
                 </div>
             </header>
 
+            {{-- Component Toast thông báo toàn cục --}}
+            <x-toast />
+
             {{-- Main Content Container --}}
             <main class="flex-1 mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
                 {{-- Session Success Alert --}}
