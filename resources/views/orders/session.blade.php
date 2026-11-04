@@ -702,6 +702,68 @@ currentOrderPanel.replaceWith(
     }
 
 });
+
+/*
+|--------------------------------------------------------------------------
+| Realtime Kitchen -> Order
+|--------------------------------------------------------------------------
+*/
+
+window.addEventListener('load', function () {
+
+    if (!window.Echo) {
+        console.error('Echo chưa được khởi tạo');
+        return;
+    }
+
+    window.Echo
+        .channel('orders.{{ $order->id }}')
+        .listen('.kitchen.item.status.changed', async (event) => {
+
+            console.log('Kitchen realtime:', event);
+
+            try {
+
+                const response = await fetch(window.location.href, {
+                    headers: {
+                        'Accept': 'text/html'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('HTTP error: ' + response.status);
+                }
+
+                const html = await response.text();
+
+                const parser = new DOMParser();
+                const newDocument = parser.parseFromString(
+                    html,
+                    'text/html'
+                );
+
+                const newOrderPanel =
+                    newDocument.querySelector('#order-panel');
+
+                const currentOrderPanel =
+                    document.querySelector('#order-panel');
+
+                if (newOrderPanel && currentOrderPanel) {
+                    currentOrderPanel.replaceWith(newOrderPanel);
+                }
+
+            } catch (error) {
+
+                console.error(
+                    'Realtime Order refresh error:',
+                    error
+                );
+
+            }
+
+        });
+
+});
 </script>
 
 @endsection
