@@ -35,6 +35,14 @@ class ForgotPasswordTest extends TestCase
             ->assertRedirect(route('password.otp.form'))
             ->assertSessionHas('status', self::GENERIC_MESSAGE);
 
+        $this->get(route('password.otp.form'))
+            ->assertOk()
+            ->assertViewIs('auth.verify-otp')
+            ->assertSee('01:00')
+            ->assertViewHas('otpExpiresAt', fn (?int $expiry): bool => $expiry !== null
+                && $expiry > now()->getTimestampMs()
+                && $expiry <= now()->addSeconds(60)->getTimestampMs());
+
         $otp = null;
         Mail::assertSent(ForgotPasswordOtpMail::class, function (ForgotPasswordOtpMail $mail) use (&$otp): bool {
             $otp = $mail->otp;
@@ -57,8 +65,13 @@ class ForgotPasswordTest extends TestCase
                 'password' => 'BrandNewPassword123!',
                 'password_confirmation' => 'BrandNewPassword123!',
             ])
-            ->assertRedirect(route('login'))
-            ->assertSessionHas('status', 'Mật khẩu đã được đặt lại thành công. Vui lòng đăng nhập lại.');
+            ->assertRedirect(route('password.reset.result'));
+
+        $this->get(route('password.reset.result'))
+            ->assertOk()
+            ->assertViewIs('auth.password-reset-result')
+            ->assertViewHas('success', true)
+            ->assertSee('Cập nhật mật khẩu thành công.');
 
         $this->assertTrue(Hash::check(
             'BrandNewPassword123!',
@@ -97,7 +110,7 @@ class ForgotPasswordTest extends TestCase
             return true;
         });
 
-        $this->travel(6)->minutes();
+        $this->travel(2)->minutes();
 
         $this->withSession(['password_reset_email' => $user->email])
             ->post(route('password.otp.verify'), ['otp' => $otp])
@@ -134,6 +147,34 @@ class ForgotPasswordTest extends TestCase
         $this->post(route('password.otp.resend'), ['email' => $user->email]);
 
         Mail::assertSentCount(1);
+    }
+
+    public function test_expired_reset_ticket_shows_failure_before_redirecting(): void
+    {
+        $this->withSession(['password_reset_ticket' => 'expired-ticket'])
+            ->put(route('password.reset'), [
+                'password' => 'BrandNewPassword123!',
+                'password_confirmation' => 'BrandNewPassword123!',
+            ])
+            ->assertRedirect(route('password.reset.result'));
+
+        $this->get(route('password.reset.result'))
+            ->assertOk()
+            ->assertViewIs('auth.password-reset-result')
+            ->assertViewHas('success', false)
+            ->assertSee('Không thể cập nhật mật khẩu.');
+    }
+
+    public function test_reset_password_requires_uppercase_first_letter_lowercase_number_and_symbol(): void
+    {
+        foreach (['lowercase123!', 'Uppercase123', 'Uppercase!abc', 'UPPERCASE123!'] as $password) {
+            $this->withSession(['password_reset_ticket' => 'test-ticket'])
+                ->put(route('password.reset'), [
+                    'password' => $password,
+                    'password_confirmation' => $password,
+                ])
+                ->assertSessionHasErrors('password');
+        }
     }
 
     /**

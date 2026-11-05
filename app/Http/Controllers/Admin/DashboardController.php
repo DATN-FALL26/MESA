@@ -2,10 +2,16 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\UserStatus;
+use App\Helpers\ConstantHelper;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Models\Permission;
+use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\Order;
+use App\Models\User;
 
 class DashboardController extends Controller
 {
@@ -14,6 +20,55 @@ class DashboardController extends Controller
      */
     public function index(Request $request)
     {
+        $user = $request->user();
+        $currentRoles = $user->activeRoles()->orderBy('name')->get();
+        $totalUsers = User::query()->count();
+        $activeUsers = User::query()
+            ->where('status', UserStatus::ACTIVE->value)
+            ->count();
+        $totalRoles = Role::query()->count();
+        $totalPermissions = Permission::query()->count();
+        $recentActivities = AuditLog::query()
+            ->orderByDesc('created_at')
+            ->limit(6)
+            ->get();
+        $activityUsers = User::query()
+            ->whereIn('id', $recentActivities->pluck('user_id')->filter()->unique())
+            ->pluck('full_name', 'id');
+        $actionLabels = [
+            'create' => 'Đã tạo',
+            'update' => 'Đã cập nhật',
+            'delete' => 'Đã xóa',
+            'status_change' => 'Đã thay đổi trạng thái',
+            'login' => 'Đã đăng nhập',
+        ];
+        $modules = [
+            [
+                'permission' => ConstantHelper::PERM_USERS_VIEW,
+                'route' => 'users.index',
+                'title' => 'Quản lý tài khoản',
+                'description' => 'Theo dõi tài khoản, thông tin nhân sự và trạng thái hoạt động.',
+                'icon' => 'users',
+                'color' => 'indigo',
+            ],
+            [
+                'permission' => ConstantHelper::PERM_ROLES_VIEW,
+                'route' => 'roles.index',
+                'title' => 'Quản lý vai trò',
+                'description' => 'Tổ chức vai trò và kiểm soát quyền truy cập theo nhóm.',
+                'icon' => 'roles',
+                'color' => 'violet',
+            ],
+            [
+                'permission' => ConstantHelper::PERM_PERMISSIONS_VIEW,
+                'route' => 'permissions.index',
+                'title' => 'Quản lý quyền',
+                'description' => 'Tra cứu các quyền chức năng được cấu hình trong hệ thống.',
+                'icon' => 'permissions',
+                'color' => 'amber',
+            ],
+        ];
+
         $branchId = $request->input('branch_id', 1);
         $title = 'Tổng quan Dashboard';
         $today = today();
@@ -108,6 +163,16 @@ class DashboardController extends Controller
         }
 
         return view('admin.dashboard', compact(
+            'user',
+            'currentRoles',
+            'totalUsers',
+            'activeUsers',
+            'totalRoles',
+            'totalPermissions',
+            'recentActivities',
+            'activityUsers',
+            'actionLabels',
+            'modules',
             'doanhThu',
             'tongDon',
             'danhSachBan',
@@ -239,39 +304,7 @@ class DashboardController extends Controller
         }
     }
 
-    /**
-     * Thống kê khung giờ khách vào đông/vắng (Hourly Traffic) cho Dashboard
-     */
-    public function getHourlyTrafficStats(Request $request)
-    {
-        try {
-            $hourlyData = Order::select(DB::raw('HOUR(created_at) as hour'), DB::raw('COUNT(*) as count'))
-                ->whereDate('created_at', today())
-                ->groupBy('hour')
-                ->pluck('count', 'hour');
-
-            $result = [];
-            for ($i = 8; $i <= 22; $i++) {
-                $result[$i . ':00'] = $hourlyData[$i] ?? rand(2, 15);
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $result
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'success',
-                'data' => [
-                    '8:00' => 5, '9:00' => 8, '10:00' => 12, '11:00' => 35,
-                    '12:00' => 45, '13:00' => 20, '14:00' => 8, '15:00' => 6,
-                    '16:00' => 10, '17:00' => 25, '18:00' => 50, '19:00' => 60,
-                    '20:00' => 40, '21:00' => 15, '22:00' => 5
-                ]
-            ]);
-        }
-    }
-
+   
     /**
      * Báo cáo tình trạng bảo quản thực phẩm dự phòng riêng nếu cần gọi API
      */

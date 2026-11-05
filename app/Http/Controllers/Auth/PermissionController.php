@@ -13,15 +13,44 @@ use Illuminate\View\View;
 
 class PermissionController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $modules = Permission::query()
+            ->distinct()
+            ->orderBy('module')
+            ->pluck('module');
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:150'],
+            'module' => ['nullable', 'string', 'max:50', Rule::in($modules->all())],
+            'usage' => ['nullable', Rule::in(['assigned', 'unassigned'])],
+        ]);
+        $search = trim($filters['q'] ?? '');
+        $module = $filters['module'] ?? '';
+        $usage = $filters['usage'] ?? '';
+
         $permissions = Permission::query()
             ->withCount('roles')
+            ->when($search !== '', fn ($query) => $query->where(
+                fn ($inner) => $inner
+                    ->where('code', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%")
+                    ->orWhere('module', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+            ))
+            ->when($module !== '', fn ($query) => $query->where('module', $module))
+            ->when($usage === 'assigned', fn ($query) => $query->has('roles'))
+            ->when($usage === 'unassigned', fn ($query) => $query->doesntHave('roles'))
+            ->orderByDesc('id')
             ->orderBy('module')
             ->orderBy('code')
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
 
-        return view('permissions.index', compact('permissions'));
+        return view('permissions.index', [
+            'permissions' => $permissions,
+            'modules' => $modules,
+            'filters' => compact('search', 'module', 'usage'),
+        ]);
     }
 
     public function create(): View

@@ -40,6 +40,24 @@ class MenuCategoryTest extends TestCase
         $this->assertLessThan(strpos($html, 'Nước ngọt'), strpos($html, 'Đồ uống'), 'Danh mục con phải nằm sau danh mục cha.');
     }
 
+    public function test_newly_created_category_group_appears_first_without_separating_its_parent_and_child(): void
+    {
+        $manager = $this->createUserWithRole(ConstantHelper::ROLE_BRANCH_MANAGER);
+        $this->createCategory('Danh mục cũ');
+        $recentParent = $this->createCategory('Danh mục cha mới');
+        $recentChild = $this->createCategory('Danh mục con mới', $recentParent);
+
+        $categories = $this->actingAs($manager)
+            ->get(route('menu.categories.index'))
+            ->assertOk()
+            ->viewData('categories');
+
+        $this->assertSame(
+            [$recentParent->id, $recentChild->id],
+            $categories->take(2)->pluck('id')->all(),
+        );
+    }
+
     public function test_view_only_user_sees_the_list_without_management_buttons(): void
     {
         $waiter = $this->createUserWithRole(ConstantHelper::ROLE_WAITER);

@@ -16,14 +16,33 @@ use Illuminate\View\View;
 
 class RoleController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:150'],
+            'type' => ['nullable', Rule::in(['system', 'custom'])],
+        ]);
+        $search = trim($filters['q'] ?? '');
+        $type = $filters['type'] ?? '';
+
         $roles = Role::query()
             ->withCount('permissions')
+            ->when($search !== '', fn ($query) => $query->where(
+                fn ($inner) => $inner
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+            ))
+            ->when($type === 'system', fn ($query) => $query->where('is_system', true))
+            ->when($type === 'custom', fn ($query) => $query->where('is_system', false))
             ->orderBy('name')
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
-        return view('roles.index', compact('roles'));
+        return view('roles.index', [
+            'roles' => $roles,
+            'filters' => compact('search', 'type'),
+        ]);
     }
 
     public function create(): View

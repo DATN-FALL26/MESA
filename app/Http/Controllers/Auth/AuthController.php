@@ -52,7 +52,7 @@ class AuthController extends Controller
         $request->session()->regenerate();
         Auth::user()?->forceFill(['last_login_at' => now()])->save();
 
-        return redirect()->route('dashboard');
+        return redirect()->route('admin.dashboard');
     }
 
     public function logout(Request $request): RedirectResponse

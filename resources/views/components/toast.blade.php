@@ -105,9 +105,9 @@ window.showToast = function(message, type = 'success') {
     if (!container) return;
 
     const toast = document.createElement('div');
-    const borderColor = type === 'success' ? 'border-emerald-200' : (type === 'error' ? 'border-rose-200' : 'border-slate-200');
-    const badgeColor = type === 'success' ? 'bg-emerald-100 text-emerald-600' : (type === 'error' ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-600');
-    const title = type === 'success' ? 'Thành công' : (type === 'error' ? 'Có lỗi xảy ra' : 'Thông báo');
+    const borderColor = type === 'success' ? 'border-emerald-200' : (type === 'error' ? 'border-rose-200' : (type === 'warning' ? 'border-amber-200' : 'border-slate-200'));
+    const badgeColor = type === 'success' ? 'bg-emerald-100 text-emerald-600' : (type === 'error' ? 'bg-rose-100 text-rose-600' : (type === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-600'));
+    const title = type === 'success' ? 'Thành công' : (type === 'error' ? 'Có lỗi xảy ra' : (type === 'warning' ? 'Cảnh báo' : 'Thông báo'));
 
     toast.className = `pointer-events-auto flex items-start gap-3 p-3.5 rounded-lg border bg-white shadow-sm transition-all duration-200 ${borderColor}`;
     toast.innerHTML = `
@@ -123,6 +123,18 @@ window.showToast = function(message, type = 'success') {
         setTimeout(() => toast.remove(), 300);
     }, 4000);
 };
+
+// Cung cấp alias đồng bộ cho các view gọi window.toast(...) hoặc window.toast.error(...)
+window.toast = Object.assign(
+    function(message, type = 'success') { window.showToast(message, type); },
+    {
+        show: (type, message) => window.showToast(message, type),
+        success: (message) => window.showToast(message, 'success'),
+        error: (message) => window.showToast(message, 'error'),
+        warning: (message) => window.showToast(message, 'warning'),
+        info: (message) => window.showToast(message, 'info'),
+    }
+);
 
 @if(session('success'))
     document.addEventListener('DOMContentLoaded', () => window.showToast(@js(session('success')), 'success'));
