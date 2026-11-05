@@ -18,6 +18,7 @@ use App\Http\Controllers\PublicDashboardController;
 use App\Http\Controllers\table\TableController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\OrderController;
 // use Symfony\Component\Routing\Router;
 
 
@@ -192,6 +193,50 @@ Route::middleware('auth')->group(function () {
     Route::delete('/permissions/{permission}', [PermissionController::class, 'destroy'])
         ->middleware('permission:permissions.delete')
         ->name('permissions.destroy');
+});
+
+
+/*
+|--------------------------------------------------------------------------
+| MOD03 - Quản lý gọi món
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->prefix('orders')->name('orders.')->group(function () {
+
+    // Xem màn gọi món của Dining Session
+    Route::get('/session/{sessionId}', [OrderController::class, 'showSession'])
+        ->middleware('permission:order.view')
+        ->name('session');
+
+    // Tạo Order cho Dining Session
+    Route::post('/session/{sessionId}/start', [OrderController::class, 'startOrder'])
+        ->middleware('permission:order.create')
+        ->name('start');
+
+    // Thêm / tăng món
+    Route::post('/{orderId}/items/{menuItemId}', [OrderController::class, 'addItem'])
+        ->middleware('permission:order.update')
+        ->name('items.add');
+
+    // Giảm món
+    Route::post('/{orderId}/items/{orderItemId}/decrease', [OrderController::class, 'decreaseItem'])
+        ->middleware('permission:order.update')
+        ->name('items.decrease');
+
+    // Ghi chú món
+    Route::post('/{orderId}/items/{orderItemId}/note', [OrderController::class, 'updateItemNote'])
+        ->middleware('permission:order.update')
+        ->name('items.note');
+
+    // Gửi Batch xuống bếp
+    Route::post('/{orderId}/send-kitchen', [OrderController::class, 'sendToKitchen'])
+        ->middleware('permission:order.batch.release')
+        ->name('send-kitchen');
+
+    // Cập nhật món đã gửi nhưng bếp chưa bắt đầu
+    Route::post('/{orderId}/update-kitchen', [OrderController::class, 'updateKitchen'])
+        ->middleware('permission:order.update')
+        ->name('update-kitchen');
 });
 
 /*
