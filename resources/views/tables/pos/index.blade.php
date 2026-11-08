@@ -37,6 +37,17 @@
                 <p class="mt-1.5 text-sm text-slate-500">Theo dõi bàn và thao tác phục vụ tại chi nhánh.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+                @if (isset($branches) && $branches->count() > 1)
+                    <form method="GET" action="{{ route('tables.index') }}" class="inline-flex items-center">
+                        <select name="branch_id" onchange="this.form.submit()" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600">
+                            @foreach ($branches as $branch)
+                                <option value="{{ $branch->id }}" @selected($branch->id === $currentBranchId)>
+                                    {{ $branch->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </form>
+                @endif
                 <button type="button" data-refresh-tables class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60">
                     <svg data-refresh-icon class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 12a8.25 8.25 0 0 1-14.09 5.84M3.75 12A8.25 8.25 0 0 1 17.84 6.16M3.75 16.5v-4.5h4.5m12-4.5v4.5h-4.5" /></svg>
                     Làm mới

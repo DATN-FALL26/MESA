@@ -1059,8 +1059,8 @@ window.addEventListener('load', function () {
 
     if (!window.Echo) {
 
-        console.error(
-            'Echo chưa được khởi tạo'
+        console.warn(
+            'Echo chưa được khởi tạo (WebSocket Realtime chưa được cấu hình)'
         );
 
         return;
