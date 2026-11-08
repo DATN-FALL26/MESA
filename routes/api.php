@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Inventory\RecipeController;
 use App\Http\Controllers\Api\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Api\Inventory\StockLedgerController;
 use App\Http\Controllers\Api\Inventory\SupplierController;
+use App\Http\Controllers\Api\Inventory\SupplierDocumentController;
 use App\Http\Controllers\Api\Inventory\WarehouseController;
 use App\Http\Controllers\table\DiningSessionController;
 use App\Http\Controllers\table\TableController;
@@ -68,12 +69,26 @@ Route::prefix('v1/inventory')->group(function () {
         ->names('api.inventory.ingredients');
 
     // ==========================================
-    // 3. MASTER DATA: NHÀ CUNG CẤP (SUPPLIERS)
+    // 3. MASTER DATA: NHÀ CUNG CẤP & HỒ SƠ ATVSTP (SUPPLIERS & DOCUMENTS)
     // ==========================================
     Route::get('/suppliers/active', [SupplierController::class, 'active'])
         ->name('api.inventory.suppliers.active');
+    Route::get('/supplier-documents/types', [SupplierDocumentController::class, 'types'])
+        ->name('api.inventory.supplier-documents.types');
+    Route::get('/supplier-documents/expiring', [SupplierDocumentController::class, 'expiring'])
+        ->name('api.inventory.supplier-documents.expiring');
     Route::apiResource('suppliers', SupplierController::class)
         ->names('api.inventory.suppliers');
+    Route::get('/suppliers/{supplier}/documents', [SupplierDocumentController::class, 'index'])
+        ->name('api.inventory.suppliers.documents.index');
+    Route::post('/suppliers/{supplier}/documents', [SupplierDocumentController::class, 'store'])
+        ->name('api.inventory.suppliers.documents.store');
+    Route::get('/suppliers/{supplier}/documents/{document}', [SupplierDocumentController::class, 'show'])
+        ->name('api.inventory.suppliers.documents.show');
+    Route::post('/suppliers/{supplier}/documents/{document}', [SupplierDocumentController::class, 'update'])
+        ->name('api.inventory.suppliers.documents.update');
+    Route::delete('/suppliers/{supplier}/documents/{document}', [SupplierDocumentController::class, 'destroy'])
+        ->name('api.inventory.suppliers.documents.destroy');
 
     // ==========================================
     // 3B. MASTER DATA: KHO & CHI NHÁNH / CƠ SỞ

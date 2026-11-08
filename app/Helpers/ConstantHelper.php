@@ -99,6 +99,8 @@ final class ConstantHelper
 
     public const TABLE_SUPPLIERS = 'suppliers';
 
+    public const TABLE_SUPPLIER_DOCUMENTS = 'supplier_documents';
+
     public const TABLE_RECIPES = 'recipes';
 
     public const TABLE_RECIPE_ITEMS = 'recipe_items';
@@ -357,6 +359,7 @@ final class ConstantHelper
             self::TABLE_STOCK_LEVELS,
             self::TABLE_STOCK_MOVEMENTS,
             self::TABLE_SUPPLIERS,
+            self::TABLE_SUPPLIER_DOCUMENTS,
             self::TABLE_RECIPES,
             self::TABLE_RECIPE_ITEMS,
             self::TABLE_PURCHASE_ORDERS,

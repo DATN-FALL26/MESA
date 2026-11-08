@@ -25,6 +25,8 @@ class SupplierResource extends JsonResource
             'phone' => $this->phone,
             'address' => $this->address,
             'is_active' => (bool) $this->is_active,
+            'documents_count' => (int) ($this->documents_count ?? $this->documents()->count()),
+            'has_valid_food_safety' => $this->hasValidFoodSafetyCert(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
