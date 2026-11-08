@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Kitchen;
 
 use App\Enums\BatchStatus;
+use App\Enums\BranchStatus;
 use App\Enums\NotificationType;
 use App\Enums\OrderItemStatus;
 use App\Enums\StationCode;
@@ -14,6 +15,7 @@ use App\Events\Kitchen\KitchenTicketItemStatusChanged;
 use App\Helpers\ConstantHelper;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Kitchen\Concerns\ResolvesBranchScope;
+use App\Models\Branch;
 use App\Models\KitchenTicket;
 use App\Models\KitchenTicketItem;
 use App\Models\Notification;
@@ -21,6 +23,8 @@ use App\Models\OrderBatch;
 use App\Models\OrderStatusHistory;
 use App\Models\PrintJob;
 use App\Models\User;
+use App\Models\Warehouse;
+use App\Services\Kitchen\KitchenDailyCheckinService;
 use App\Services\Kitchen\KitchenTicketDispatcher;
 use App\Services\Kitchen\KitchenTicketPrinter;
 use Illuminate\Database\Eloquent\Builder;
@@ -50,21 +54,68 @@ class KitchenDisplayController extends Controller
      */
     public const OVERDUE_MINUTES = 10;
 
-    public function __construct(private KitchenTicketPrinter $printer) {}
+    public function __construct(
+        private KitchenTicketPrinter $printer,
+        private KitchenDailyCheckinService $checkinService,
+    ) {}
 
     public function index(Request $request): View
     {
         $stationCode = $this->selectedStationCode($request);
-        $branchIds = $this->kitchenBranchIds($request->user());
-        $columns = $this->boardColumns($branchIds, $stationCode);
+        $accessibleBranchIds = $this->kitchenBranchIds($request->user());
+
+        $branches = Branch::query()
+            ->where('status', BranchStatus::ACTIVE)
+            ->when($accessibleBranchIds !== null, fn ($q) => $q->whereIn('id', $accessibleBranchIds))
+            ->orderBy('id')
+            ->get();
+
+        $activeBranchId = $this->resolveActiveBranchId($request, $accessibleBranchIds, $branches);
+        $filterBranchIds = $activeBranchId !== null ? [$activeBranchId] : $accessibleBranchIds;
+
+        $columns = $this->boardColumns($filterBranchIds, $stationCode);
+
+        $currentBranch = $activeBranchId ? Branch::find($activeBranchId) : null;
+        $needsDailyCheckin = false;
+        $dailyIngredients = collect();
+        $currentWarehouse = null;
+
+        if ($currentBranch) {
+            $currentWarehouse = Warehouse::query()
+                ->where('branch_id', $currentBranch->id)
+                ->where('is_active', true)
+                ->first();
+
+            if (! $currentWarehouse) {
+                $currentWarehouse = Warehouse::query()->create([
+                    'branch_id' => $currentBranch->id,
+                    'name' => 'Kho '.$currentBranch->name,
+                    'type' => \App\Enums\WarehouseType::BRANCH,
+                    'is_active' => true,
+                ]);
+            }
+
+            if ($currentWarehouse) {
+                $dailyIngredients = $this->checkinService->getDailyIngredientsWithStock($currentWarehouse->id);
+                if ($dailyIngredients->isNotEmpty()) {
+                    $needsDailyCheckin = ! $this->checkinService->hasCheckedInToday($currentBranch->id);
+                }
+            }
+        }
 
         return view('kitchen.index', [
             'columns' => $columns,
             'printJobs' => $this->printJobsFor($columns),
-            'phoBowlStats' => $this->phoBowlStats($branchIds),
+            'phoBowlStats' => $this->phoBowlStats($filterBranchIds),
             'stationCode' => $stationCode,
             'stationCodes' => [StationCode::PHO, StationCode::SIDE],
             'overdueMinutes' => self::OVERDUE_MINUTES,
+            'needsDailyCheckin' => $needsDailyCheckin,
+            'dailyIngredients' => $dailyIngredients,
+            'branches' => $branches,
+            'activeBranchId' => $activeBranchId,
+            'currentBranch' => $currentBranch,
+            'currentWarehouse' => $currentWarehouse,
         ]);
     }
 
@@ -73,16 +124,51 @@ class KitchenDisplayController extends Controller
      */
     public function board(Request $request): View
     {
-        $branchIds = $this->kitchenBranchIds($request->user());
+        $accessibleBranchIds = $this->kitchenBranchIds($request->user());
+
+        $branches = Branch::query()
+            ->where('status', BranchStatus::ACTIVE)
+            ->when($accessibleBranchIds !== null, fn ($q) => $q->whereIn('id', $accessibleBranchIds))
+            ->orderBy('id')
+            ->get();
+
+        $activeBranchId = $this->resolveActiveBranchId($request, $accessibleBranchIds, $branches);
+        $filterBranchIds = $activeBranchId !== null ? [$activeBranchId] : $accessibleBranchIds;
+
         $stationCode = $this->selectedStationCode($request);
-        $columns = $this->boardColumns($branchIds, $stationCode);
+        $columns = $this->boardColumns($filterBranchIds, $stationCode);
 
         return view('kitchen.partials.board', [
             'columns' => $columns,
             'printJobs' => $this->printJobsFor($columns),
-            'phoBowlStats' => $this->phoBowlStats($branchIds),
+            'phoBowlStats' => $this->phoBowlStats($filterBranchIds),
             'overdueMinutes' => self::OVERDUE_MINUTES,
         ]);
+    }
+
+    /**
+     * Xác định chi nhánh hoạt động hiện tại cho màn hình Bếp.
+     *
+     * @param  list<int>|null  $accessibleBranchIds
+     * @param  Collection<int, Branch>  $branches
+     */
+    private function resolveActiveBranchId(Request $request, ?array $accessibleBranchIds, Collection $branches): ?int
+    {
+        if ($request->filled('branch_id')) {
+            $branchId = (int) $request->input('branch_id');
+            if ($branches->contains('id', $branchId)) {
+                $request->session()->put('kitchen_branch_id', $branchId);
+
+                return $branchId;
+            }
+        }
+
+        $sessionBranchId = (int) $request->session()->get('kitchen_branch_id');
+        if ($sessionBranchId > 0 && $branches->contains('id', $sessionBranchId)) {
+            return $sessionBranchId;
+        }
+
+        return $branches->first()?->id;
     }
 
     /**

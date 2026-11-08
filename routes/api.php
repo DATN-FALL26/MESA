@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Inventory\RecipeController;
 use App\Http\Controllers\Api\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Api\Inventory\StockLedgerController;
 use App\Http\Controllers\Api\Inventory\SupplierController;
+use App\Http\Controllers\Api\Inventory\WarehouseController;
 use App\Http\Controllers\table\DiningSessionController;
 use App\Http\Controllers\table\TableController;
 use Illuminate\Support\Facades\Route;
@@ -73,6 +74,14 @@ Route::prefix('v1/inventory')->group(function () {
         ->name('api.inventory.suppliers.active');
     Route::apiResource('suppliers', SupplierController::class)
         ->names('api.inventory.suppliers');
+
+    // ==========================================
+    // 3B. MASTER DATA: KHO & CHI NHÁNH / CƠ SỞ
+    // ==========================================
+    Route::get('/warehouses', [WarehouseController::class, 'index'])
+        ->name('api.inventory.warehouses.index');
+    Route::get('/branches', [WarehouseController::class, 'branches'])
+        ->name('api.inventory.branches.index');
 
     // ==========================================
     // 4. QUẢN LÝ CÔNG THỨC ĐỊNH LƯỢNG (BOM RECIPES)

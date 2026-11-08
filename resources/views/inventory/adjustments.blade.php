@@ -84,18 +84,46 @@
         </div>
 
         <!-- SEARCH & FILTERS -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-white p-4 rounded-xl border border-slate-200">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 bg-white p-4 rounded-xl border border-slate-200">
             <div class="relative">
                 <input 
                     type="text" 
                     id="filter-adj-search" 
-                    placeholder="Tìm theo mã phiếu hoặc ghi chú..." 
+                    placeholder="Tìm theo mã phiếu, ghi chú..." 
                     class="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
                     onkeyup="if(event.key === 'Enter') applyAdjFilter()"
                 >
                 <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                 </svg>
+            </div>
+            <div>
+                <select 
+                    id="filter-adj-branch" 
+                    class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-600"
+                    onchange="onFilterBranchChange(); applyAdjFilter();"
+                >
+                    <option value="">-- Tất cả cơ sở / chi nhánh --</option>
+                    @if (isset($branches))
+                        @foreach ($branches as $b)
+                            <option value="{{ $b->id }}">{{ $b->name }}</option>
+                        @endforeach
+                    @endif
+                </select>
+            </div>
+            <div>
+                <select 
+                    id="filter-adj-warehouse" 
+                    class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-600"
+                    onchange="applyAdjFilter()"
+                >
+                    <option value="">-- Tất cả kho kiểm kê --</option>
+                    @if (isset($warehouses))
+                        @foreach ($warehouses as $wh)
+                            <option value="{{ $wh->id }}" data-branch="{{ $wh->branch_id }}">{{ $wh->name }} ({{ $wh->branch?->name }})</option>
+                        @endforeach
+                    @endif
+                </select>
             </div>
             <div>
                 <select 
@@ -150,7 +178,7 @@
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
                             <th class="py-3 px-4">Mã phiếu (Adj No)</th>
-                            <th class="py-3 px-4">Kho kiểm kê</th>
+                            <th class="py-3 px-4">Cơ sở & Kho kiểm kê</th>
                             <th class="py-3 px-4 text-center">Lý do</th>
                             <th class="py-3 px-4 text-center">Trạng thái</th>
                             <th class="py-3 px-4 text-center">Số mặt hàng</th>
@@ -203,12 +231,24 @@
             </div>
 
             <form id="form-create-adj" onsubmit="submitCreateAdj(event)" class="p-6 space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Kho kiểm kê <span class="text-rose-500">*</span></label>
-                    <select id="adj-warehouse-id" required class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-600">
-                        <option value="1">Kho Bếp Ba Đình (Kho chi nhánh)</option>
-                        <option value="2">Kho Trung Tâm MESA Hà Nội</option>
-                    </select>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Cơ sở / Chi nhánh <span class="text-rose-500">*</span></label>
+                        <select id="adj-branch-id" required onchange="onAdjCreateBranchChange()" class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-600">
+                            <option value="">-- Chọn chi nhánh --</option>
+                            @if (isset($branches))
+                                @foreach ($branches as $b)
+                                    <option value="{{ $b->id }}">{{ $b->name }}</option>
+                                @endforeach
+                            @endif
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Kho kiểm kê <span class="text-rose-500">*</span></label>
+                        <select id="adj-warehouse-id" required class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-600">
+                            <option value="">-- Chọn kho kiểm kê --</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div>
@@ -257,7 +297,11 @@
             </div>
 
             <div class="p-6 space-y-4">
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-xl text-xs">
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 p-4 bg-slate-50 rounded-xl text-xs">
+                    <div>
+                        <span class="text-slate-400 block">Cơ sở / Chi nhánh:</span>
+                        <strong id="detail-adj-branch" class="text-slate-800 font-semibold block mt-0.5">-</strong>
+                    </div>
                     <div>
                         <span class="text-slate-400 block">Kho kiểm kê:</span>
                         <strong id="detail-adj-warehouse" class="text-slate-800 font-semibold block mt-0.5">-</strong>
@@ -319,12 +363,24 @@
             </div>
 
             <form id="form-direct-waste" onsubmit="submitDirectWaste(event)" class="p-6 space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Kho phát sinh <span class="text-rose-500">*</span></label>
-                    <select id="waste-warehouse-id" required class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-rose-600">
-                        <option value="1">Kho Bếp Ba Đình (Kho chi nhánh)</option>
-                        <option value="2">Kho Trung Tâm MESA Hà Nội</option>
-                    </select>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Cơ sở / Chi nhánh <span class="text-rose-500">*</span></label>
+                        <select id="waste-branch-id" required onchange="onWasteCreateBranchChange()" class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-rose-600">
+                            <option value="">-- Chọn chi nhánh --</option>
+                            @if (isset($branches))
+                                @foreach ($branches as $b)
+                                    <option value="{{ $b->id }}">{{ $b->name }}</option>
+                                @endforeach
+                            @endif
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Kho phát sinh <span class="text-rose-500">*</span></label>
+                        <select id="waste-warehouse-id" required class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-rose-600">
+                            <option value="">-- Chọn kho --</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div>
@@ -357,6 +413,57 @@
         let currentAdjPage = 1;
         let activeIngredientsList = [];
         let currentViewingAdj = null;
+
+        const serverBranches = @json($branches ?? []);
+        const serverWarehouses = @json($warehouses ?? []);
+
+        function onFilterBranchChange() {
+            const branchId = document.getElementById('filter-adj-branch').value;
+            const whSelect = document.getElementById('filter-adj-warehouse');
+            whSelect.innerHTML = '<option value="">-- Tất cả kho kiểm kê --</option>';
+
+            const filteredWhs = branchId 
+                ? serverWarehouses.filter(w => String(w.branch_id) === String(branchId))
+                : serverWarehouses;
+
+            filteredWhs.forEach(w => {
+                whSelect.innerHTML += `<option value="${w.id}">${w.name} (${w.branch?.name || ''})</option>`;
+            });
+        }
+
+        function onAdjCreateBranchChange() {
+            const branchId = document.getElementById('adj-branch-id').value;
+            const whSelect = document.getElementById('adj-warehouse-id');
+            whSelect.innerHTML = '<option value="">-- Chọn kho kiểm kê --</option>';
+
+            if (!branchId) return;
+
+            const filteredWhs = serverWarehouses.filter(w => String(w.branch_id) === String(branchId));
+            filteredWhs.forEach(w => {
+                whSelect.innerHTML += `<option value="${w.id}">${w.name}</option>`;
+            });
+
+            if (filteredWhs.length === 1) {
+                whSelect.value = filteredWhs[0].id;
+            }
+        }
+
+        function onWasteCreateBranchChange() {
+            const branchId = document.getElementById('waste-branch-id').value;
+            const whSelect = document.getElementById('waste-warehouse-id');
+            whSelect.innerHTML = '<option value="">-- Chọn kho --</option>';
+
+            if (!branchId) return;
+
+            const filteredWhs = serverWarehouses.filter(w => String(w.branch_id) === String(branchId));
+            filteredWhs.forEach(w => {
+                whSelect.innerHTML += `<option value="${w.id}">${w.name}</option>`;
+            });
+
+            if (filteredWhs.length === 1) {
+                whSelect.value = filteredWhs[0].id;
+            }
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             loadMasterData();
@@ -391,6 +498,8 @@
             const search = document.getElementById('filter-adj-search').value.trim();
             const reason = document.getElementById('filter-adj-reason').value;
             const status = document.getElementById('filter-adj-status').value;
+            const branchId = document.getElementById('filter-adj-branch')?.value;
+            const warehouseId = document.getElementById('filter-adj-warehouse')?.value;
 
             const params = new URLSearchParams({
                 page: currentAdjPage,
@@ -399,6 +508,8 @@
             if (search) params.append('search', search);
             if (reason) params.append('reason', reason);
             if (status) params.append('status', status);
+            if (branchId) params.append('branch_id', branchId);
+            if (warehouseId) params.append('warehouse_id', warehouseId);
 
             const tbody = document.getElementById('adj-table-body');
             tbody.innerHTML = `
@@ -482,8 +593,8 @@
                     <tr class="hover:bg-slate-50/80 transition-colors">
                         <td class="py-3 px-4 font-bold text-indigo-600">${adj.adjustment_no}</td>
                         <td class="py-3 px-4">
-                            <div class="font-medium text-slate-800">${adj.warehouse_name || 'Kho Bếp'}</div>
-                            <div class="text-[10px] text-slate-400">${adj.branch_name || ''}</div>
+                            <div class="font-semibold text-slate-800">${adj.branch_name || 'Toàn hệ thống'}</div>
+                            <div class="text-[11px] text-slate-500">${adj.warehouse_name || 'Kho chi nhánh'}</div>
                         </td>
                         <td class="py-3 px-4 text-center">${reasonBadge}</td>
                         <td class="py-3 px-4 text-center">${statusBadge}</td>
@@ -566,12 +677,22 @@
             document.getElementById('filter-adj-search').value = '';
             document.getElementById('filter-adj-reason').value = '';
             document.getElementById('filter-adj-status').value = '';
+            const bSelect = document.getElementById('filter-adj-branch');
+            if (bSelect) bSelect.value = '';
+            onFilterBranchChange();
+            const wSelect = document.getElementById('filter-adj-warehouse');
+            if (wSelect) wSelect.value = '';
             loadAdjustments(1);
         }
 
         // 3. TẠO PHIẾU KIỂM KÊ MỚI
         function openCreateAdjModal() {
             document.getElementById('form-create-adj').reset();
+            document.getElementById('adj-warehouse-id').innerHTML = '<option value="">-- Chọn kho kiểm kê --</option>';
+            if (serverBranches.length === 1) {
+                document.getElementById('adj-branch-id').value = serverBranches[0].id;
+                onAdjCreateBranchChange();
+            }
             document.getElementById('modal-create-adj').classList.remove('hidden');
         }
 
@@ -585,9 +706,17 @@
             btn.disabled = true;
             btn.textContent = 'Đang khởi tạo snapshot...';
 
+            const branchId = document.getElementById('adj-branch-id').value;
             const warehouseId = document.getElementById('adj-warehouse-id').value;
             const reason = document.getElementById('adj-reason').value;
             const note = document.getElementById('adj-note').value;
+
+            if (!branchId || !warehouseId) {
+                notifyToast('Vui lòng chọn cơ sở và kho kiểm kê!', 'warning');
+                btn.disabled = false;
+                btn.textContent = 'Khởi Tạo Phiếu';
+                return;
+            }
 
             try {
                 const res = await fetch('/api/v1/inventory/adjustments', {
@@ -632,6 +761,8 @@
                 document.getElementById('detail-adj-no').textContent = adj.adjustment_no;
                 document.getElementById('detail-adj-status-badge').innerHTML = getStatusBadge(adj.status, adj.status_label);
                 document.getElementById('detail-adj-reason-badge').innerHTML = getReasonBadge(adj.reason, adj.reason_label);
+                const branchElem = document.getElementById('detail-adj-branch');
+                if (branchElem) branchElem.textContent = adj.branch_name || 'Toàn hệ thống';
                 document.getElementById('detail-adj-warehouse').textContent = adj.warehouse_name || 'Kho chính';
                 document.getElementById('detail-adj-creator').textContent = adj.creator_name || 'N/A';
                 document.getElementById('detail-adj-approver').textContent = adj.approver_name || 'Chưa duyệt';
@@ -818,6 +949,11 @@
         // 6. XUẤT HỦY NHANH (DIRECT WASTE)
         function openDirectWasteModal() {
             document.getElementById('form-direct-waste').reset();
+            document.getElementById('waste-warehouse-id').innerHTML = '<option value="">-- Chọn kho --</option>';
+            if (serverBranches.length === 1) {
+                document.getElementById('waste-branch-id').value = serverBranches[0].id;
+                onWasteCreateBranchChange();
+            }
             document.getElementById('modal-direct-waste').classList.remove('hidden');
         }
 
@@ -831,10 +967,18 @@
             btn.disabled = true;
             btn.textContent = 'Đang xử lý xuất hủy...';
 
+            const branchId = document.getElementById('waste-branch-id').value;
             const warehouseId = document.getElementById('waste-warehouse-id').value;
             const ingredientId = document.getElementById('waste-ingredient-id').value;
             const quantity = document.getElementById('waste-quantity').value;
             const note = document.getElementById('waste-note').value;
+
+            if (!branchId || !warehouseId) {
+                notifyToast('Vui lòng chọn cơ sở và kho phát sinh xuất hủy!', 'warning');
+                btn.disabled = false;
+                btn.textContent = 'Xác Nhận Xuất Hủy';
+                return;
+            }
 
             try {
                 const res = await fetch('/api/v1/inventory/waste', {

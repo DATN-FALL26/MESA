@@ -30,7 +30,7 @@ class StockAdjustmentController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $perPage = (int) $request->input('per_page', 15);
-        $filters = $request->only(['warehouse_id', 'reason', 'status', 'search']);
+        $filters = $request->only(['branch_id', 'warehouse_id', 'reason', 'status', 'search']);
 
         $adjustments = $this->adjustmentRepository->paginate($filters, $perPage);
 
