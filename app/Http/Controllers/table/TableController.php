@@ -5,6 +5,7 @@ namespace App\Http\Controllers\table;
 use App\Enums\SessionStatus;
 use App\Enums\TableStatus;
 use App\Helpers\ConstantHelper;
+use App\Http\Controllers\table\Concerns\ResolvesTableBranch;
 use App\Models\Area;
 use App\Models\AuditLog;
 use App\Models\DiningTable;
@@ -21,9 +22,12 @@ use Illuminate\View\View;
 
 class TableController extends BaseController
 {
+    use ResolvesTableBranch;
+
     public function index(Request $request): View
     {
-        $currentBranchId = (int) $request->session()->get('branch_id', 1);
+        $currentBranchId = $this->resolveBranchId($request);
+        $branches = $this->accessibleBranches($request);
         $areas = Area::query()
             ->where('branch_id', $currentBranchId)
             ->where('is_active', true)
@@ -94,6 +98,7 @@ class TableController extends BaseController
         return view($view, compact(
             'tables',
             'areas',
+            'branches',
             'currentBranchId',
             'openSessionsByTableId',
             'tableTransferHistoryByTableId',
@@ -113,7 +118,7 @@ class TableController extends BaseController
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $branchId = (int) $request->session()->get('branch_id', 1);
+        $branchId = $this->resolveBranchId($request);
         $table = DiningTable::query()
             ->where('branch_id', $branchId)
             ->findOrFail($id);
@@ -155,7 +160,7 @@ class TableController extends BaseController
 
     public function destroy(Request $request, int $id): JsonResponse
     {
-        $branchId = (int) $request->session()->get('branch_id', 1);
+        $branchId = $this->resolveBranchId($request);
         $table = DiningTable::query()
             ->where('branch_id', $branchId)
             ->findOrFail($id);
@@ -186,7 +191,7 @@ class TableController extends BaseController
 
     public function status(Request $request): JsonResponse
     {
-        $branchId = (int) $request->session()->get('branch_id', 1);
+        $branchId = $this->resolveBranchId($request);
         /** @var Collection<int, DiningTable> $tables */
         $tables = DiningTable::query()
             ->where('branch_id', $branchId)
@@ -231,7 +236,7 @@ class TableController extends BaseController
      */
     private function tableRules(Request $request, ?DiningTable $table = null): array
     {
-        $branchId = (int) $request->session()->get('branch_id', 1);
+        $branchId = $this->resolveBranchId($request);
         $uniqueCode = Rule::unique((new DiningTable)->getTable(), 'code')
             ->where('branch_id', $branchId)
             ->whereNull('deleted_at');
