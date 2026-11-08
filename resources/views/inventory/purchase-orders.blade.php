@@ -74,18 +74,46 @@
         </div>
 
         <!-- SEARCH & FILTERS -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-white p-4 rounded-xl border border-slate-200">
-            <div class="md:col-span-2 relative">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 bg-white p-4 rounded-xl border border-slate-200">
+            <div class="relative">
                 <input 
                     type="text" 
                     id="filter-po-search" 
-                    placeholder="Tìm theo số đơn PO hoặc ghi chú..." 
+                    placeholder="Tìm theo số PO, ghi chú..." 
                     class="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
                     onkeyup="if(event.key === 'Enter') applyPoFilter()"
                 >
                 <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                 </svg>
+            </div>
+            <div>
+                <select 
+                    id="filter-po-branch" 
+                    class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-600"
+                    onchange="onFilterBranchChange(); applyPoFilter();"
+                >
+                    <option value="">-- Tất cả cơ sở / chi nhánh --</option>
+                    @if (isset($branches))
+                        @foreach ($branches as $b)
+                            <option value="{{ $b->id }}">{{ $b->name }}</option>
+                        @endforeach
+                    @endif
+                </select>
+            </div>
+            <div>
+                <select 
+                    id="filter-po-warehouse" 
+                    class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-600"
+                    onchange="applyPoFilter()"
+                >
+                    <option value="">-- Tất cả kho nhận --</option>
+                    @if (isset($warehouses))
+                        @foreach ($warehouses as $wh)
+                            <option value="{{ $wh->id }}" data-branch="{{ $wh->branch_id }}">{{ $wh->name }} ({{ $wh->branch?->name }})</option>
+                        @endforeach
+                    @endif
+                </select>
             </div>
             <div>
                 <select 
@@ -128,7 +156,7 @@
                         <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
                             <th class="py-3 px-4">Mã đơn (PO No)</th>
                             <th class="py-3 px-4">Nhà cung cấp</th>
-                            <th class="py-3 px-4">Kho nhập</th>
+                            <th class="py-3 px-4">Cơ sở & Kho nhận</th>
                             <th class="py-3 px-4 text-center">Trạng thái</th>
                             <th class="py-3 px-4 text-center">Nguồn tạo</th>
                             <th class="py-3 px-4 text-right">Tổng tiền dự kiến</th>
@@ -180,7 +208,7 @@
             </div>
 
             <form id="form-create-po" onsubmit="submitCreatePo(event)" class="p-6 space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Nhà cung cấp <span class="text-rose-500">*</span></label>
                         <select id="po-supplier-id" required class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-600">
@@ -188,10 +216,20 @@
                         </select>
                     </div>
                     <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Cơ sở / Chi nhánh <span class="text-rose-500">*</span></label>
+                        <select id="po-branch-id" required onchange="onPoCreateBranchChange()" class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-600">
+                            <option value="">-- Chọn chi nhánh --</option>
+                            @if (isset($branches))
+                                @foreach ($branches as $b)
+                                    <option value="{{ $b->id }}">{{ $b->name }}</option>
+                                @endforeach
+                            @endif
+                        </select>
+                    </div>
+                    <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Kho nhận hàng <span class="text-rose-500">*</span></label>
                         <select id="po-warehouse-id" required class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-600">
-                            <option value="1">Kho Bếp Ba Đình (Kho chi nhánh)</option>
-                            <option value="2">Kho Trung Tâm MESA Hà Nội</option>
+                            <option value="">-- Chọn kho nhận --</option>
                         </select>
                     </div>
                 </div>
@@ -262,10 +300,14 @@
             </div>
 
             <div class="p-6 space-y-4">
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-xl text-xs">
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 p-4 bg-slate-50 rounded-xl text-xs">
                     <div>
                         <span class="text-slate-400 block">Nhà cung cấp:</span>
                         <strong id="detail-po-supplier" class="text-slate-800 font-semibold block mt-0.5">-</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block">Cơ sở / Chi nhánh:</span>
+                        <strong id="detail-po-branch" class="text-slate-800 font-semibold block mt-0.5">-</strong>
                     </div>
                     <div>
                         <span class="text-slate-400 block">Kho nhận:</span>
@@ -365,6 +407,40 @@
         let activeSuppliersList = [];
         let currentViewingPo = null;
 
+        const serverBranches = @json($branches ?? []);
+        const serverWarehouses = @json($warehouses ?? []);
+
+        function onFilterBranchChange() {
+            const branchId = document.getElementById('filter-po-branch').value;
+            const whSelect = document.getElementById('filter-po-warehouse');
+            whSelect.innerHTML = '<option value="">-- Tất cả kho nhận --</option>';
+
+            const filteredWhs = branchId 
+                ? serverWarehouses.filter(w => String(w.branch_id) === String(branchId))
+                : serverWarehouses;
+
+            filteredWhs.forEach(w => {
+                whSelect.innerHTML += `<option value="${w.id}">${w.name} (${w.branch?.name || ''})</option>`;
+            });
+        }
+
+        function onPoCreateBranchChange() {
+            const branchId = document.getElementById('po-branch-id').value;
+            const whSelect = document.getElementById('po-warehouse-id');
+            whSelect.innerHTML = '<option value="">-- Chọn kho nhận --</option>';
+
+            if (!branchId) return;
+
+            const filteredWhs = serverWarehouses.filter(w => String(w.branch_id) === String(branchId));
+            filteredWhs.forEach(w => {
+                whSelect.innerHTML += `<option value="${w.id}">${w.name}</option>`;
+            });
+
+            if (filteredWhs.length === 1) {
+                whSelect.value = filteredWhs[0].id;
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             loadMasterData();
             loadPurchaseOrders();
@@ -405,6 +481,8 @@
             currentPoPage = page;
             const search = document.getElementById('filter-po-search').value.trim();
             const status = document.getElementById('filter-po-status').value;
+            const branchId = document.getElementById('filter-po-branch')?.value;
+            const warehouseId = document.getElementById('filter-po-warehouse')?.value;
 
             const params = new URLSearchParams({
                 page: currentPoPage,
@@ -412,6 +490,8 @@
             });
             if (search) params.append('search', search);
             if (status) params.append('status', status);
+            if (branchId) params.append('branch_id', branchId);
+            if (warehouseId) params.append('warehouse_id', warehouseId);
 
             const tbody = document.getElementById('po-table-body');
             tbody.innerHTML = `
@@ -509,9 +589,12 @@
                         <td class="py-3 px-4 font-bold text-indigo-600">${po.po_no}</td>
                         <td class="py-3 px-4">
                             <div class="font-medium text-slate-800">${po.supplier_name || 'Chưa chỉ định'}</div>
-                            <div class="text-[10px] text-slate-400">${po.branch_name || ''}</div>
+                            <div class="text-[10px] text-slate-400">NCC #${po.supplier_id || ''}</div>
                         </td>
-                        <td class="py-3 px-4 text-slate-600">${po.warehouse_name || 'Kho chính'}</td>
+                        <td class="py-3 px-4">
+                            <div class="font-semibold text-slate-800">${po.branch_name || 'Chi nhánh'}</div>
+                            <div class="text-[11px] text-slate-500">${po.warehouse_name || 'Kho chính'}</div>
+                        </td>
                         <td class="py-3 px-4 text-center">${statusBadge}</td>
                         <td class="py-3 px-4 text-center">${sourceBadge}</td>
                         <td class="py-3 px-4 text-right font-semibold text-slate-900">${totalFormatted}</td>
@@ -577,6 +660,11 @@
         function resetPoFilter() {
             document.getElementById('filter-po-search').value = '';
             document.getElementById('filter-po-status').value = '';
+            const bSelect = document.getElementById('filter-po-branch');
+            if (bSelect) bSelect.value = '';
+            onFilterBranchChange();
+            const wSelect = document.getElementById('filter-po-warehouse');
+            if (wSelect) wSelect.value = '';
             loadPurchaseOrders(1);
         }
 
@@ -584,6 +672,11 @@
         function openCreatePoModal() {
             document.getElementById('form-create-po').reset();
             document.getElementById('po-items-table-body').innerHTML = '';
+            document.getElementById('po-warehouse-id').innerHTML = '<option value="">-- Chọn kho nhận --</option>';
+            if (serverBranches.length === 1) {
+                document.getElementById('po-branch-id').value = serverBranches[0].id;
+                onPoCreateBranchChange();
+            }
             addPoItemRow(); // Thêm sẵn 1 dòng
             updateCreateTotalDisplay();
             document.getElementById('modal-create-po').classList.remove('hidden');
@@ -669,8 +762,16 @@
             btn.textContent = 'Đang lưu đơn...';
 
             const supplierId = document.getElementById('po-supplier-id').value;
+            const branchId = document.getElementById('po-branch-id').value;
             const warehouseId = document.getElementById('po-warehouse-id').value;
             const note = document.getElementById('po-note').value;
+
+            if (!supplierId || !branchId || !warehouseId) {
+                notifyToast('Vui lòng chọn nhà cung cấp, chi nhánh và kho nhận hàng!', 'warning');
+                btn.disabled = false;
+                btn.textContent = 'Lưu Bản Nháp';
+                return;
+            }
 
             const items = [];
             document.querySelectorAll('#po-items-table-body tr').forEach(tr => {
@@ -702,7 +803,7 @@
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
                     body: JSON.stringify({
-                        branch_id: 1, // Ba Đình
+                        branch_id: parseInt(branchId),
                         warehouse_id: parseInt(warehouseId),
                         supplier_id: parseInt(supplierId),
                         note: note,
@@ -739,6 +840,8 @@
                 document.getElementById('detail-po-no').textContent = po.po_no;
                 document.getElementById('detail-po-status-badge').innerHTML = getStatusBadge(po.status, po.status_label);
                 document.getElementById('detail-po-supplier').textContent = po.supplier_name || 'Không rõ';
+                const branchElem = document.getElementById('detail-po-branch');
+                if (branchElem) branchElem.textContent = po.branch_name || 'Chưa chỉ định';
                 document.getElementById('detail-po-warehouse').textContent = po.warehouse_name || 'Kho chính';
                 document.getElementById('detail-po-creator').textContent = po.creator_name || 'N/A';
                 document.getElementById('detail-po-approver').textContent = po.approver_name || 'Chưa duyệt';

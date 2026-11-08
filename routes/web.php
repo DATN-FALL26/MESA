@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\PermissionController;
 use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\Auth\RoleController;
 use App\Http\Controllers\Auth\UserController;
+use App\Http\Controllers\Kitchen\KitchenDailyCheckinController;
 use App\Http\Controllers\Kitchen\KitchenDisplayController;
 use App\Http\Controllers\Kitchen\ServeController;
 use App\Http\Controllers\Menu\BranchMenuController;
@@ -249,6 +250,7 @@ Route::middleware('auth')->prefix('kitchen')->name('kitchen.')->group(function (
     Route::middleware('permission:kitchen.view')->group(function () {
         Route::get('/', [KitchenDisplayController::class, 'index'])->name('index');
         Route::get('/board', [KitchenDisplayController::class, 'board'])->name('board');
+        Route::post('/daily-checkin', [KitchenDailyCheckinController::class, 'store'])->name('daily-checkin.store');
     });
 
     // Đổi trạng thái món / cả phiếu: Mới → Đang nấu → Hoàn thành
@@ -342,7 +344,21 @@ Route::middleware('auth')->prefix('menu')->name('menu.')->group(function () {
         Route::view('/ingredients', 'inventory.ingredients')->name('ingredients');
         Route::view('/suppliers', 'inventory.suppliers')->name('suppliers');
         Route::view('/recipes', 'inventory.recipes')->name('recipes');
-        Route::view('/stock-movements', 'inventory.stock-movements')->name('stock-movements');
-        Route::view('/purchase-orders', 'inventory.purchase-orders')->name('purchase-orders');
-        Route::view('/adjustments', 'inventory.adjustments')->name('adjustments');
+        Route::get('/stock-movements', function () {
+            $branches = \App\Models\Branch::where('status', \App\Enums\BranchStatus::ACTIVE)->orderBy('id')->get();
+            $warehouses = \App\Models\Warehouse::where('is_active', true)->with('branch')->orderBy('branch_id')->get();
+            $ingredients = \App\Models\Ingredient::where('is_active', true)->orderBy('name')->get();
+            return view('inventory.stock-movements', compact('branches', 'warehouses', 'ingredients'));
+        })->name('stock-movements');
+        Route::get('/purchase-orders', function () {
+            $branches = \App\Models\Branch::where('status', \App\Enums\BranchStatus::ACTIVE)->orderBy('id')->get();
+            $warehouses = \App\Models\Warehouse::where('is_active', true)->with('branch')->orderBy('id')->get();
+            return view('inventory.purchase-orders', compact('branches', 'warehouses'));
+        })->name('purchase-orders');
+
+        Route::get('/adjustments', function () {
+            $branches = \App\Models\Branch::where('status', \App\Enums\BranchStatus::ACTIVE)->orderBy('id')->get();
+            $warehouses = \App\Models\Warehouse::where('is_active', true)->with('branch')->orderBy('id')->get();
+            return view('inventory.adjustments', compact('branches', 'warehouses'));
+        })->name('adjustments');
     });

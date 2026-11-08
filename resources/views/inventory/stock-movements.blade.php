@@ -1,6 +1,6 @@
 @php
-    $warehouses = \App\Models\Warehouse::query()->where('is_active', true)->orderBy('name')->get();
-    $ingredients = \App\Models\Ingredient::query()->where('is_active', true)->orderBy('name')->get();
+    $warehouses = $warehouses ?? \App\Models\Warehouse::query()->where('is_active', true)->with('branch')->orderBy('branch_id')->get();
+    $ingredients = $ingredients ?? \App\Models\Ingredient::query()->where('is_active', true)->orderBy('name')->get();
 @endphp
 
 @extends('layouts.auth')
@@ -26,7 +26,7 @@
                     <select id="select-warehouse" class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-emerald-600 font-medium" onchange="onLedgerFilterChange()">
                         <option value="">-- Chọn kho hàng --</option>
                         @foreach($warehouses as $wh)
-                            <option value="{{ $wh->id }}">{{ $wh->name }} ({{ $wh->type->value ?? 'branch' }})</option>
+                            <option value="{{ $wh->id }}">{{ $wh->branch?->name ? '[' . $wh->branch->name . '] ' : '' }}{{ $wh->name }} ({{ $wh->type->label() ?? 'Kho chi nhánh' }})</option>
                         @endforeach
                     </select>
                 </div>

@@ -111,6 +111,10 @@ final class ConstantHelper
 
     public const TABLE_STOCK_ADJUSTMENT_ITEMS = 'stock_adjustment_items';
 
+    public const TABLE_KITCHEN_DAILY_CHECKINS = 'kitchen_daily_checkins';
+
+    public const TABLE_KITCHEN_DAILY_CHECKIN_ITEMS = 'kitchen_daily_checkin_items';
+
     // ==========================================
     // MODULE H: AI VÀ PHÊ DUYỆT (4 BẢNG)
     // ==========================================
