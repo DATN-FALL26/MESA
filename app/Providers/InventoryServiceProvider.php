@@ -16,6 +16,7 @@ use App\Repositories\Contracts\RecipeRepositoryInterface;
 use App\Repositories\Contracts\StockAdjustmentRepositoryInterface;
 use App\Repositories\Contracts\StockLevelRepositoryInterface;
 use App\Repositories\Contracts\StockMovementRepositoryInterface;
+use App\Repositories\Contracts\SupplierDocumentRepositoryInterface;
 use App\Repositories\Contracts\SupplierRepositoryInterface;
 use App\Repositories\Eloquent\EloquentIngredientRepository;
 use App\Repositories\Eloquent\EloquentPurchaseOrderRepository;
@@ -23,6 +24,7 @@ use App\Repositories\Eloquent\EloquentRecipeRepository;
 use App\Repositories\Eloquent\EloquentStockAdjustmentRepository;
 use App\Repositories\Eloquent\EloquentStockLevelRepository;
 use App\Repositories\Eloquent\EloquentStockMovementRepository;
+use App\Repositories\Eloquent\EloquentSupplierDocumentRepository;
 use App\Repositories\Eloquent\EloquentSupplierRepository;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -57,6 +59,11 @@ class InventoryServiceProvider extends ServiceProvider
         $this->app->bind(
             SupplierRepositoryInterface::class,
             EloquentSupplierRepository::class
+        );
+
+        $this->app->bind(
+            SupplierDocumentRepositoryInterface::class,
+            EloquentSupplierDocumentRepository::class
         );
 
         $this->app->bind(
