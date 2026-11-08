@@ -230,7 +230,7 @@ Route::middleware('auth')->prefix('orders')->name('orders.')->group(function () 
 
     // Gửi Batch xuống bếp
     Route::post('/{orderId}/send-kitchen', [OrderController::class, 'sendToKitchen'])
-        ->middleware('permission:order.batch.release')
+        ->middleware('permission:order.batch.release,order.update,order.create')
         ->name('send-kitchen');
 
     // Cập nhật món đã gửi nhưng bếp chưa bắt đầu
