@@ -8,6 +8,7 @@ use App\Enums\SessionStatus;
 use App\Enums\TableStatus;
 use App\Enums\UserStatus;
 use App\Helpers\ConstantHelper;
+use App\Http\Controllers\table\Concerns\ResolvesTableBranch;
 use App\Models\AuditLog;
 use App\Models\DiningSession;
 use App\Models\DiningTable;
@@ -26,6 +27,7 @@ use Illuminate\Validation\ValidationException;
 
 class DiningSessionController extends BaseController
 {
+    use ResolvesTableBranch;
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -38,7 +40,7 @@ class DiningSessionController extends BaseController
             ],
         ]);
 
-        $branchId = (int) $request->session()->get('branch_id', 1);
+        $branchId = $this->resolveBranchId($request);
         $table = DiningTable::query()
             ->where('branch_id', $branchId)
             ->where('is_active', true)
@@ -114,7 +116,7 @@ class DiningSessionController extends BaseController
 
     public function employees(Request $request): JsonResponse
     {
-        $branchId = (int) $request->session()->get('branch_id', 1);
+        $branchId = $this->resolveBranchId($request);
         $employees = $this->activeBranchWaiters($branchId)
             ->orderBy('full_name')
             ->get(['id', 'full_name']);
@@ -127,7 +129,7 @@ class DiningSessionController extends BaseController
 
     public function closeByTable(Request $request, int $tableId): JsonResponse
     {
-        $branchId = (int) $request->session()->get('branch_id', 1);
+        $branchId = $this->resolveBranchId($request);
 
         $session = DB::transaction(function () use ($branchId, $tableId): DiningSession|JsonResponse {
             $table = DiningTable::query()
@@ -194,7 +196,7 @@ class DiningSessionController extends BaseController
         $validated = $request->validate([
             'target_table_id' => ['required', 'integer', 'not_in:'.$tableId],
         ]);
-        $branchId = (int) $request->session()->get('branch_id', 1);
+        $branchId = $this->resolveBranchId($request);
         $userId = Auth::id();
 
         $result = DB::transaction(function () use ($request, $branchId, $tableId, $userId, $validated): array|JsonResponse {
@@ -304,7 +306,7 @@ class DiningSessionController extends BaseController
 
     public function showByTable(Request $request, int $tableId): JsonResponse
     {
-        $branchId = (int) $request->session()->get('branch_id', 1);
+        $branchId = $this->resolveBranchId($request);
         $table = DiningTable::query()
             ->where('branch_id', $branchId)
             ->where('is_active', true)
