@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\PermissionController;
@@ -10,18 +11,7 @@ use App\Http\Controllers\Kitchen\KitchenDisplayController;
 use App\Http\Controllers\Kitchen\ServeController;
 use App\Http\Controllers\PublicDashboardController;
 use App\Http\Controllers\table\TableController;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DashboardController;
-<<<<<<< Updated upstream
-// use Symfony\Component\Routing\Router;
-
-
-Route::prefix('admin')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
-    Route::get('/reports', [DashboardController::class, 'reports'])->name('admin.reports');
-    Route::get('/api/revenue', [DashboardController::class, 'getRevenueApi'])->name('admin.api.revenue');
-});
-=======
 use App\Http\Controllers\OrderController;
 
 /*
@@ -33,7 +23,7 @@ Route::middleware(['auth', 'permission:dashboard.view'])->prefix('admin')->name(
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/reports', [DashboardController::class, 'reports'])->name('reports');
     Route::get('/api/revenue', [DashboardController::class, 'getRevenueApi'])->name('api.revenue');
->>>>>>> Stashed changes
+});
 
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
     // Route API cho biểu đồ Dashboard (Thanh toán & Khung giờ)
@@ -62,25 +52,6 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login']);
 
-<<<<<<< Updated upstream
-    Route::get('/forgot-password', [ForgotPasswordController::class, 'showRequestForm'])
-        ->name('password.request');
-    Route::post('/forgot-password', [ForgotPasswordController::class, 'sendOtp'])
-        ->middleware('throttle:10,60')
-        ->name('password.email');
-    Route::get('/forgot-password/verify', [ForgotPasswordController::class, 'showVerifyForm'])
-        ->name('password.otp.form');
-    Route::post('/forgot-password/verify', [ForgotPasswordController::class, 'verifyOtp'])
-        ->name('password.otp.verify');
-    Route::post('/forgot-password/resend', [ForgotPasswordController::class, 'resendOtp'])
-        ->middleware('throttle:10,60')
-        ->name('password.otp.resend');
-    Route::get('/forgot-password/reset', [ForgotPasswordController::class, 'showResetForm'])
-        ->name('password.reset.form');
-    Route::put('/forgot-password/reset', [ForgotPasswordController::class, 'resetPassword'])
-        ->name('password.reset');
-
-=======
     Route::get('/forgot-password', [ForgotPasswordController::class, 'showRequestForm'])->name('password.request');
     Route::post('/forgot-password', [ForgotPasswordController::class, 'sendOtp'])->middleware('throttle:10,60')->name('password.email');
     Route::get('/forgot-password/verify', [ForgotPasswordController::class, 'showVerifyForm'])->name('password.otp.form');
@@ -89,15 +60,14 @@ Route::middleware('guest')->group(function () {
     Route::get('/forgot-password/reset', [ForgotPasswordController::class, 'showResetForm'])->name('password.reset.form');
     Route::put('/forgot-password/reset', [ForgotPasswordController::class, 'resetPassword'])->name('password.reset');
     Route::get('/forgot-password/result', [ForgotPasswordController::class, 'showResetResult'])->name('password.reset.result');
->>>>>>> Stashed changes
 });
 
-// Trang public dashboard qua QR code hoặc link ngoài (giữ nguyên không đụng chạm)
+// Trang public dashboard qua QR code hoặc link ngoài
 Route::get('/public-dashboard', [PublicDashboardController::class, 'show'])->name('public.dashboard');
 
 /*
 |--------------------------------------------------------------------------
-| Authenticated Routes (Đã đăng nhập - Giữ nguyên toàn bộ chức năng của team)
+| Authenticated Routes (Đã đăng nhập)
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth')->group(function () {
@@ -152,9 +122,6 @@ Route::middleware('auth')->group(function () {
     Route::delete('/permissions/{permission}', [PermissionController::class, 'destroy'])->middleware('permission:permissions.delete')->name('permissions.destroy');
 });
 
-<<<<<<< Updated upstream
-=======
-
 /*
 |--------------------------------------------------------------------------
 | MOD03 - Quản lý gọi món
@@ -170,7 +137,6 @@ Route::middleware('auth')->prefix('orders')->name('orders.')->group(function () 
     Route::post('/{orderId}/update-kitchen', [OrderController::class, 'updateKitchen'])->middleware('permission:order.update')->name('update-kitchen');
 });
 
->>>>>>> Stashed changes
 /*
 |--------------------------------------------------------------------------
 | MOD04 - Bếp / KDS
@@ -196,22 +162,7 @@ Route::middleware('auth')->prefix('kitchen')->name('kitchen.')->group(function (
     });
 });
 
-
 /*
-<<<<<<< Updated upstream
-    |--------------------------------------------------------------------------
-    | Phân hệ Kho & Định lượng (Module 07)
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('inventory')->name('inventory.')->group(function () {
-        Route::view('/ingredients', 'inventory.ingredients')->name('ingredients');
-        Route::view('/suppliers', 'inventory.suppliers')->name('suppliers');
-        Route::view('/recipes', 'inventory.recipes')->name('recipes');
-        Route::view('/stock-movements', 'inventory.stock-movements')->name('stock-movements');
-        Route::view('/purchase-orders', 'inventory.purchase-orders')->name('purchase-orders');
-        Route::view('/adjustments', 'inventory.adjustments')->name('adjustments');
-    });
-=======
 |--------------------------------------------------------------------------
 | MOD03 - Quản lý Thực đơn
 |--------------------------------------------------------------------------
@@ -284,4 +235,3 @@ Route::prefix('inventory')->name('inventory.')->group(function () {
         return view('inventory.adjustments', compact('branches', 'warehouses'));
     })->name('adjustments');
 });
->>>>>>> Stashed changes
