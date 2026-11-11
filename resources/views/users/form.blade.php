@@ -19,8 +19,13 @@
             </div>
             <div>
                 <label for="employee_code" class="mb-1 block text-sm font-medium text-slate-700">Mã nhân viên</label>
-                <input id="employee_code" name="employee_code" value="{{ old('employee_code', $user->employee_code) }}" maxlength="30" 
-                    class="w-full rounded-lg border border-slate-300 px-3.5 py-2 text-sm text-slate-900 shadow-sm transition duration-200 hover:border-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/20">
+                <input id="employee_code" name="employee_code"
+                    value="{{ $isEditing ? old('employee_code', $user->employee_code) : $employeeCode }}" maxlength="30"
+                    @readonly(!$isEditing)
+                    class="w-full rounded-lg border border-slate-300 px-3.5 py-2 text-sm text-slate-900 shadow-sm transition duration-200 {{ $isEditing ? 'hover:border-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/20' : 'bg-slate-50 text-slate-600' }}">
+                @unless ($isEditing)
+                    <p class="mt-1 text-xs text-slate-500">Mã nhân viên được hệ thống tự động tạo.</p>
+                @endunless
             </div>
             <div>
                 <label for="full_name" class="mb-1 block text-sm font-medium text-slate-700">Họ và tên</label>
