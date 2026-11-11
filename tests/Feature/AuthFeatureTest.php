@@ -484,6 +484,15 @@ class AuthFeatureTest extends TestCase
         $this->grantPermission($manager, 'users.assign_roles');
         $this->grantPermission($manager, 'users.delete');
 
+        $retiredUser = User::query()->create([
+            'username' => 'retiredstaff',
+            'employee_code' => 'NV0012',
+            'full_name' => 'Retired Staff',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $retiredUser->delete();
+
         $role = Role::query()->create([
             'code' => 'TEST_STAFF',
             'name' => 'Test Staff',
@@ -492,10 +501,14 @@ class AuthFeatureTest extends TestCase
 
         $this->withoutVite();
         $this->actingAs($manager);
-        $this->get('/users/create')->assertOk();
+        $this->get('/users/create')
+            ->assertOk()
+            ->assertSee('id="employee_code" name="employee_code"', false)
+            ->assertSee('readonly', false);
 
         $this->actingAs($manager)->post('/users', [
             'username' => 'newstaff',
+            'employee_code' => 'MANUAL-EMPLOYEE-CODE',
             'full_name' => 'New Staff',
             'email' => 'newstaff@example.com',
             'status' => UserStatus::ACTIVE->value,
@@ -506,6 +519,8 @@ class AuthFeatureTest extends TestCase
         ])->assertRedirect('/users');
 
         $createdUser = User::query()->where('username', 'newstaff')->firstOrFail();
+        $this->assertSame('NV0013', $createdUser->employee_code);
+        $this->assertDatabaseMissing('users', ['employee_code' => 'MANUAL-EMPLOYEE-CODE']);
         $this->assertDatabaseHas('user_roles', [
             'user_id' => $createdUser->id,
             'role_id' => $role->id,
@@ -545,7 +560,7 @@ class AuthFeatureTest extends TestCase
         $this->actingAs($admin)
             ->get('/users')
             ->assertOk()
-            ->assertSee('Thêm tài khoản mới');
+            ->assertSee('Thêm tài khoản');
         $this->get('/users/create')->assertOk();
 
         $this->post('/users', [
@@ -559,6 +574,7 @@ class AuthFeatureTest extends TestCase
         ])->assertRedirect('/users');
 
         $createdUser = User::query()->where('username', 'admincreated')->firstOrFail();
+        $this->assertSame('NV0001', $createdUser->employee_code);
         $this->assertDatabaseHas('user_roles', [
             'user_id' => $createdUser->id,
             'role_id' => $role->id,
@@ -612,18 +628,19 @@ class AuthFeatureTest extends TestCase
         ]);
 
         $this->actingAs($manager)->post('/roles', [
-            'code' => 'ORDER_VIEWER',
+            'code' => 'UNTRUSTED_FRONTEND_CODE',
             'name' => 'Order Viewer',
             'assign_permissions' => '1',
             'permission_ids' => [$firstPermission->id, $secondPermission->id],
         ])->assertRedirect('/roles');
 
         $this->post('/roles', [
-            'code' => 'customer',
+            'code' => 'UNTRUSTED_FRONTEND_CODE',
             'name' => 'Customer',
         ])->assertSessionHasErrors('code');
 
         $role = Role::query()->where('code', 'ORDER_VIEWER')->firstOrFail();
+        $this->assertDatabaseMissing('roles', ['code' => 'UNTRUSTED_FRONTEND_CODE']);
         $this->assertDatabaseHas('role_permissions', [
             'role_id' => $role->id,
             'permission_id' => $firstPermission->id,
@@ -634,12 +651,123 @@ class AuthFeatureTest extends TestCase
         ]);
 
         $this->post('/permissions', [
-            'code' => 'orders.cancel',
-            'module' => 'order',
-            'name' => 'Cancel orders',
+            'code' => 'untrusted.frontend-value',
+            'module' => 'ORDER',
+            'action' => 'view',
+            'name' => 'Xem đơn hàng',
         ])->assertRedirect('/permissions');
 
-        $this->assertDatabaseHas('permissions', ['code' => 'orders.cancel']);
+        $this->assertDatabaseHas('permissions', [
+            'code' => 'order.view',
+            'module' => 'order',
+            'name' => 'Xem đơn hàng',
+        ]);
+        $this->assertDatabaseMissing('permissions', ['code' => 'untrusted.frontend-value']);
+    }
+
+    public function test_role_creation_generates_a_unique_code_from_the_role_name(): void
+    {
+        $manager = $this->createUser([
+            'username' => 'rolecodecreator',
+            'full_name' => 'Role Code Creator',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($manager, 'roles.create');
+        $this->withoutVite();
+
+        $this->actingAs($manager)
+            ->get('/roles/create')
+            ->assertOk()
+            ->assertSee('id="code" name="code"', false)
+            ->assertSee('readonly', false);
+
+        $this->post('/roles', [
+            'code' => 'UNTRUSTED_FRONTEND_CODE',
+            'name' => 'Quản lý',
+        ])->assertRedirect('/roles');
+
+        $this->assertDatabaseHas('roles', [
+            'code' => 'MANAGER',
+            'name' => 'Quản lý',
+        ]);
+        $this->assertDatabaseMissing('roles', ['code' => 'UNTRUSTED_FRONTEND_CODE']);
+
+        $this->post('/roles', [
+            'code' => 'ANOTHER_UNTRUSTED_CODE',
+            'name' => 'Quản lý',
+        ])->assertSessionHasErrors([
+            'code' => 'Mã vai trò đã tồn tại.',
+        ]);
+        $this->assertDatabaseMissing('roles', ['code' => 'ANOTHER_UNTRUSTED_CODE']);
+    }
+
+    public function test_permission_creation_form_uses_readonly_code_and_standard_options(): void
+    {
+        $manager = $this->createUser([
+            'username' => 'permissionformmanager',
+            'full_name' => 'Permission Form Manager',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($manager, 'permissions.create');
+
+        $this->withoutVite();
+        $this->actingAs($manager)
+            ->get('/permissions/create')
+            ->assertOk()
+            ->assertSee('id="code" name="code"', false)
+            ->assertSee('readonly', false)
+            ->assertSee('value="employee"', false)
+            ->assertSee('value="approve"', false);
+    }
+
+    public function test_duplicate_permission_code_is_rejected_with_the_expected_message(): void
+    {
+        $manager = $this->createUser([
+            'username' => 'permissionduplicatemanager',
+            'full_name' => 'Permission Duplicate Manager',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($manager, 'permissions.create');
+        Permission::query()->create([
+            'code' => 'employee.view',
+            'module' => 'employee',
+            'name' => 'Xem nhân viên',
+        ]);
+        $permissionCount = Permission::query()->count();
+
+        $this->actingAs($manager)->post('/permissions', [
+            'module' => 'EMPLOYEE',
+            'action' => 'view',
+            'name' => 'Xem nhân viên khác',
+        ])->assertSessionHasErrors([
+            'code' => 'Quyền đã tồn tại',
+        ]);
+
+        $this->assertSame($permissionCount, Permission::query()->count());
+    }
+
+    public function test_permission_creation_rejects_modules_outside_the_standard_list(): void
+    {
+        $manager = $this->createUser([
+            'username' => 'permissionmodulemanager',
+            'full_name' => 'Permission Module Manager',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($manager, 'permissions.create');
+
+        $this->actingAs($manager)->post('/permissions', [
+            'module' => 'unknown',
+            'action' => 'view',
+            'name' => 'Quyền không hợp lệ',
+        ])->assertSessionHasErrors('module');
+
+        $this->assertDatabaseMissing('permissions', [
+            'code' => 'unknown.view',
+        ]);
     }
 
     public function test_user_can_update_profile_with_avatar(): void

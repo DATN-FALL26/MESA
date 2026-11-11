@@ -55,7 +55,7 @@ class UserController extends Controller
     {
         abort_unless($this->canCreateAccounts(auth()->user()), 403);
 
-        return $this->formView(new User, 'users.form');
+        return $this->formView(new User, 'users.form', null, $this->nextEmployeeCode());
     }
 
     public function store(Request $request): RedirectResponse
@@ -67,7 +67,7 @@ class UserController extends Controller
         DB::transaction(function () use ($validated, $request): void {
             $user = User::query()->create([
                 'username' => $validated['username'],
-                'employee_code' => $validated['employee_code'] ?? null,
+                'employee_code' => $this->nextEmployeeCode(),
                 'full_name' => $validated['full_name'],
                 'email' => $validated['email'] ?? null,
                 'phone' => $validated['phone'] ?? null,
@@ -141,8 +141,12 @@ class UserController extends Controller
     /**
      * @param  list<int>|null  $selectedRoleIds
      */
-    private function formView(User $user, string $view, ?array $selectedRoleIds = null): View
-    {
+    private function formView(
+        User $user,
+        string $view,
+        ?array $selectedRoleIds = null,
+        ?string $employeeCode = null
+    ): View {
         $roles = Role::query()->orderBy('name')->get();
         $departments = DB::table(ConstantHelper::TABLE_DEPARTMENTS)
             ->where(fn ($query) => $query
@@ -158,7 +162,24 @@ class UserController extends Controller
             'statuses' => UserStatus::cases(),
             'selectedRoleIds' => $selectedRoleIds ?? [],
             'canAssignRoles' => $this->canAssignRoles(auth()->user()),
+            'employeeCode' => $employeeCode,
         ]);
+    }
+
+    private function nextEmployeeCode(): string
+    {
+        $highestNumber = User::withTrashed()
+            ->where('employee_code', 'like', 'NV%')
+            ->pluck('employee_code')
+            ->reduce(function (int $highestNumber, ?string $employeeCode): int {
+                if (preg_match('/^NV(\d+)$/i', $employeeCode ?? '', $matches) !== 1) {
+                    return $highestNumber;
+                }
+
+                return max($highestNumber, (int) $matches[1]);
+            }, 0);
+
+        return 'NV'.str_pad((string) ($highestNumber + 1), 4, '0', STR_PAD_LEFT);
     }
 
     private function canCreateAccounts(User $user): bool
@@ -193,9 +214,8 @@ class UserController extends Controller
             abort(403);
         }
 
-        $validated = $request->validate([
+        $rules = [
             'username' => ['required', 'string', 'min:3', 'max:50', 'alpha_dash', Rule::unique(User::class, 'username')->ignore($user?->getKey())],
-            'employee_code' => ['nullable', 'string', 'max:30', Rule::unique(User::class, 'employee_code')->ignore($user?->getKey())],
             'full_name' => ['required', 'string', 'max:150'],
             'email' => ['nullable', 'email', 'max:150', Rule::unique(User::class, 'email')->ignore($user?->getKey())],
             'phone' => ['nullable', 'string', 'max:20'],
@@ -205,7 +225,18 @@ class UserController extends Controller
             'role_ids' => [$request->boolean('assign_roles') ? 'required' : 'sometimes', 'array', 'min:1'],
             'role_ids.*' => ['integer', 'distinct', Rule::exists(ConstantHelper::TABLE_ROLES, 'id')],
             'assign_roles' => [$user === null ? 'required' : 'sometimes', 'accepted'],
-        ]);
+        ];
+
+        if ($user !== null) {
+            $rules['employee_code'] = [
+                'nullable',
+                'string',
+                'max:30',
+                Rule::unique(User::class, 'employee_code')->ignore($user->getKey()),
+            ];
+        }
+
+        $validated = $request->validate($rules);
 
         if ($request->boolean('assign_roles')) {
             $validated['role_ids'] = array_map('intval', $validated['role_ids'] ?? []);
