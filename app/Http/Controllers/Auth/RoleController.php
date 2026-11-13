@@ -11,19 +11,52 @@ use App\Models\Role;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class RoleController extends Controller
 {
-    public function index(): View
+    private const ROLE_CODE_ALIASES = [
+        'quan_tri_vien' => 'ADMIN',
+        'quan_tri_vien_he_thong' => 'ADMIN',
+        'quan_ly' => 'MANAGER',
+        'quan_ly_chi_nhanh' => 'MANAGER',
+        'thu_ngan' => 'CASHIER',
+        'phuc_vu' => 'WAITER',
+        'nhan_vien_phuc_vu' => 'WAITER',
+        'dau_bep' => 'CHEF',
+        'nhan_vien_bep' => 'CHEF',
+    ];
+
+    public function index(Request $request): View
     {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:150'],
+            'type' => ['nullable', Rule::in(['system', 'custom'])],
+        ]);
+        $search = trim($filters['q'] ?? '');
+        $type = $filters['type'] ?? '';
+
         $roles = Role::query()
             ->withCount('permissions')
+            ->when($search !== '', fn ($query) => $query->where(
+                fn ($inner) => $inner
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+            ))
+            ->when($type === 'system', fn ($query) => $query->where('is_system', true))
+            ->when($type === 'custom', fn ($query) => $query->where('is_system', false))
             ->orderBy('name')
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
-        return view('roles.index', compact('roles'));
+        return view('roles.index', [
+            'roles' => $roles,
+            'filters' => compact('search', 'type'),
+        ]);
     }
 
     public function create(): View
@@ -38,7 +71,7 @@ class RoleController extends Controller
 
         DB::transaction(function () use ($validated): void {
             $role = Role::query()->create([
-                'code' => strtoupper($validated['code']),
+                'code' => $validated['code'],
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
                 'is_system' => false,
@@ -116,20 +149,44 @@ class RoleController extends Controller
      */
     private function validatedRole(Request $request, ?Role $role = null): array
     {
-        $validated = $request->validate([
-            'code' => [
-                'required',
-                'string',
-                'max:50',
-                'regex:/^(?!CUSTOMER$)[A-Za-z][A-Za-z0-9_-]*$/i',
-                Rule::unique(Role::class, 'code')->ignore($role?->getKey()),
-            ],
+        $rules = [
             'name' => ['required', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:255'],
             'permission_ids' => ['sometimes', 'array'],
             'permission_ids.*' => ['integer', 'distinct', Rule::exists(ConstantHelper::TABLE_PERMISSIONS, 'id')],
             'assign_permissions' => ['sometimes', 'accepted'],
-        ]);
+        ];
+
+        if ($role !== null) {
+            $rules['code'] = [
+                'required',
+                'string',
+                'max:50',
+                'regex:/^(?!CUSTOMER$)[A-Za-z][A-Za-z0-9_-]*$/i',
+                Rule::unique(Role::class, 'code')->ignore($role?->getKey()),
+            ];
+        }
+
+        $validated = $request->validate($rules);
+
+        if ($role === null) {
+            $code = $this->generateRoleCode($validated['name']);
+
+            Validator::make(['code' => $code], [
+                'code' => [
+                    'required',
+                    'string',
+                    'max:50',
+                    'regex:/^(?!CUSTOMER$)[A-Z][A-Z0-9_-]*$/',
+                    Rule::unique(Role::class, 'code'),
+                ],
+            ], [
+                'code.unique' => 'Mã vai trò đã tồn tại.',
+                'code.regex' => 'Tên vai trò không thể tạo mã hợp lệ hoặc mã này không được phép sử dụng.',
+            ])->validate();
+
+            $validated['code'] = $code;
+        }
 
         if ($request->boolean('assign_permissions')) {
             $validated['permission_ids'] = array_map('intval', $validated['permission_ids'] ?? []);
@@ -138,6 +195,13 @@ class RoleController extends Controller
         unset($validated['assign_permissions']);
 
         return $validated;
+    }
+
+    private function generateRoleCode(string $name): string
+    {
+        $slug = Str::slug($name, '_');
+
+        return self::ROLE_CODE_ALIASES[$slug] ?? Str::upper($slug);
     }
 
     /**

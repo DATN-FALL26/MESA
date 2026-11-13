@@ -17,7 +17,7 @@ class EloquentSupplierRepository implements SupplierRepositoryInterface
      */
     public function paginate(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Supplier::query();
+        $query = Supplier::query()->withCount('documents');
 
         if (! empty($filters['search'])) {
             $search = (string) $filters['search'];

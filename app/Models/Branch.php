@@ -165,4 +165,9 @@ class Branch extends Model
     {
         return $this->hasMany(DailyItemSales::class, 'branch_id');
     }
+
+    public function kitchenDailyCheckins(): HasMany
+    {
+        return $this->hasMany(KitchenDailyCheckin::class, 'branch_id');
+    }
 }

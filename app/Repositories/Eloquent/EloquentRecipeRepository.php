@@ -30,9 +30,20 @@ class EloquentRecipeRepository implements RecipeRepositoryInterface
         }
 
         // 2. Fallback tìm công thức mặc định (variant_id IS NULL)
-        return Recipe::with(['items.ingredient'])
+        $defaultRecipe = Recipe::with(['items.ingredient'])
             ->where('menu_item_id', $menuItemId)
             ->whereNull('variant_id')
+            ->where('is_active', true)
+            ->orderBy('version', 'desc')
+            ->first();
+
+        if ($defaultRecipe !== null) {
+            return $defaultRecipe;
+        }
+
+        // 3. Fallback tìm công thức active đầu tiên của món ăn nếu không có variant cụ thể
+        return Recipe::with(['items.ingredient'])
+            ->where('menu_item_id', $menuItemId)
             ->where('is_active', true)
             ->orderBy('version', 'desc')
             ->first();

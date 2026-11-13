@@ -205,7 +205,7 @@
                 </button>
             </div>
 
-            <form id="bom-builder-form" onsubmit="submitNewRecipeVersion(event)" class="flex-1 overflow-y-auto p-4 space-y-4">
+            <form id="bom-builder-form" novalidate onsubmit="submitNewRecipeVersion(event)" class="flex-1 overflow-y-auto p-4 space-y-4">
                 <div class="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
                     <div>
                         <span class="block text-slate-500 font-medium">Món ăn:</span>
@@ -411,6 +411,12 @@
             // Highlight nút version
             renderVersionsListButtonsOnly();
 
+            // Nếu trong danh sách nạp sẵn đã có dữ liệu items, render tức thời để phản hồi nhanh
+            const localRecipe = currentLoadedRecipes.find(r => r.id === id);
+            if (localRecipe && localRecipe.items) {
+                renderRecipeDetails(localRecipe);
+            }
+
             try {
                 const res = await fetch(`/api/v1/inventory/recipes/${id}`, {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
@@ -470,17 +476,19 @@
             }
 
             tbody.innerHTML = items.map(it => {
-                const ing = it.ingredient || {};
-                const isRaw = ing.ingredient_type === 'raw';
-                const typeLabel = isRaw ? 'Thô' : 'Sơ chế';
+                const sku = it.ingredient_sku || it.ingredient?.sku || '—';
+                const name = it.ingredient_name || it.ingredient?.name || '—';
+                const uom = it.base_uom || it.ingredient?.base_uom || '—';
+                const rawType = it.ingredient_type || it.ingredient?.ingredient_type || 'raw';
+                const typeLabel = rawType === 'semi_finished' ? 'Bán thành phẩm' : 'Nguyên liệu thô';
 
                 return `
                     <tr class="hover:bg-slate-50/60">
-                        <td class="py-2.5 px-4 font-mono font-semibold text-slate-800">${escapeHtml(ing.sku || '—')}</td>
-                        <td class="py-2.5 px-4 font-medium text-slate-900">${escapeHtml(ing.name || '—')}</td>
-                        <td class="py-2.5 px-4 text-slate-500">${typeLabel}</td>
+                        <td class="py-2.5 px-4 font-mono font-semibold text-slate-800">${escapeHtml(sku)}</td>
+                        <td class="py-2.5 px-4 font-medium text-slate-900">${escapeHtml(name)}</td>
+                        <td class="py-2.5 px-4 text-slate-500">${escapeHtml(typeLabel)}</td>
                         <td class="py-2.5 px-4 text-right font-mono font-bold text-slate-900">${Number(it.quantity || 0).toLocaleString('vi-VN', { maximumFractionDigits: 3 })}</td>
-                        <td class="py-2.5 px-4 font-medium text-slate-600">${escapeHtml(ing.base_uom || '—')}</td>
+                        <td class="py-2.5 px-4 font-medium text-slate-600">${escapeHtml(uom)}</td>
                     </tr>
                 `;
             }).join('');
@@ -687,19 +695,33 @@
             const variantId = document.getElementById('select-variant').value;
             const activateNow = document.getElementById('modal-activate-now').checked;
 
+            if (!menuItemId) {
+                window.showToast('Vui lòng chọn món ăn trước khi tạo công thức.', 'warning');
+                return;
+            }
+
             const rows = document.querySelectorAll('#bom-builder-rows tr');
             const items = [];
 
             for (const r of rows) {
                 const ingId = r.querySelector('.bom-ing-select')?.value;
-                const qty = r.querySelector('.bom-qty-input')?.value;
-                if (!ingId || !qty) {
-                    window.showToast('Vui lòng chọn đầy đủ nguyên liệu và nhập số lượng định lượng.', 'warning');
+                const qtyStr = r.querySelector('.bom-qty-input')?.value;
+                const qty = parseFloat(qtyStr);
+
+                if (!ingId || isNaN(qty) || qty <= 0) {
+                    window.showToast('Vui lòng chọn đầy đủ nguyên liệu và nhập số lượng định lượng lớn hơn 0.', 'warning');
                     return;
                 }
+
+                const parsedIngId = parseInt(ingId);
+                if (items.some(it => it.ingredient_id === parsedIngId)) {
+                    window.showToast('Không được chọn trùng lặp nguyên liệu trong cùng một công thức.', 'warning');
+                    return;
+                }
+
                 items.push({
-                    ingredient_id: parseInt(ingId),
-                    quantity: parseFloat(qty)
+                    ingredient_id: parsedIngId,
+                    quantity: qty
                 });
             }
 
@@ -734,7 +756,14 @@
                 const json = await res.json();
 
                 if (!res.ok) {
-                    window.showToast(json.message || 'Lỗi khi tạo công thức mới', 'error');
+                    let errMsg = json.message || 'Lỗi khi tạo công thức mới';
+                    if (json.errors) {
+                        const firstError = Object.values(json.errors)[0];
+                        if (Array.isArray(firstError)) {
+                            errMsg = firstError[0];
+                        }
+                    }
+                    window.showToast(errMsg, 'error');
                     return;
                 }
 

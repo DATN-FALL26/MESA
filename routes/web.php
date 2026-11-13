@@ -7,22 +7,25 @@ use App\Http\Controllers\Auth\PermissionController;
 use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\Auth\RoleController;
 use App\Http\Controllers\Auth\UserController;
+use App\Http\Controllers\Kitchen\KitchenDailyCheckinController;
 use App\Http\Controllers\Kitchen\KitchenDisplayController;
 use App\Http\Controllers\Kitchen\ServeController;
+use App\Http\Controllers\Menu\BranchMenuController;
+use App\Http\Controllers\Menu\CategoryController;
+use App\Http\Controllers\Menu\ItemVariantController;
+use App\Http\Controllers\Menu\MenuItemController;
+use App\Http\Controllers\Menu\ModifierController;
+use App\Http\Controllers\Menu\ModifierGroupController;
 use App\Http\Controllers\PublicDashboardController;
 use App\Http\Controllers\table\TableController;
 use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\OrderController;
+// use Symfony\Component\Routing\Router;
 
-/*
-|--------------------------------------------------------------------------
-| Module 9 - Dashboard & Báo cáo Kinh doanh F&B (Thuận phụ trách)
-|--------------------------------------------------------------------------
-*/
-Route::middleware(['auth', 'permission:dashboard.view'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/reports', [DashboardController::class, 'reports'])->name('reports');
-    Route::get('/api/revenue', [DashboardController::class, 'getRevenueApi'])->name('api.revenue');
+
+Route::prefix('admin')->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+    Route::get('/reports', [DashboardController::class, 'reports'])->name('admin.reports');
+    Route::get('/api/revenue', [DashboardController::class, 'getRevenueApi'])->name('admin.api.revenue');
 });
 
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
@@ -52,14 +55,23 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login']);
 
-    Route::get('/forgot-password', [ForgotPasswordController::class, 'showRequestForm'])->name('password.request');
-    Route::post('/forgot-password', [ForgotPasswordController::class, 'sendOtp'])->middleware('throttle:10,60')->name('password.email');
-    Route::get('/forgot-password/verify', [ForgotPasswordController::class, 'showVerifyForm'])->name('password.otp.form');
-    Route::post('/forgot-password/verify', [ForgotPasswordController::class, 'verifyOtp'])->name('password.otp.verify');
-    Route::post('/forgot-password/resend', [ForgotPasswordController::class, 'resendOtp'])->middleware('throttle:10,60')->name('password.otp.resend');
-    Route::get('/forgot-password/reset', [ForgotPasswordController::class, 'showResetForm'])->name('password.reset.form');
-    Route::put('/forgot-password/reset', [ForgotPasswordController::class, 'resetPassword'])->name('password.reset');
-    Route::get('/forgot-password/result', [ForgotPasswordController::class, 'showResetResult'])->name('password.reset.result');
+    Route::get('/forgot-password', [ForgotPasswordController::class, 'showRequestForm'])
+        ->name('password.request');
+    Route::post('/forgot-password', [ForgotPasswordController::class, 'sendOtp'])
+        ->middleware('throttle:10,60')
+        ->name('password.email');
+    Route::get('/forgot-password/verify', [ForgotPasswordController::class, 'showVerifyForm'])
+        ->name('password.otp.form');
+    Route::post('/forgot-password/verify', [ForgotPasswordController::class, 'verifyOtp'])
+        ->name('password.otp.verify');
+    Route::post('/forgot-password/resend', [ForgotPasswordController::class, 'resendOtp'])
+        ->middleware('throttle:10,60')
+        ->name('password.otp.resend');
+    Route::get('/forgot-password/reset', [ForgotPasswordController::class, 'showResetForm'])
+        ->name('password.reset.form');
+    Route::put('/forgot-password/reset', [ForgotPasswordController::class, 'resetPassword'])
+        ->name('password.reset');
+
 });
 
 // Trang public dashboard qua QR code hoặc link ngoài
@@ -137,6 +149,50 @@ Route::middleware('auth')->prefix('orders')->name('orders.')->group(function () 
     Route::post('/{orderId}/update-kitchen', [OrderController::class, 'updateKitchen'])->middleware('permission:order.update')->name('update-kitchen');
 });
 
+
+/*
+|--------------------------------------------------------------------------
+| MOD03 - Quản lý gọi món
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->prefix('orders')->name('orders.')->group(function () {
+
+    // Xem màn gọi món của Dining Session
+    Route::get('/session/{sessionId}', [OrderController::class, 'showSession'])
+        ->middleware('permission:order.view')
+        ->name('session');
+
+    // Tạo Order cho Dining Session
+    Route::post('/session/{sessionId}/start', [OrderController::class, 'startOrder'])
+        ->middleware('permission:order.create')
+        ->name('start');
+
+    // Thêm / tăng món
+    Route::post('/{orderId}/items/{menuItemId}', [OrderController::class, 'addItem'])
+        ->middleware('permission:order.update')
+        ->name('items.add');
+
+    // Giảm món
+    Route::post('/{orderId}/items/{orderItemId}/decrease', [OrderController::class, 'decreaseItem'])
+        ->middleware('permission:order.update')
+        ->name('items.decrease');
+
+    // Ghi chú món
+    Route::post('/{orderId}/items/{orderItemId}/note', [OrderController::class, 'updateItemNote'])
+        ->middleware('permission:order.update')
+        ->name('items.note');
+
+    // Gửi Batch xuống bếp
+    Route::post('/{orderId}/send-kitchen', [OrderController::class, 'sendToKitchen'])
+        ->middleware('permission:order.batch.release,order.update,order.create')
+        ->name('send-kitchen');
+
+    // Cập nhật món đã gửi nhưng bếp chưa bắt đầu
+    Route::post('/{orderId}/update-kitchen', [OrderController::class, 'updateKitchen'])
+        ->middleware('permission:order.update')
+        ->name('update-kitchen');
+});
+
 /*
 |--------------------------------------------------------------------------
 | MOD04 - Bếp / KDS
@@ -146,6 +202,7 @@ Route::middleware('auth')->prefix('kitchen')->name('kitchen.')->group(function (
     Route::middleware('permission:kitchen.view')->group(function () {
         Route::get('/', [KitchenDisplayController::class, 'index'])->name('index');
         Route::get('/board', [KitchenDisplayController::class, 'board'])->name('board');
+        Route::post('/daily-checkin', [KitchenDailyCheckinController::class, 'store'])->name('daily-checkin.store');
     });
 
     Route::middleware('permission:kitchen.update_status')->group(function () {
@@ -162,76 +219,17 @@ Route::middleware('auth')->prefix('kitchen')->name('kitchen.')->group(function (
     });
 });
 
-/*
-|--------------------------------------------------------------------------
-| MOD03 - Quản lý Thực đơn
-|--------------------------------------------------------------------------
-*/
-Route::middleware('auth')->prefix('menu')->name('menu.')->group(function () {
-    Route::middleware('permission:menu.view')->group(function () {
-        Route::get('/items', [MenuItemController::class, 'index'])->name('items.index');
-        Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
-        Route::get('/modifier-groups', [ModifierGroupController::class, 'index'])->name('modifier-groups.index');
-        Route::get('/availability', [BranchMenuController::class, 'index'])->name('availability.index');
-    });
-
-    Route::middleware('permission:menu.availability.update,menu.manage')->group(function () {
-        Route::patch('/availability/{branch}/{menuItem}', [BranchMenuController::class, 'updateAvailability'])->name('availability.update');
-        Route::post('/availability/{branch}/reset', [BranchMenuController::class, 'resetAvailability'])->name('availability.reset');
-    });
-
-    Route::middleware('permission:menu.manage')->group(function () {
-        Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
-        Route::put('/categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
-        Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
-
-        Route::get('/items/create', [MenuItemController::class, 'create'])->name('items.create');
-        Route::post('/items', [MenuItemController::class, 'store'])->name('items.store');
-        Route::get('/items/{menuItem}/edit', [MenuItemController::class, 'edit'])->name('items.edit');
-        Route::put('/items/{menuItem}', [MenuItemController::class, 'update'])->name('items.update');
-        Route::patch('/items/{menuItem}/toggle', [MenuItemController::class, 'toggle'])->name('items.toggle');
-        Route::delete('/items/{menuItem}', [MenuItemController::class, 'destroy'])->name('items.destroy');
-        Route::put('/items/{menuItem}/modifier-groups', [MenuItemController::class, 'syncModifierGroups'])->name('items.modifier-groups.sync');
-
-        Route::post('/items/{menuItem}/variants', [ItemVariantController::class, 'store'])->name('variants.store');
-        Route::put('/variants/{variant}', [ItemVariantController::class, 'update'])->name('variants.update');
-        Route::delete('/variants/{variant}', [ItemVariantController::class, 'destroy'])->name('variants.destroy');
-
-        Route::post('/modifier-groups', [ModifierGroupController::class, 'store'])->name('modifier-groups.store');
-        Route::get('/modifier-groups/{modifierGroup}/edit', [ModifierGroupController::class, 'edit'])->name('modifier-groups.edit');
-        Route::put('/modifier-groups/{modifierGroup}', [ModifierGroupController::class, 'update'])->name('modifier-groups.update');
-        Route::delete('/modifier-groups/{modifierGroup}', [ModifierGroupController::class, 'destroy'])->name('modifier-groups.destroy');
-        Route::post('/modifier-groups/{modifierGroup}/modifiers', [ModifierController::class, 'store'])->name('modifiers.store');
-        Route::put('/modifiers/{modifier}', [ModifierController::class, 'update'])->name('modifiers.update');
-        Route::delete('/modifiers/{modifier}', [ModifierController::class, 'destroy'])->name('modifiers.destroy');
-
-        Route::put('/availability/{branch}/{menuItem}/price', [BranchMenuController::class, 'updatePrice'])->name('availability.price');
-    });
-});
 
 /*
-|--------------------------------------------------------------------------
-| Phân hệ Kho & Định lượng (Module 07)
-|--------------------------------------------------------------------------
-*/
-Route::prefix('inventory')->name('inventory.')->group(function () {
-    Route::view('/ingredients', 'inventory.ingredients')->name('ingredients');
-    Route::view('/suppliers', 'inventory.suppliers')->name('suppliers');
-    Route::view('/recipes', 'inventory.recipes')->name('recipes');
-    Route::get('/stock-movements', function () {
-        $branches = \App\Models\Branch::where('status', \App\Enums\BranchStatus::ACTIVE)->orderBy('id')->get();
-        $warehouses = \App\Models\Warehouse::where('is_active', true)->with('branch')->orderBy('branch_id')->get();
-        $ingredients = \App\Models\Ingredient::where('is_active', true)->orderBy('name')->get();
-        return view('inventory.stock-movements', compact('branches', 'warehouses', 'ingredients'));
-    })->name('stock-movements');
-    Route::get('/purchase-orders', function () {
-        $branches = \App\Models\Branch::where('status', \App\Enums\BranchStatus::ACTIVE)->orderBy('id')->get();
-        $warehouses = \App\Models\Warehouse::where('is_active', true)->with('branch')->orderBy('id')->get();
-        return view('inventory.purchase-orders', compact('branches', 'warehouses'));
-    })->name('purchase-orders');
-    Route::get('/adjustments', function () {
-        $branches = \App\Models\Branch::where('status', \App\Enums\BranchStatus::ACTIVE)->orderBy('id')->get();
-        $warehouses = \App\Models\Warehouse::where('is_active', true)->with('branch')->orderBy('id')->get();
-        return view('inventory.adjustments', compact('branches', 'warehouses'));
-    })->name('adjustments');
-});
+    |--------------------------------------------------------------------------
+    | Phân hệ Kho & Định lượng (Module 07)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('inventory')->name('inventory.')->group(function () {
+        Route::view('/ingredients', 'inventory.ingredients')->name('ingredients');
+        Route::view('/suppliers', 'inventory.suppliers')->name('suppliers');
+        Route::view('/recipes', 'inventory.recipes')->name('recipes');
+        Route::view('/stock-movements', 'inventory.stock-movements')->name('stock-movements');
+        Route::view('/purchase-orders', 'inventory.purchase-orders')->name('purchase-orders');
+        Route::view('/adjustments', 'inventory.adjustments')->name('adjustments');
+    });

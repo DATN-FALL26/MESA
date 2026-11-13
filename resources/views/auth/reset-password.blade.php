@@ -29,6 +29,8 @@
                     <div class="mb-3">
                         <label for="password" class="form-label">Mật khẩu mới</label>
                         <input id="password" name="password" type="password" minlength="8"
+                            pattern="(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9])[A-Z].{7,}"
+                            title="Tối thiểu 8 ký tự, bắt đầu bằng chữ in hoa và có chữ thường, số, ký tự đặc biệt."
                             autocomplete="new-password" required class="form-control">
                     </div>
                     <div class="mb-3">

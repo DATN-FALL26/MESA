@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property IngredientType $ingredient_type
  * @property string $base_uom
  * @property string $min_stock
+ * @property bool $is_daily_procured
  * @property bool $is_active
  * @property CarbonInterface|null $created_at
  * @property CarbonInterface|null $updated_at
@@ -48,8 +49,14 @@ class Ingredient extends Model
         return [
             'ingredient_type' => IngredientType::class,
             'min_stock' => 'decimal:3',
+            'is_daily_procured' => 'boolean',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function scopeDailyProcured($query)
+    {
+        return $query->where('is_daily_procured', true);
     }
 
     public function modifiers(): HasMany

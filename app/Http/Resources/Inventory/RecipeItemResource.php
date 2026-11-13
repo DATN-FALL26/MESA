@@ -23,6 +23,7 @@ class RecipeItemResource extends JsonResource
             'ingredient_id' => $this->ingredient_id,
             'ingredient_sku' => $this->ingredient?->sku,
             'ingredient_name' => $this->ingredient?->name,
+            'ingredient_type' => $this->ingredient?->ingredient_type,
             'base_uom' => $this->ingredient?->base_uom,
             'quantity' => (float) $this->quantity,
         ];

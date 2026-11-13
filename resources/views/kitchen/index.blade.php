@@ -21,6 +21,26 @@
                         <p class="text-base font-bold leading-tight text-slate-900">I-Pho · Bếp (KDS)</p>
                         <p class="text-xs text-slate-500">{{ $stationCode ? ($stationLabels[$stationCode->value] ?? $stationCode->value) : 'Tất cả quầy' }}</p>
                     </div>
+
+                    @if (isset($branches) && $branches->count() > 1)
+                        <form method="GET" action="{{ route('kitchen.index') }}" class="flex items-center gap-1.5 ml-2">
+                            @if ($stationCode)
+                                <input type="hidden" name="station" value="{{ $stationCode->value }}">
+                            @endif
+                            <label class="text-xs text-slate-500 font-medium hidden sm:inline">Cơ sở:</label>
+                            <select name="branch_id" onchange="this.form.submit()" class="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-800 shadow-xs transition hover:bg-slate-50 focus:border-indigo-600 focus:outline-none">
+                                @foreach ($branches as $b)
+                                    <option value="{{ $b->id }}" @selected($b->id === $activeBranchId)>
+                                        {{ $b->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </form>
+                    @elseif ($currentBranch)
+                        <span class="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 ml-2">
+                            {{ $currentBranch->name }}
+                        </span>
+                    @endif
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2 text-xs font-medium">
@@ -41,12 +61,12 @@
 
             <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-2 sm:px-6">
                 <nav class="flex flex-wrap gap-2" aria-label="Lọc theo quầy">
-                    <a href="{{ route('kitchen.index') }}"
+                    <a href="{{ route('kitchen.index', array_filter(['branch_id' => $activeBranchId])) }}"
                        class="rounded-full px-4 py-1.5 text-sm font-semibold {{ $stationCode === null ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                         Tất cả quầy
                     </a>
                     @foreach ($stationCodes as $code)
-                        <a href="{{ route('kitchen.index', ['station' => $code->value]) }}"
+                        <a href="{{ route('kitchen.index', array_filter(['station' => $code->value, 'branch_id' => $activeBranchId])) }}"
                            class="rounded-full px-4 py-1.5 text-sm font-semibold {{ $stationCode === $code ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                             {{ $stationLabels[$code->value] ?? $code->value }}
                         </a>
@@ -55,11 +75,16 @@
 
                 <div class="flex items-center gap-3 text-sm">
                     <span class="hidden text-slate-500 sm:inline">{{ auth()->user()->full_name }}</span>
+                    <button type="button"
+                            onclick="openDailyCheckinModal('in_shift_addition')"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 active:scale-95 transition">
+                        <span>+ Nhập nguyên liệu</span>
+                    </button>
                     @if (auth()->user()->hasPermission('order.serve'))
                         <x-button :href="route('kitchen.serve.index')" variant="ghost" size="sm">Trang ra món</x-button>
                     @endif
                     @if (auth()->user()->hasPermission('dashboard.view'))
-                        <x-button :href="route('dashboard')" variant="ghost" size="sm">Quản trị</x-button>
+                        <x-button :href="route('admin.dashboard')" variant="ghost" size="sm">Quản trị</x-button>
                     @endif
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
@@ -72,7 +97,7 @@
         {{-- Bảng phiếu bếp: tự làm mới mỗi 5 giây --}}
         <main class="flex-1 p-4 sm:p-6">
             <div id="kds-board"
-                 data-board-url="{{ route('kitchen.board', array_filter(['station' => $stationCode?->value])) }}"
+                 data-board-url="{{ route('kitchen.board', array_filter(['station' => $stationCode?->value, 'branch_id' => $activeBranchId])) }}"
                  data-overdue-minutes="{{ $overdueMinutes }}">
                 @include('kitchen.partials.board', ['columns' => $columns])
             </div>
@@ -146,6 +171,11 @@
 
             /** Tải lại bảng phiếu và làm nổi bật thẻ mới xuất hiện. */
             async function refreshBoard() {
+                const gatekeeperModal = document.getElementById('kitchen-daily-checkin-modal');
+                if (gatekeeperModal && gatekeeperModal.dataset.isGatekeeper === 'true' && ! gatekeeperModal.classList.contains('hidden')) {
+                    return;
+                }
+
                 if (isRefreshing) {
                     return;
                 }
@@ -226,4 +256,10 @@
             50% { box-shadow: 0 0 0 4px rgb(250 204 21); }
         }
     </style>
+    @include('kitchen.partials.daily-checkin-modal', [
+        'needsDailyCheckin' => $needsDailyCheckin,
+        'dailyIngredients' => $dailyIngredients,
+        'currentBranch' => $currentBranch,
+        'currentWarehouse' => $currentWarehouse,
+    ])
 @endsection

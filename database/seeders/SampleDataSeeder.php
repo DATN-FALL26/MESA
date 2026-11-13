@@ -605,6 +605,7 @@ class SampleDataSeeder extends Seeder
                 'ingredient_type' => IngredientType::RAW->value,
                 'base_uom' => 'g',
                 'min_stock' => 5000.000,
+                'is_daily_procured' => true,
                 'is_active' => true,
             ],
             [
@@ -613,6 +614,7 @@ class SampleDataSeeder extends Seeder
                 'ingredient_type' => IngredientType::RAW->value,
                 'base_uom' => 'g',
                 'min_stock' => 3000.000,
+                'is_daily_procured' => true,
                 'is_active' => true,
             ],
             [
@@ -621,6 +623,7 @@ class SampleDataSeeder extends Seeder
                 'ingredient_type' => IngredientType::RAW->value,
                 'base_uom' => 'g',
                 'min_stock' => 3000.000,
+                'is_daily_procured' => true,
                 'is_active' => true,
             ],
             [
@@ -629,6 +632,7 @@ class SampleDataSeeder extends Seeder
                 'ingredient_type' => IngredientType::RAW->value,
                 'base_uom' => 'g',
                 'min_stock' => 10000.000,
+                'is_daily_procured' => false,
                 'is_active' => true,
             ],
             [
@@ -637,6 +641,7 @@ class SampleDataSeeder extends Seeder
                 'ingredient_type' => IngredientType::RAW->value,
                 'base_uom' => 'g',
                 'min_stock' => 1000.000,
+                'is_daily_procured' => true,
                 'is_active' => true,
             ],
             [
@@ -645,6 +650,7 @@ class SampleDataSeeder extends Seeder
                 'ingredient_type' => IngredientType::RAW->value,
                 'base_uom' => 'cái',
                 'min_stock' => 100.000,
+                'is_daily_procured' => true,
                 'is_active' => true,
             ],
             [
@@ -653,6 +659,7 @@ class SampleDataSeeder extends Seeder
                 'ingredient_type' => IngredientType::SEMI_FINISHED->value,
                 'base_uom' => 'ml',
                 'min_stock' => 20000.000,
+                'is_daily_procured' => false,
                 'is_active' => true,
             ],
             [
@@ -661,6 +668,7 @@ class SampleDataSeeder extends Seeder
                 'ingredient_type' => IngredientType::RAW->value,
                 'base_uom' => 'g',
                 'min_stock' => 500.000,
+                'is_daily_procured' => false,
                 'is_active' => true,
             ],
             [
@@ -669,6 +677,7 @@ class SampleDataSeeder extends Seeder
                 'ingredient_type' => IngredientType::RAW->value,
                 'base_uom' => 'lon',
                 'min_stock' => 50.000,
+                'is_daily_procured' => false,
                 'is_active' => true,
             ],
         ];
@@ -677,7 +686,7 @@ class SampleDataSeeder extends Seeder
             DB::table(ConstantHelper::TABLE_INGREDIENTS)->upsert(
                 array_merge($ing, ['created_at' => now(), 'updated_at' => now()]),
                 ['sku'],
-                ['name', 'ingredient_type', 'base_uom', 'min_stock', 'is_active', 'updated_at']
+                ['name', 'ingredient_type', 'base_uom', 'min_stock', 'is_daily_procured', 'is_active', 'updated_at']
             );
         }
 
@@ -1237,12 +1246,12 @@ class SampleDataSeeder extends Seeder
     private function seedStockLevels(array $warehouseIds, array $ingredientIds): void
     {
         $initialStocks = [
-            'NL_BANH_PHO' => ['quantity' => 50000.000, 'avg_cost' => 18000.00],
-            'NL_THIT_BO_TAI' => ['quantity' => 30000.000, 'avg_cost' => 220000.00],
-            'NL_THIT_BO_CHIN' => ['quantity' => 30000.000, 'avg_cost' => 200000.00],
+            'NL_BANH_PHO' => ['quantity' => 0.000, 'avg_cost' => 18000.00],
+            'NL_THIT_BO_TAI' => ['quantity' => 0.000, 'avg_cost' => 220000.00],
+            'NL_THIT_BO_CHIN' => ['quantity' => 0.000, 'avg_cost' => 200000.00],
             'NL_XUONG_BO' => ['quantity' => 40000.000, 'avg_cost' => 60000.00],
-            'NL_HANH_LA' => ['quantity' => 10000.000, 'avg_cost' => 25000.00],
-            'NL_QUAY' => ['quantity' => 500.000,   'avg_cost' => 2000.00],
+            'NL_HANH_LA' => ['quantity' => 0.000, 'avg_cost' => 25000.00],
+            'NL_QUAY' => ['quantity' => 0.000,   'avg_cost' => 2000.00],
             'NL_NUOC_DUNG' => ['quantity' => 100000.000, 'avg_cost' => 15000.00],
             'NL_TRA' => ['quantity' => 5000.000,  'avg_cost' => 150000.00],
             'NL_NUOC_NGOT' => ['quantity' => 200.000,   'avg_cost' => 8000.00],

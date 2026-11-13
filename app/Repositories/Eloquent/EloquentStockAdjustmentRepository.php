@@ -22,6 +22,10 @@ class EloquentStockAdjustmentRepository implements StockAdjustmentRepositoryInte
             ->with(['warehouse.branch', 'creator', 'approver', 'items.ingredient'])
             ->withCount('items');
 
+        if (!empty($filters['branch_id'])) {
+            $query->whereHas('warehouse', fn ($q) => $q->where('branch_id', (int) $filters['branch_id']));
+        }
+
         if (!empty($filters['warehouse_id'])) {
             $query->where('warehouse_id', (int) $filters['warehouse_id']);
         }

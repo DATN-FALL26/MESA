@@ -99,6 +99,8 @@ final class ConstantHelper
 
     public const TABLE_SUPPLIERS = 'suppliers';
 
+    public const TABLE_SUPPLIER_DOCUMENTS = 'supplier_documents';
+
     public const TABLE_RECIPES = 'recipes';
 
     public const TABLE_RECIPE_ITEMS = 'recipe_items';
@@ -110,6 +112,10 @@ final class ConstantHelper
     public const TABLE_STOCK_ADJUSTMENTS = 'stock_adjustments';
 
     public const TABLE_STOCK_ADJUSTMENT_ITEMS = 'stock_adjustment_items';
+
+    public const TABLE_KITCHEN_DAILY_CHECKINS = 'kitchen_daily_checkins';
+
+    public const TABLE_KITCHEN_DAILY_CHECKIN_ITEMS = 'kitchen_daily_checkin_items';
 
     // ==========================================
     // MODULE H: AI VÀ PHÊ DUYỆT (4 BẢNG)
@@ -353,6 +359,7 @@ final class ConstantHelper
             self::TABLE_STOCK_LEVELS,
             self::TABLE_STOCK_MOVEMENTS,
             self::TABLE_SUPPLIERS,
+            self::TABLE_SUPPLIER_DOCUMENTS,
             self::TABLE_RECIPES,
             self::TABLE_RECIPE_ITEMS,
             self::TABLE_PURCHASE_ORDERS,
