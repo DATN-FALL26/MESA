@@ -1,0 +1,871 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature;
+
+use App\Enums\BranchStatus;
+use App\Enums\UserStatus;
+use App\Helpers\ConstantHelper;
+use App\Models\Branch;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\User;
+use App\Models\UserRole;
+use Database\Seeders\ReferenceSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+class AuthFeatureTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(ReferenceSeeder::class);
+    }
+
+    public function test_guest_can_open_the_public_dashboard_without_signing_in(): void
+    {
+        Branch::query()->create([
+            'code' => 'PUBLIC01',
+            'name' => 'MESA Public Branch',
+            'timezone' => 'Asia/Ho_Chi_Minh',
+            'status' => BranchStatus::ACTIVE,
+        ]);
+
+        $this->withoutVite()
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('MESA Public Branch')
+            ->assertSee('Đăng nhập nhân viên')
+            ->assertDontSee('Quản lý tài khoản');
+
+        $this->assertGuest();
+    }
+
+    public function test_guest_menu_and_table_qr_routes_are_removed(): void
+    {
+        $this->get('/menu/1')->assertNotFound();
+        $this->get('/customer/table/1')->assertNotFound();
+        $this->get('/customer/table/1/qr-link')->assertNotFound();
+
+        $this->assertGuest();
+    }
+
+    public function test_customer_registration_endpoints_are_not_available(): void
+    {
+        $this->get('/register')->assertNotFound();
+        $this->post('/register')->assertNotFound();
+        $this->assertGuest();
+    }
+
+    public function test_reference_seeder_only_creates_internal_roles(): void
+    {
+        $this->assertEqualsCanonicalizing([
+            ConstantHelper::ROLE_ADMIN,
+            ConstantHelper::ROLE_BRANCH_MANAGER,
+            ConstantHelper::ROLE_CASHIER,
+            ConstantHelper::ROLE_WAITER,
+            ConstantHelper::ROLE_KITCHEN,
+            ConstantHelper::ROLE_WAREHOUSE,
+        ], Role::query()->pluck('code')->all());
+    }
+
+    public function test_reference_seeder_removes_legacy_customer_role_and_disables_customer_only_accounts(): void
+    {
+        $customerRole = Role::query()->create([
+            'code' => 'CUSTOMER',
+            'name' => 'Khách hàng',
+            'is_system' => true,
+        ]);
+        $customerPermission = Permission::query()->create([
+            'code' => 'customer.profile.view',
+            'module' => 'customer',
+            'name' => 'Customer profile view',
+        ]);
+        DB::table('role_permissions')->insert([
+            'role_id' => $customerRole->getKey(),
+            'permission_id' => $customerPermission->getKey(),
+        ]);
+        $user = User::query()->create([
+            'username' => 'legacyuser',
+            'full_name' => 'Legacy User',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        UserRole::query()->create([
+            'user_id' => $user->getKey(),
+            'role_id' => $customerRole->getKey(),
+            'scope_type' => 'ALL',
+            'scope_id' => null,
+            'valid_from' => now()->subMinute(),
+        ]);
+
+        $this->seed(ReferenceSeeder::class);
+
+        $legacyUser = User::withTrashed()->findOrFail($user->getKey());
+        $this->assertSame(UserStatus::INACTIVE, $legacyUser->status);
+        $this->assertNotNull($legacyUser->deleted_at);
+        $this->assertDatabaseMissing('roles', ['code' => 'CUSTOMER']);
+        $this->assertDatabaseMissing('permissions', ['code' => 'customer.profile.view']);
+        $this->assertDatabaseMissing('user_roles', ['user_id' => $user->getKey()]);
+    }
+
+    public function test_user_can_login_with_username(): void
+    {
+        $this->createUser([
+            'username' => 'bob',
+            'full_name' => 'Bob Tran',
+            'email' => 'bob@example.com',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $response = $this->post('/login', [
+            'login' => 'bob',
+            'password' => 'Password123!',
+        ]);
+
+        $response->assertRedirect('/admin/dashboard');
+        $this->assertAuthenticatedAs(User::first());
+    }
+
+    public function test_inactive_user_cannot_login(): void
+    {
+        $this->createUser([
+            'username' => 'inactive',
+            'full_name' => 'Inactive User',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::INACTIVE,
+        ]);
+
+        $this->post('/login', [
+            'login' => 'inactive',
+            'password' => 'Password123!',
+        ])->assertSessionHasErrors('login');
+
+        $this->assertGuest();
+    }
+
+    public function test_user_without_an_active_internal_role_cannot_login(): void
+    {
+        User::query()->create([
+            'username' => 'unassigned',
+            'full_name' => 'Unassigned User',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->post('/login', [
+            'login' => 'unassigned',
+            'password' => 'Password123!',
+        ])->assertSessionHasErrors('login');
+
+        $this->assertGuest();
+    }
+
+    public function test_user_can_logout(): void
+    {
+        $user = $this->createUser([
+            'username' => 'charlie',
+            'full_name' => 'Charlie Nguyen',
+            'email' => 'charlie@example.com',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->post('/logout');
+
+        $response->assertRedirect('/login');
+        $this->assertGuest();
+    }
+
+    public function test_authenticated_user_is_redirected_to_the_combined_dashboard(): void
+    {
+        $user = $this->createUser([
+            'username' => 'diana',
+            'full_name' => 'Diana Tran',
+            'email' => 'diana@example.com',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->actingAs($user);
+        $this->withoutVite();
+
+        $this->get('/dashboard')->assertRedirect(route('admin.dashboard'));
+
+        $this->get('/admin/dashboard')
+            ->assertOk()
+            ->assertSee('Tổng quan hệ thống')
+            ->assertSee('Doanh thu hôm nay')
+            ->assertSee('Hoạt động hệ thống gần đây');
+    }
+
+    public function test_guest_cannot_access_the_admin_dashboard(): void
+    {
+        $this->get('/admin/dashboard')->assertRedirect('/login');
+    }
+
+    public function test_user_without_dashboard_permission_cannot_access_the_admin_dashboard(): void
+    {
+        $user = User::query()->create([
+            'username' => 'limiteddashboard',
+            'full_name' => 'Limited Dashboard',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->actingAs($user)
+            ->get('/admin/dashboard')
+            ->assertForbidden();
+    }
+
+    public function test_user_without_permission_cannot_manage_users(): void
+    {
+        $user = $this->createUser([
+            'username' => 'frank',
+            'full_name' => 'Frank Tran',
+            'email' => 'frank@example.com',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->actingAs($user);
+        $this->withoutVite();
+
+        $this->get('/users')->assertForbidden();
+    }
+
+    public function test_permission_granted_through_a_role_controls_menu_and_route_access(): void
+    {
+        $user = $this->createUser([
+            'username' => 'hasusersview',
+            'full_name' => 'Has Users View',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($user, 'users.view');
+
+        $this->withoutVite();
+        $this->actingAs($user)
+            ->get('/dashboard')
+            ->assertRedirect(route('admin.dashboard'));
+
+        $this->get('/admin/dashboard')
+            ->assertOk()
+            ->assertSee('Quản lý tài khoản');
+
+        $this->get('/users')->assertOk();
+    }
+
+    public function test_dashboard_view_permission_is_required_for_admin_reports(): void
+    {
+        $user = $this->createUser([
+            'username' => 'reportviewer',
+            'full_name' => 'Report Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->withoutVite();
+
+        $this->actingAs($user)
+            ->get('/admin/reports?from_date=2026-10-01&to_date=2026-10-16')
+            ->assertOk();
+    }
+
+    public function test_user_list_can_be_searched_filtered_and_keeps_filters_in_pagination(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'userfilterviewer',
+            'full_name' => 'User Filter Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'users.view');
+
+        $role = Role::query()->create([
+            'code' => 'FILTER_STAFF',
+            'name' => 'Filter Staff',
+            'is_system' => false,
+        ]);
+
+        for ($index = 1; $index <= 16; $index++) {
+            $user = $this->createUser([
+                'username' => sprintf('filterstaff%02d', $index),
+                'full_name' => sprintf('Staff Person %02d', $index),
+                'email' => sprintf('staff.person.%02d@example.com', $index),
+                'password' => Hash::make('Password123!'),
+                'status' => UserStatus::ACTIVE,
+            ]);
+
+            UserRole::query()->create([
+                'user_id' => $user->id,
+                'role_id' => $role->id,
+                'scope_type' => 'ALL',
+                'scope_id' => null,
+                'valid_from' => now()->subMinute(),
+                'granted_by' => null,
+            ]);
+        }
+
+        $this->withoutVite();
+        $this->actingAs($viewer)
+            ->get('/users?q=staff.person.01%40example.com&role_id='.$role->id.'&status=active')
+            ->assertOk()
+            ->assertSee('filterstaff01')
+            ->assertDontSee('filterstaff02')
+            ->assertSee('Đặt lại');
+
+        $this->get('/users?q=Staff&role_id='.$role->id.'&status=active')
+            ->assertOk()
+            ->assertSee('q=Staff')
+            ->assertSee('role_id='.$role->id)
+            ->assertSee('status=active');
+    }
+
+    public function test_newly_created_accounts_appear_first_in_the_account_list(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'newestaccountviewer',
+            'full_name' => 'Newest Account Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'users.view');
+
+        $olderAccount = $this->createUser([
+            'username' => 'zolderaccount',
+            'full_name' => 'Z Older Account',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $newerAccount = $this->createUser([
+            'username' => 'aneweraccount',
+            'full_name' => 'A Newer Account',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->withoutVite();
+
+        $response = $this->actingAs($viewer)->get('/users')->assertOk();
+
+        $this->assertSame(
+            [$newerAccount->id, $olderAccount->id],
+            $response->viewData('users')->take(2)->pluck('id')->all(),
+        );
+    }
+
+    public function test_roles_can_be_searched_and_filtered_by_role_type(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'rolefilterviewer',
+            'full_name' => 'Role Filter Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'roles.view');
+
+        Role::query()->create([
+            'code' => 'FILTER_SYSTEM_ALPHA',
+            'name' => 'Alpha System Role',
+            'description' => 'Searchable system role',
+            'is_system' => true,
+        ]);
+        Role::query()->create([
+            'code' => 'FILTER_CUSTOM_ALPHA',
+            'name' => 'Alpha Custom Role',
+            'description' => 'Searchable custom role',
+            'is_system' => false,
+        ]);
+
+        $this->withoutVite();
+
+        $this->actingAs($viewer)
+            ->get('/roles?q=Alpha&type=system')
+            ->assertOk()
+            ->assertSee('FILTER_SYSTEM_ALPHA')
+            ->assertDontSee('FILTER_CUSTOM_ALPHA')
+            ->assertSee('value="system" selected');
+    }
+
+    public function test_permissions_can_be_searched_and_filtered_by_module_and_role_assignment(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'permissionfilterviewer',
+            'full_name' => 'Permission Filter Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'permissions.view');
+
+        $assignedPermission = Permission::query()->create([
+            'code' => 'filter.orders.read',
+            'module' => 'filter_orders',
+            'name' => 'Read filtered orders',
+        ]);
+        Permission::query()->create([
+            'code' => 'filter.orders.write',
+            'module' => 'filter_orders',
+            'name' => 'Write filtered orders',
+        ]);
+        Permission::query()->create([
+            'code' => 'filter.stock.read',
+            'module' => 'filter_stock',
+            'name' => 'Read filtered stock',
+        ]);
+        $role = Role::query()->create([
+            'code' => 'FILTER_PERMISSION_ROLE',
+            'name' => 'Filter Permission Role',
+            'is_system' => false,
+        ]);
+        $role->permissions()->attach($assignedPermission);
+
+        $this->withoutVite();
+
+        $this->actingAs($viewer)
+            ->get('/permissions?q=filter&module=filter_orders&usage=assigned')
+            ->assertOk()
+            ->assertSee('filter.orders.read')
+            ->assertDontSee('filter.orders.write')
+            ->assertDontSee('filter.stock.read')
+            ->assertSee('value="filter_orders" selected')
+            ->assertSee('value="assigned" selected');
+    }
+
+    public function test_newly_created_permissions_appear_first_in_the_permission_list(): void
+    {
+        $viewer = $this->createUser([
+            'username' => 'newestpermissionviewer',
+            'full_name' => 'Newest Permission Viewer',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($viewer, 'permissions.view');
+
+        Permission::query()->create([
+            'code' => 'old.permission',
+            'module' => 'old_module',
+            'name' => 'Old permission',
+        ]);
+        $newPermission = Permission::query()->create([
+            'code' => 'new.permission',
+            'module' => 'new_module',
+            'name' => 'New permission',
+        ]);
+
+        $this->withoutVite();
+
+        $response = $this->actingAs($viewer)->get('/permissions')->assertOk();
+
+        $this->assertSame($newPermission->id, $response->viewData('permissions')->first()->id);
+    }
+
+    public function test_user_can_create_account_and_assign_a_role_with_permissions(): void
+    {
+        $manager = $this->createUser([
+            'username' => 'usercreator',
+            'full_name' => 'User Creator',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($manager, 'users.create');
+        $this->grantPermission($manager, 'users.assign_roles');
+        $this->grantPermission($manager, 'users.delete');
+
+        $retiredUser = User::query()->create([
+            'username' => 'retiredstaff',
+            'employee_code' => 'NV0012',
+            'full_name' => 'Retired Staff',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $retiredUser->delete();
+
+        $role = Role::query()->create([
+            'code' => 'TEST_STAFF',
+            'name' => 'Test Staff',
+            'is_system' => false,
+        ]);
+
+        $this->withoutVite();
+        $this->actingAs($manager);
+        $this->get('/users/create')
+            ->assertOk()
+            ->assertSee('id="employee_code" name="employee_code"', false)
+            ->assertSee('readonly', false);
+
+        $this->actingAs($manager)->post('/users', [
+            'username' => 'newstaff',
+            'employee_code' => 'MANUAL-EMPLOYEE-CODE',
+            'full_name' => 'New Staff',
+            'email' => 'newstaff@example.com',
+            'status' => UserStatus::ACTIVE->value,
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'assign_roles' => '1',
+            'role_ids' => [$role->id],
+        ])->assertRedirect('/users');
+
+        $createdUser = User::query()->where('username', 'newstaff')->firstOrFail();
+        $this->assertSame('NV0013', $createdUser->employee_code);
+        $this->assertDatabaseMissing('users', ['employee_code' => 'MANUAL-EMPLOYEE-CODE']);
+        $this->assertDatabaseHas('user_roles', [
+            'user_id' => $createdUser->id,
+            'role_id' => $role->id,
+            'scope_type' => 'ALL',
+            'scope_id' => null,
+        ]);
+
+        $this->delete('/users/'.$createdUser->id)->assertMethodNotAllowed();
+        $this->assertDatabaseHas('users', ['id' => $createdUser->id]);
+    }
+
+    public function test_admin_can_create_an_account_and_assign_a_role(): void
+    {
+        $adminRole = Role::query()->where('code', ConstantHelper::ROLE_ADMIN)->firstOrFail();
+        $admin = $this->createUser([
+            'username' => 'accountadmin',
+            'full_name' => 'Account Admin',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        UserRole::query()->create([
+            'user_id' => $admin->id,
+            'role_id' => $adminRole->id,
+            'scope_type' => 'ALL',
+            'scope_id' => null,
+            'valid_from' => now()->subMinute(),
+            'granted_by' => null,
+        ]);
+
+        $role = Role::query()->create([
+            'code' => 'ADMIN_ASSIGNED_STAFF',
+            'name' => 'Admin Assigned Staff',
+            'is_system' => false,
+        ]);
+
+        $this->withoutVite();
+        $this->actingAs($admin)
+            ->get('/users')
+            ->assertOk()
+            ->assertSee('Thêm tài khoản');
+        $this->get('/users/create')->assertOk();
+
+        $this->post('/users', [
+            'username' => 'admincreated',
+            'full_name' => 'Admin Created',
+            'status' => UserStatus::ACTIVE->value,
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'assign_roles' => '1',
+            'role_ids' => [$role->id],
+        ])->assertRedirect('/users');
+
+        $createdUser = User::query()->where('username', 'admincreated')->firstOrFail();
+        $this->assertSame('NV0001', $createdUser->employee_code);
+        $this->assertDatabaseHas('user_roles', [
+            'user_id' => $createdUser->id,
+            'role_id' => $role->id,
+            'scope_type' => 'ALL',
+            'scope_id' => null,
+        ]);
+    }
+
+    public function test_user_creation_is_forbidden_without_role_assignment_permission(): void
+    {
+        $manager = $this->createUser([
+            'username' => 'limitedcreator',
+            'full_name' => 'Limited Creator',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($manager, 'users.create');
+
+        $this->actingAs($manager)->post('/users', [
+            'username' => 'roleless',
+            'full_name' => 'Roleless User',
+            'status' => UserStatus::ACTIVE->value,
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+        ])->assertForbidden();
+
+        $this->assertDatabaseMissing('users', ['username' => 'roleless']);
+    }
+
+    public function test_role_can_group_permissions_and_permissions_can_be_created(): void
+    {
+        $manager = $this->createUser([
+            'username' => 'rolemanager',
+            'full_name' => 'Role Manager',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($manager, 'roles.create');
+        $this->grantPermission($manager, 'roles.assign_permissions');
+        $this->grantPermission($manager, 'permissions.create');
+
+        $firstPermission = Permission::query()->create([
+            'code' => 'orders.view',
+            'module' => 'order',
+            'name' => 'View orders',
+        ]);
+        $secondPermission = Permission::query()->create([
+            'code' => 'orders.update',
+            'module' => 'order',
+            'name' => 'Update orders',
+        ]);
+
+        $this->actingAs($manager)->post('/roles', [
+            'code' => 'UNTRUSTED_FRONTEND_CODE',
+            'name' => 'Order Viewer',
+            'assign_permissions' => '1',
+            'permission_ids' => [$firstPermission->id, $secondPermission->id],
+        ])->assertRedirect('/roles');
+
+        $this->post('/roles', [
+            'code' => 'UNTRUSTED_FRONTEND_CODE',
+            'name' => 'Customer',
+        ])->assertSessionHasErrors('code');
+
+        $role = Role::query()->where('code', 'ORDER_VIEWER')->firstOrFail();
+        $this->assertDatabaseMissing('roles', ['code' => 'UNTRUSTED_FRONTEND_CODE']);
+        $this->assertDatabaseHas('role_permissions', [
+            'role_id' => $role->id,
+            'permission_id' => $firstPermission->id,
+        ]);
+        $this->assertDatabaseHas('role_permissions', [
+            'role_id' => $role->id,
+            'permission_id' => $secondPermission->id,
+        ]);
+
+        $this->post('/permissions', [
+            'code' => 'untrusted.frontend-value',
+            'module' => 'ORDER',
+            'action' => 'view',
+            'name' => 'Xem đơn hàng',
+        ])->assertRedirect('/permissions');
+
+        $this->assertDatabaseHas('permissions', [
+            'code' => 'order.view',
+            'module' => 'order',
+            'name' => 'Xem đơn hàng',
+        ]);
+        $this->assertDatabaseMissing('permissions', ['code' => 'untrusted.frontend-value']);
+    }
+
+    public function test_role_creation_generates_a_unique_code_from_the_role_name(): void
+    {
+        $manager = $this->createUser([
+            'username' => 'rolecodecreator',
+            'full_name' => 'Role Code Creator',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($manager, 'roles.create');
+        $this->withoutVite();
+
+        $this->actingAs($manager)
+            ->get('/roles/create')
+            ->assertOk()
+            ->assertSee('id="code" name="code"', false)
+            ->assertSee('readonly', false);
+
+        $this->post('/roles', [
+            'code' => 'UNTRUSTED_FRONTEND_CODE',
+            'name' => 'Quản lý',
+        ])->assertRedirect('/roles');
+
+        $this->assertDatabaseHas('roles', [
+            'code' => 'MANAGER',
+            'name' => 'Quản lý',
+        ]);
+        $this->assertDatabaseMissing('roles', ['code' => 'UNTRUSTED_FRONTEND_CODE']);
+
+        $this->post('/roles', [
+            'code' => 'ANOTHER_UNTRUSTED_CODE',
+            'name' => 'Quản lý',
+        ])->assertSessionHasErrors([
+            'code' => 'Mã vai trò đã tồn tại.',
+        ]);
+        $this->assertDatabaseMissing('roles', ['code' => 'ANOTHER_UNTRUSTED_CODE']);
+    }
+
+    public function test_permission_creation_form_uses_readonly_code_and_standard_options(): void
+    {
+        $manager = $this->createUser([
+            'username' => 'permissionformmanager',
+            'full_name' => 'Permission Form Manager',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($manager, 'permissions.create');
+
+        $this->withoutVite();
+        $this->actingAs($manager)
+            ->get('/permissions/create')
+            ->assertOk()
+            ->assertSee('id="code" name="code"', false)
+            ->assertSee('readonly', false)
+            ->assertSee('value="employee"', false)
+            ->assertSee('value="approve"', false);
+    }
+
+    public function test_duplicate_permission_code_is_rejected_with_the_expected_message(): void
+    {
+        $manager = $this->createUser([
+            'username' => 'permissionduplicatemanager',
+            'full_name' => 'Permission Duplicate Manager',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($manager, 'permissions.create');
+        Permission::query()->create([
+            'code' => 'employee.view',
+            'module' => 'employee',
+            'name' => 'Xem nhân viên',
+        ]);
+        $permissionCount = Permission::query()->count();
+
+        $this->actingAs($manager)->post('/permissions', [
+            'module' => 'EMPLOYEE',
+            'action' => 'view',
+            'name' => 'Xem nhân viên khác',
+        ])->assertSessionHasErrors([
+            'code' => 'Quyền đã tồn tại',
+        ]);
+
+        $this->assertSame($permissionCount, Permission::query()->count());
+    }
+
+    public function test_permission_creation_rejects_modules_outside_the_standard_list(): void
+    {
+        $manager = $this->createUser([
+            'username' => 'permissionmodulemanager',
+            'full_name' => 'Permission Module Manager',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $this->grantPermission($manager, 'permissions.create');
+
+        $this->actingAs($manager)->post('/permissions', [
+            'module' => 'unknown',
+            'action' => 'view',
+            'name' => 'Quyền không hợp lệ',
+        ])->assertSessionHasErrors('module');
+
+        $this->assertDatabaseMissing('permissions', [
+            'code' => 'unknown.view',
+        ]);
+    }
+
+    public function test_user_can_update_profile_with_avatar(): void
+    {
+        $user = $this->createUser([
+            'username' => 'erin',
+            'full_name' => 'Erin Nguyen',
+            'email' => 'erin@example.com',
+            'phone' => '0909000001',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->actingAs($user);
+        Storage::fake('public');
+
+        $response = $this->put('/profile', [
+            'full_name' => 'Erin Nguyen Updated',
+            'email' => 'erin.updated@example.com',
+            'phone' => '0909000002',
+            'avatar' => UploadedFile::fake()->image('avatar.jpg', 200, 200),
+        ]);
+
+        $response->assertRedirect('/profile');
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'full_name' => 'Erin Nguyen Updated',
+            'email' => 'erin.updated@example.com',
+            'phone' => '0909000002',
+        ]);
+    }
+
+    public function test_user_can_change_password(): void
+    {
+        $user = $this->createUser([
+            'username' => 'grace',
+            'full_name' => 'Grace Nguyen',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+
+        $this->actingAs($user);
+
+        $this->put('/profile/password', [
+            'current_password' => 'Password123!',
+            'password' => 'NewPassword123!',
+            'password_confirmation' => 'NewPassword123!',
+        ])->assertRedirect('/profile');
+
+        $this->assertTrue(Hash::check('NewPassword123!', $user->fresh()->password));
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function createUser(array $attributes): User
+    {
+        $user = User::query()->create($attributes);
+        $staffRole = Role::query()->where('code', ConstantHelper::ROLE_WAITER)->firstOrFail();
+
+        UserRole::query()->create([
+            'user_id' => $user->getKey(),
+            'role_id' => $staffRole->getKey(),
+            'scope_type' => 'ALL',
+            'scope_id' => null,
+            'valid_from' => now()->subMinute(),
+            'granted_by' => null,
+        ]);
+
+        return $user;
+    }
+
+    private function grantPermission(User $user, string $permissionCode): void
+    {
+        $permission = Permission::query()->create([
+            'code' => $permissionCode,
+            'module' => 'auth_user',
+            'name' => $permissionCode,
+        ]);
+
+        $role = Role::query()->create([
+            'code' => 'TEST_'.strtoupper(str_replace('.', '_', $permissionCode)),
+            'name' => $permissionCode,
+            'is_system' => false,
+        ]);
+
+        DB::table(ConstantHelper::TABLE_ROLE_PERMISSIONS)->insert([
+            'role_id' => $role->id,
+            'permission_id' => $permission->id,
+        ]);
+
+        UserRole::query()->create([
+            'user_id' => $user->id,
+            'role_id' => $role->id,
+            'scope_type' => 'ALL',
+            'scope_id' => null,
+            'valid_from' => now()->subMinute(),
+            'granted_by' => null,
+        ]);
+    }
+}
