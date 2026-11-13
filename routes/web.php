@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\UserController;
 use App\Http\Controllers\Kitchen\KitchenDailyCheckinController;
 use App\Http\Controllers\Kitchen\KitchenDisplayController;
 use App\Http\Controllers\Kitchen\ServeController;
+use App\Http\Controllers\Payment\PaymentController;
 use App\Http\Controllers\Menu\BranchMenuController;
 use App\Http\Controllers\Menu\CategoryController;
 use App\Http\Controllers\Menu\ItemVariantController;
@@ -365,3 +366,15 @@ Route::middleware('auth')->prefix('menu')->name('menu.')->group(function () {
             return view('inventory.adjustments', compact('branches', 'warehouses'));
         })->name('adjustments');
     });
+
+/*
+|--------------------------------------------------------------------------
+| MOD04 - Thanh toán
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->prefix('payments')->name('payments.')->group(function () {
+    // Hóa đơn tạm tính của bàn (INV-19)
+    Route::get('/orders/{order}', [PaymentController::class, 'show'])
+        ->middleware('permission:payment.request')
+        ->name('show');
+});

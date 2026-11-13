@@ -299,7 +299,7 @@
                         {{-- =====================================
                             DANH SÁCH MÓN
                         ====================================== --}}
-                        <div class="space-y-3 px-3 py-3 sm:px-4 sm:py-4 xl:flex-1 xl:overflow-y-auto">
+                        <div class="space-y-3 px-3 py-3 sm:px-4 sm:py-4 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
 
                             @forelse ($orderItems as $orderItem)
 
@@ -639,6 +639,17 @@
                                     Đã gửi bếp
                                 </button>
 
+                            @endif
+
+                            {{-- MOD04 – Thanh toán: hiện khi đã có món được gửi bếp --}}
+                            @if (
+                                $orderItems->whereNotIn('status', ['pending', 'cancelled'])->isNotEmpty()
+                                && auth()->user()->hasPermission('payment.request')
+                            )
+                                <a href="{{ route('payments.show', $order->id) }}"
+                                   class="mt-3 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700">
+                                    Thanh toán
+                                </a>
                             @endif
 
                         </div>

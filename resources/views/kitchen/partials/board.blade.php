@@ -45,12 +45,16 @@
                         $startedAt = $ticket->items->pluck('started_at')->filter()->min() ?? $ticket->fired_at;
                         $isServedTicket = $columnKey === 'done'
                             && $ticket->items->every(fn ($ticketItem) => $ticketItem->orderItem->status === \App\Enums\OrderItemStatus::SERVED);
+                        // M04-T06: món bị phục vụ sửa số lượng / hủy sau khi đã gửi bếp
+                        $hasChange = $ticket->items->contains(fn ($ticketItem) => \App\Http\Controllers\Kitchen\KitchenDisplayController::isQuantityChanged($ticketItem));
+                        $ticketCancelledItems = $cancelledItems->get($ticket->id, collect());
+                        $changeRingClass = $hasChange || $ticketCancelledItems->isNotEmpty() ? 'kds-card-changed' : '';
                     @endphp
 
                     {{-- Cột Nước & Quẩy: thẻ gọn 1 dòng, bấm "Xong" là hoàn thành --}}
                     @if ($columnKey === 'quick')
                         <article data-ticket-id="{{ $ticket->id }}"
-                                 class="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200 {{ $isOverdue ? 'kds-card-overdue' : '' }}">
+                                 class="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200 {{ $isOverdue ? 'kds-card-overdue' : '' }} {{ $changeRingClass }}">
                             <div class="min-w-0">
                                 <p class="flex flex-wrap items-center gap-x-2 text-sm font-bold text-slate-900">
                                     {{ filled($tableCodes) ? 'Bàn '.$tableCodes : 'Mang về' }}
@@ -61,8 +65,14 @@
                                         Chờ {{ $formatDuration($elapsedSeconds) }}
                                     </span>
                                 </p>
-                                <p class="truncate text-xs text-slate-700">
-                                    {{ $ticket->items->map(fn ($ticketItem) => $ticketItem->orderItem->quantity.'x '.$ticketItem->orderItem->item_name_snapshot)->join(', ') }}
+                                <p class="text-xs text-slate-700">
+                                    @foreach ($ticket->items as $ticketItem)
+                                        <span class="whitespace-nowrap">{{ $ticketItem->orderItem->quantity }}x {{ $ticketItem->orderItem->item_name_snapshot }}@if (\App\Http\Controllers\Kitchen\KitchenDisplayController::isQuantityChanged($ticketItem))
+                                                <span class="rounded bg-amber-100 px-1 font-semibold text-amber-800">Đã sửa {{ $ticketItem->notified_quantity }}→{{ $ticketItem->orderItem->quantity }}</span>@endif{{ $loop->last ? '' : ',' }}</span>
+                                    @endforeach
+                                    @foreach ($ticketCancelledItems as $cancelledItem)
+                                        <span class="whitespace-nowrap text-red-700"><span class="line-through">{{ $cancelledItem->orderItem->item_name_snapshot }}</span> Đã hủy</span>
+                                    @endforeach
                                 </p>
                             </div>
                             <form method="POST" action="{{ route('kitchen.tickets.advance', $ticket) }}" data-kds-action class="shrink-0">
@@ -75,7 +85,7 @@
                     @endif
 
                     <article data-ticket-id="{{ $ticket->id }}"
-                             class="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200 transition-opacity {{ $isOverdue ? 'kds-card-overdue' : '' }} {{ $isServedTicket ? 'opacity-50' : '' }}">
+                             class="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200 transition-opacity {{ $isOverdue ? 'kds-card-overdue' : '' }} {{ $isServedTicket ? 'opacity-50' : '' }} {{ $columnKey !== 'done' ? $changeRingClass : '' }}">
                         <div class="flex items-start justify-between gap-2">
                             <div>
                                 <p class="text-base font-bold leading-tight text-slate-900">
@@ -135,6 +145,9 @@
                                         @if ($orderItem->note)
                                             <span class="font-medium text-red-700">· {{ $orderItem->note }}</span>
                                         @endif
+                                        @if ($columnKey !== 'done' && \App\Http\Controllers\Kitchen\KitchenDisplayController::isQuantityChanged($ticketItem))
+                                            <span class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800 no-underline">Đã sửa: {{ $ticketItem->notified_quantity }} → {{ $orderItem->quantity }}</span>
+                                        @endif
                                     </p>
                                     @foreach ($orderItem->modifiers as $modifier)
                                         <p class="pl-5 text-xs text-slate-500">
@@ -143,6 +156,14 @@
                                     @endforeach
                                 </li>
                             @endforeach
+                            @if ($columnKey !== 'done')
+                                @foreach ($ticketCancelledItems as $cancelledItem)
+                                    <li class="text-red-700">
+                                        <span class="font-bold line-through">{{ $cancelledItem->orderItem->quantity }}x {{ $cancelledItem->orderItem->item_name_snapshot }}</span>
+                                        <span class="ml-1 rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-semibold">Đã hủy</span>
+                                    </li>
+                                @endforeach
+                            @endif
                         </ul>
 
                         {{-- INV-17: trạng thái in phiếu trả món (in sau khi bếp bấm Hoàn thành) --}}

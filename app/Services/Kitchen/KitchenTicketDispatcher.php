@@ -99,6 +99,7 @@ class KitchenTicketDispatcher
                     KitchenTicketItem::query()->create([
                         'ticket_id' => $ticket->getKey(),
                         'order_item_id' => $orderItem->getKey(),
+                        'notified_quantity' => $orderItem->quantity,
                         'status' => $isReadyMade ? TicketItemStatus::PREPARING : TicketItemStatus::NEW,
                         'fire_at' => $now,
                         'started_at' => $isReadyMade ? $now : null,

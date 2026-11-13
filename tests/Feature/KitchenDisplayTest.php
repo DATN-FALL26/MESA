@@ -10,6 +10,8 @@ use App\Enums\StationCode;
 use App\Enums\TicketItemStatus;
 use App\Enums\TicketStatus;
 use App\Helpers\ConstantHelper;
+use App\Models\KitchenTicketItem;
+use App\Models\PrintJob;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Feature\Concerns\BuildsKitchenOrders;
@@ -87,6 +89,77 @@ class KitchenDisplayTest extends TestCase
             ->assertSee('data-pending="2" data-done="1"', false);
     }
 
+    public function test_kds_flags_quantity_changed_after_sending_until_the_kitchen_starts_cooking(): void
+    {
+        $branch = $this->createBranch('KDS01');
+        $ticket = $this->createTicket($branch, 'B01', 'Phở bò chín', StationCode::PHO);
+        $kitchenUser = $this->createUserWithRole(ConstantHelper::ROLE_KITCHEN, $branch);
+
+        // Phục vụ tăng số lượng món đã gửi bếp (giống màn gọi món của MOD03).
+        $ticket->items()->first()->orderItem->update(['quantity' => 3]);
+
+        $this->actingAs($kitchenUser)
+            ->get(route('kitchen.board'))
+            ->assertOk()
+            ->assertSee('3x')
+            ->assertSee('Đã sửa: 1 → 3')
+            ->assertSee('kds-card-changed', false);
+
+        $this->actingAs($kitchenUser)->patchJson(route('kitchen.tickets.advance', $ticket))->assertOk();
+
+        $this->assertSame(3, $ticket->items()->first()->notified_quantity);
+        $this->actingAs($kitchenUser)
+            ->get(route('kitchen.board'))
+            ->assertDontSee('Đã sửa');
+    }
+
+    public function test_kds_shows_cancelled_items_and_hides_fully_cancelled_tickets(): void
+    {
+        $branch = $this->createBranch('KDS01');
+        $order = $this->createSentOrder($branch, 'B01', [['Phở bò tái', StationCode::PHO], ['Phở gà', StationCode::PHO]]);
+        $emptiedTicket = $this->createTicket($branch, 'B02', 'Phở chín bị hủy', StationCode::PHO);
+        $kitchenUser = $this->createUserWithRole(ConstantHelper::ROLE_KITCHEN, $branch);
+
+        $this->cancelTicketItem($order->kitchenTickets()->first()->items()->latest('id')->first());
+        $this->cancelTicketItem($emptiedTicket->items()->first());
+
+        $this->actingAs($kitchenUser)
+            ->get(route('kitchen.board'))
+            ->assertOk()
+            ->assertSee('Phở bò tái')
+            ->assertSeeInOrder(['Phở gà', 'Đã hủy'])
+            ->assertDontSee('data-ticket-id="'.$emptiedTicket->id.'"', false)
+            ->assertSee('data-pending="1" data-done="0"', false);
+    }
+
+    public function test_ready_made_ticket_changed_after_done_returns_to_its_column_and_reprints(): void
+    {
+        $branch = $this->createBranch('KDS01');
+        $this->createStation($branch, StationCode::PHO, printerIsActive: true);
+        $order = $this->createSentOrder($branch, 'B05', [['Trà đá', StationCode::DRINK]]);
+        $ticket = $order->kitchenTickets()->firstOrFail();
+        $kitchenUser = $this->createUserWithRole(ConstantHelper::ROLE_KITCHEN, $branch);
+
+        $this->actingAs($kitchenUser)->patchJson(route('kitchen.tickets.advance', $ticket))->assertOk();
+        $this->assertSame(TicketStatus::READY, $ticket->fresh()->status);
+        $this->assertSame(1, PrintJob::query()->where('ref_id', $ticket->id)->count());
+
+        // Khách gọi thêm trà đá vào cùng món đã xong.
+        $ticket->items()->first()->orderItem->update(['quantity' => 2]);
+
+        $this->actingAs($kitchenUser)
+            ->get(route('kitchen.board'))
+            ->assertSeeInOrder(['Nước &amp; Quẩy', 'Trà đá', 'Đã sửa 1→2', 'Xong', 'Hoàn thành'], false);
+
+        $this->actingAs($kitchenUser)->patchJson(route('kitchen.tickets.advance', $ticket))->assertOk();
+
+        $this->assertSame(2, $ticket->items()->first()->notified_quantity);
+        $this->assertSame(2, PrintJob::query()->where('ref_id', $ticket->id)->count());
+        $this->actingAs($kitchenUser)
+            ->get(route('kitchen.board'))
+            ->assertDontSee('Đã sửa');
+    }
+
     public function test_drinks_and_sides_go_to_their_own_column_and_finish_with_one_tap(): void
     {
         $branch = $this->createBranch('KDS01');
@@ -162,6 +235,9 @@ class KitchenDisplayTest extends TestCase
 
     public function test_done_ticket_stays_until_served_then_hides_one_minute_later(): void
     {
+        // Cố định giờ ban ngày để việc tua thời gian không làm sang ngày mới.
+        $this->travelTo(today()->setTime(10, 0));
+
         $branch = $this->createBranch('KDS01');
         $ticket = $this->createTicket($branch, 'B01', 'Phở bò tái', StationCode::PHO);
         $kitchenUser = $this->createUserWithRole(ConstantHelper::ROLE_KITCHEN, $branch);
@@ -215,5 +291,14 @@ class KitchenDisplayTest extends TestCase
             ->assertForbidden();
 
         $this->assertSame(TicketStatus::NEW, $ticket->fresh()->status);
+    }
+
+    /**
+     * Phục vụ hủy món đã gửi bếp (giống MOD03: hủy dòng món và dòng trên phiếu bếp).
+     */
+    private function cancelTicketItem(KitchenTicketItem $ticketItem): void
+    {
+        $ticketItem->orderItem->update(['status' => OrderItemStatus::CANCELLED, 'cancelled_at' => now()]);
+        $ticketItem->update(['status' => TicketItemStatus::CANCELLED]);
     }
 }
