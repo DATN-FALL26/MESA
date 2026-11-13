@@ -43,8 +43,6 @@
                         $currentRoute = Route::currentRouteName();
                     @endphp
 
-<<<<<<< HEAD
-=======
                     {{-- Dashboard --}}
                     @if (auth()->check() && auth()->user()->hasPermission('dashboard.view'))
                         <a href="{{ route('admin.dashboard') }}"
@@ -57,7 +55,6 @@
                             <span>Dashboard</span>
                         </a>
                     @endif
->>>>>>> ec82c5b08279a3957e413ae2d6242835ae535df1
 
                     @if (auth()->check() && auth()->user()->hasPermission('dashboard.view'))
                         <a href="{{ route('admin.reports') }}"
