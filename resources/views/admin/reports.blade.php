@@ -2,11 +2,10 @@
 
 @section('content')
 <div class="container-fluid px-6 py-4">
-    <!-- Tiêu đề & Nút thao tác -->
     <div class="flex flex-col md:flex-row justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
         <div>
             <h1 class="text-2xl font-bold text-gray-800">Báo Cáo Chi Tiết Kinh Doanh</h1>
-            <p class="text-sm text-gray-500">Phân tích chuyên sâu dòng doanh thu và kiểm soát rủi ro kho</p>
+            <p class="text-sm text-gray-500">Phân tích chuyên sâu dòng doanh thu và kiểm soát kho nguyên liệu</p>
         </div>
         <div class="flex items-center gap-3 mt-3 md:mt-0">
             <button onclick="window.print()" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200 transition">In báo cáo</button>
@@ -14,7 +13,6 @@
         </div>
     </div>
 
-    <!-- Bộ lọc thời gian báo cáo -->
     <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
         <form method="GET" action="{{ route('admin.reports') }}" class="flex flex-col lg:flex-row gap-4 items-center justify-between">
             <div class="flex flex-wrap items-center gap-4 w-full lg:w-auto">
@@ -33,7 +31,6 @@
         </form>
     </div>
 
-    <!-- Tầng KPI Tổng quan Báo cáo -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div class="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white p-6 rounded-2xl shadow-sm flex items-center justify-between">
             <div>
@@ -51,9 +48,7 @@
         </div>
     </div>
 
-    <!-- Tầng Bảng chi tiết: Top món ăn & Cảnh báo kho -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <!-- Bảng Top Món Ăn -->
         <div class="lg:col-span-8 bg-white p-5 rounded-xl shadow-sm border border-gray-100">
             <h3 class="text-base font-bold text-gray-800 mb-4">Top Món Ăn Doanh Thu Cao Trong Kỳ</h3>
             <div class="overflow-x-auto">
@@ -73,16 +68,13 @@
                             <td class="py-3.5 px-3 text-right font-bold text-emerald-600">{{ number_format($item->total_revenue ?? 0, 0, ',', '.') }} đ</td>
                         </tr>
                         @empty
-                        <tr>
-                            <td colspan="3" class="text-center py-4 text-gray-400 text-xs">Chưa có dữ liệu món ăn trong kỳ</td>
-                        </tr>
+                        <tr><td colspan="3" class="text-center py-4 text-gray-400 text-xs">Chưa có dữ liệu</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Cảnh báo hạn sử dụng kho -->
         <div class="lg:col-span-4 bg-white p-5 rounded-xl shadow-sm border border-gray-100">
             <h3 class="text-base font-bold text-gray-800 mb-4">Cảnh Báo Hạn Sử Dụng Kho</h3>
             <div class="overflow-x-auto">
@@ -104,9 +96,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr>
-                            <td colspan="3" class="text-center py-4 text-gray-400 text-xs">Kho hàng an toàn</td>
-                        </tr>
+                        <tr><td colspan="3" class="text-center py-4 text-gray-400 text-xs">Kho an toàn</td></tr>
                         @endforelse
                     </tbody>
                 </table>

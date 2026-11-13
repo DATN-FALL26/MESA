@@ -4,7 +4,7 @@
 <div class="container-fluid px-6 py-4">
     <div class="flex flex-col md:flex-row justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
         <div>
-            <h1 class="text-2xl font-bold text-gray-800">Dashboard</h1>
+            <h1 class="text-2xl font-bold text-gray-800">Tổng quan Dashboard Kinh doanh</h1>
             <p class="text-sm text-gray-500">Thống kê hoạt động kinh doanh nhà hàng theo thời gian thực</p>
         </div>
         <div class="flex items-center gap-3 mt-3 md:mt-0">
@@ -21,7 +21,6 @@
         </div>
     </div>
 
-    <!-- Tầng KPI (Đầy đủ màu sắc icon/chấm trạng thái) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
             <div>
@@ -55,15 +54,13 @@
         </div>
     </div>
 
-    <!-- Tầng Biểu đồ -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
         <div class="lg:col-span-8 bg-white p-5 rounded-xl shadow-sm border border-gray-100">
             <div class="flex justify-between items-center mb-4">
                 <div>
                     <h3 class="text-base font-bold text-gray-800">Biểu đồ Phân tích Doanh thu</h3>
-                    <p class="text-xs text-gray-400">Xem theo tuần (7 ngày), tháng (các tuần) hoặc năm (12 tháng)</p>
+                    <p class="text-xs text-gray-400">Xem theo tuần, tháng hoặc năm</p>
                 </div>
-                <!-- Dropdown lựa chọn biểu đồ -->
                 <select id="timeFilterSelect" class="bg-gray-50 border border-gray-300 text-gray-700 text-xs rounded-lg p-2 focus:ring-indigo-500 focus:border-indigo-500">
                     <option value="week" {{ ($filter ?? 'week') == 'week' ? 'selected' : '' }}>Tuần này (7 ngày)</option>
                     <option value="month" {{ ($filter ?? 'week') == 'month' ? 'selected' : '' }}>Tháng này (Các tuần)</option>
@@ -82,7 +79,6 @@
         </div>
     </div>
 
-    <!-- Tầng Vận hành thực tế & Bàn ăn -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-7 bg-white p-5 rounded-xl shadow-sm border border-gray-100">
             <h3 class="text-base font-bold text-gray-800 mb-4">Đơn Hàng Gần Đây</h3>
@@ -105,9 +101,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr>
-                            <td colspan="3" class="text-center py-4 text-gray-400 text-xs">Chưa có đơn hàng nào trong ngày</td>
-                        </tr>
+                        <tr><td colspan="3" class="text-center py-4 text-gray-400 text-xs">Chưa có đơn hàng nào</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -130,7 +124,6 @@
     </div>
 </div>
 
-<!-- Form ẩn gửi bộ lọc biểu đồ -->
 <form method="GET" action="{{ route('admin.dashboard') }}" id="filterForm" style="display: none;">
     <input type="hidden" name="filter" id="filterInput" value="{{ $filter ?? 'week' }}">
     <input type="hidden" name="branch_id" value="{{ $branchId ?? 1 }}">
@@ -138,7 +131,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // Bắt sự kiện chuyển đổi qua lại giữa Tuần, Tháng, Năm để render biểu đồ độc lập
     document.getElementById('timeFilterSelect').addEventListener('change', function() {
         document.getElementById('filterInput').value = this.value;
         document.getElementById('filterForm').submit();
