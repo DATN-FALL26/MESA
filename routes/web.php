@@ -377,4 +377,14 @@ Route::middleware('auth')->prefix('payments')->name('payments.')->group(function
     Route::get('/orders/{order}', [PaymentController::class, 'show'])
         ->middleware('permission:payment.request')
         ->name('show');
+
+    // Thu tiền: tiền mặt / QR mô phỏng (INV-20, INV-22)
+    Route::middleware('permission:payment.request')->group(function () {
+        Route::post('/orders/{order}/start', [PaymentController::class, 'start'])->name('start');
+        Route::get('/orders/{order}/cash', [PaymentController::class, 'cash'])->name('cash');
+        Route::post('/orders/{order}/cash', [PaymentController::class, 'payCash'])->name('cash.pay');
+        Route::get('/{payment}/qr', [PaymentController::class, 'qr'])->name('qr');
+        Route::post('/{payment}/qr/confirm', [PaymentController::class, 'confirmQr'])->name('qr.confirm');
+        Route::post('/{payment}/qr/fail', [PaymentController::class, 'failQr'])->name('qr.fail');
+    });
 });

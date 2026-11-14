@@ -103,5 +103,6 @@
             </div>
         </div>
     </div>
+    @if (\App\Services\Payment\PaymentHistoryService::canView(auth()->user())) @include('payments.partials.history') @endif
 </div>
 @endsection

@@ -211,7 +211,17 @@ class DashboardController extends Controller
 
     public function getPaymentMethodStats(Request $request)
     {
-        return response()->json(['status' => 'success', 'data' => ['cash' => 120, 'transfer' => 250]]);
+        // MOD04: tổng tiền thu thành công theo phương thức từ bảng payments (filter: week | month | year, mặc định 7 ngày).
+        $from = match ($request->input('filter', 'week')) {
+            'month' => now()->startOfMonth(),
+            'year' => now()->startOfYear(),
+            default => now()->subDays(6)->startOfDay(),
+        };
+
+        $totals = app(\App\Services\Payment\PaymentHistoryService::class)
+            ->methodTotals($request->user(), 'dashboard.view', $from, now()->endOfDay());
+
+        return response()->json(['status' => 'success', 'data' => $totals]);
     }
 
     public function getFoodStorageReport(Request $request)

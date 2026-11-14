@@ -74,10 +74,23 @@
         </div>
         <div class="lg:col-span-4 bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
             <h3 class="text-base font-bold text-gray-800 mb-1">Phương thức Thanh toán</h3>
-            <div class="relative h-56 flex items-center justify-center"><canvas id="paymentMethodChart"></canvas></div>
-            <div class="flex justify-center gap-6 mt-4 text-xs font-medium text-gray-600">
-                <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Tiền mặt</span>
-                <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-indigo-600"></span> Chuyển khoản</span>
+            <div class="relative h-56 flex items-center justify-center">
+                <canvas id="paymentMethodChart"></canvas>
+                {{-- Tổng đã thu ở giữa vòng tròn --}}
+                <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <span class="text-xs text-gray-400">Tổng đã thu</span>
+                    <span id="payTotal" class="text-lg font-bold text-gray-800">…</span>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mt-4 text-xs font-medium text-gray-600">
+                <div class="rounded-lg bg-emerald-50 px-3 py-2">
+                    <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Tiền mặt</span>
+                    <p class="mt-1 text-sm font-bold text-emerald-700"><span id="payCashAmount">0 đ</span> · <span id="payCashPercent">0%</span></p>
+                </div>
+                <div class="rounded-lg bg-indigo-50 px-3 py-2">
+                    <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-indigo-600"></span> Chuyển khoản</span>
+                    <p class="mt-1 text-sm font-bold text-indigo-700"><span id="payTransferAmount">0 đ</span> · <span id="payTransferPercent">0%</span></p>
+                </div>
             </div>
         </div>
     </div>
@@ -128,7 +141,6 @@
     </div>
 </div>
 
-<<<<<<< HEAD
 <form method="GET" action="{{ route('admin.dashboard') }}" id="filterForm" style="display: none;">
     <input type="hidden" name="filter" id="filterInput" value="{{ $filter ?? 'week' }}">
     <input type="hidden" name="branch_id" value="{{ $branchId ?? 1 }}">
@@ -159,67 +171,48 @@
         }
     });
 
+    // Biểu đồ Phương thức thanh toán: số thật từ bảng payments (MOD04), theo bộ lọc tuần / tháng / năm.
     const ctxPayment = document.getElementById('paymentMethodChart').getContext('2d');
-    new Chart(ctxPayment, {
-        type: 'doughnut',
-        data: { labels: ['Tiền mặt', 'Chuyển khoản'], datasets: [{ data: [120, 250], backgroundColor: ['#10b981', '#4f46e5'], borderWidth: 0 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '75%' }
-=======
-<!-- Chart.js Script -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        // 1. Biểu đồ Doanh thu theo ca (Cột)
-        const shiftCtx = document.getElementById('shiftRevenueChart').getContext('2d');
-        new Chart(shiftCtx, {
-            type: 'bar',
-            data: {
-                labels: ['Ca Sáng (6h - 11h)', 'Ca Trưa (11h - 17h)', 'Ca Tối (17h - 22h)'],
-                datasets: [{
-                    label: 'Doanh thu (VNĐ)',
-                    data: @json($chartData),
-                    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b'],
-                    borderRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
-                    x: { grid: { display: false } }
-                }
-            }
-        });
+    fetch("{{ route('admin.dashboard.payment_stats', ['filter' => $filter ?? 'week']) }}", { headers: { 'Accept': 'application/json' } })
+        .then(res => res.json())
+        .then(res => {
+            const cash = res.data?.cash ?? 0;
+            const transfer = res.data?.transfer ?? 0;
+            const isEmpty = cash + transfer === 0;
+            const money = (value) => value.toLocaleString('vi-VN') + ' đ';
+            const total = cash + transfer;
+            const percent = (value) => total === 0 ? '0%' : Math.round((value / total) * 1000) / 10 + '%';
 
-        // 2. Biểu đồ Phương thức thanh toán (Dùng URL tuyệt đối tránh lỗi route name)
-        fetch("/admin/dashboard/api-payment-stats")
-            .then(res => res.json())
-            .then(res => {
-                if(res.status === 'success') {
-                    const payCtx = document.getElementById('paymentMethodChart').getContext('2d');
-                    new Chart(payCtx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: ['Tiền mặt', 'Chuyển khoản'],
-                            datasets: [{
-                                data: [res.data.cash, res.data.transfer],
-                                backgroundColor: ['#10b981', '#6366f1']
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { position: 'bottom' }
-                            }
+            document.getElementById('payTotal').textContent = money(total);
+            document.getElementById('payCashAmount').textContent = money(cash);
+            document.getElementById('payCashPercent').textContent = percent(cash);
+            document.getElementById('payTransferAmount').textContent = money(transfer);
+            document.getElementById('payTransferPercent').textContent = percent(transfer);
+
+            new Chart(ctxPayment, {
+                type: 'doughnut',
+                data: {
+                    labels: isEmpty ? ['Chưa có giao dịch'] : ['Tiền mặt', 'Chuyển khoản'],
+                    datasets: [{
+                        data: isEmpty ? [1] : [cash, transfer],
+                        backgroundColor: isEmpty ? ['#e5e7eb'] : ['#10b981', '#4f46e5'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: ! isEmpty,
+                            callbacks: { label: (context) => context.label + ': ' + money(context.raw) + ' (' + percent(context.raw) + ')' }
                         }
-                    });
+                    }
                 }
-            })
-            .catch(err => console.error("Lỗi tải API phương thức thanh toán:", err));
->>>>>>> ec82c5b08279a3957e413ae2d6242835ae535df1
-    });
+            });
+        })
+        .catch(err => console.error('Lỗi tải API phương thức thanh toán:', err));
 </script>
 @endsection
