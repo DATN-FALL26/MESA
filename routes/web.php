@@ -20,6 +20,9 @@ Route::prefix('admin')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
     Route::get('/reports', [DashboardController::class, 'reports'])->name('admin.reports');
     Route::get('/api/revenue', [DashboardController::class, 'getRevenueApi'])->name('admin.api.revenue');
+    Route::get('/menu-items', [App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('menu.items.index');
+    Route::get('/categories', [App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('menu.categories.index');
+    Route::get('/modifier-groups', [App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('menu.modifier-groups.index');
 });
 
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {

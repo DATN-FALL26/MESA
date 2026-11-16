@@ -10,38 +10,45 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    /**
-     * [NOTE - MODULE 9 DASHBOARD]:
-     * - Tích hợp an toàn với Module POS (bảng orders) và Sơ đồ bàn (bảng dining_tables).
-     * - Xử lý đầy đủ biến user, activeRoles và dữ liệu dự phòng (mock data) chống sập hệ thống tuyệt đối.
-     */
     public function index(Request $request)
     {
-        $branchId = $request->input('branch_id', 1); // Lọc theo mã chi nhánh
-        $filter = $request->input('filter', 'week'); // Chế độ xem biểu đồ (week, month, year)
         $title = 'Tổng quan Dashboard Kinh doanh';
         $today = today();
 
         try {
-            // Lấy thông tin user đăng nhập và roles an toàn để truyền sang view partial
-            $user = $request->user();
-            $currentRoles = $user ? ($user->activeRoles ? $user->activeRoles()->orderBy('name')->get() : collect()) : collect();
-
-            // Truy vấn doanh thu và tổng đơn hàng trong ngày từ bảng orders
-            $doanhThu = 3450000;
-            $tongDon = 24;
-            if (Schema::hasTable('orders')) {
-                $orderStats = DB::table('orders')->whereDate('created_at', $today)->select([
-                    DB::raw('SUM(total_amount) as total_revenue'),
-                    DB::raw('COUNT(id) as total_orders'),
-                ])->first();
-                if ($orderStats && $orderStats->total_orders > 0) {
-                    $doanhThu = $orderStats->total_revenue;
-                    $tongDon = $orderStats->total_orders;
-                }
+            $branches = collect();
+            if (Schema::hasTable('branches')) {
+                $branches = DB::table('branches')->get();
+            }
+            if ($branches->isEmpty()) {
+                $branches = collect([
+                    (object)['id' => 1, 'name' => 'Phở MESA - Chi nhánh 1 (Quận 1)'],
+                    (object)['id' => 2, 'name' => 'Phở MESA - Chi nhánh 2 (Cầu Giấy)'],
+                ]);
             }
 
-            // Dữ liệu hiển thị cho 3 chế độ lọc thời gian biểu đồ
+            $defaultBranchId = $branches->first()->id ?? 1;
+            $branchId = $request->input('branch_id', session('current_branch_id', $defaultBranchId));
+            session(['current_branch_id' => $branchId]);
+
+            $orderQuery = DB::table('orders')->whereDate('created_at', $today);
+            if (Schema::hasTable('orders') && Schema::hasColumn('orders', 'branch_id')) {
+                $orderQuery->where('branch_id', $branchId);
+            }
+
+            $orderStats = $orderQuery->select([
+                DB::raw('SUM(total_amount) as total_revenue'),
+                DB::raw('COUNT(id) as total_orders'),
+            ])->first();
+
+            $hasData = $orderStats && $orderStats->total_orders > 0;
+            $doanhThu = $hasData ? $orderStats->total_revenue : 3450000;
+            $tongDon = $hasData ? $orderStats->total_orders : 24;
+
+            $chartLabels = [];
+            $chartData = [];
+            $filter = $request->input('filter', 'week');
+
             if ($filter == 'month') {
                 $chartLabels = ['Tuần 1', 'Tuần 2', 'Tuần 3', 'Tuần 4'];
                 $chartData = [18500000, 22000000, 19400000, 25600000];
@@ -53,55 +60,54 @@ class DashboardController extends Controller
                 $chartData = [1200000, 1500000, 1800000, 1400000, 2200000, 3100000, 2900000];
             }
 
-            // Truy vấn trạng thái bàn từ bảng dining_tables
             $danhSachBan = collect();
             if (Schema::hasTable('dining_tables')) {
-                $danhSachBan = DB::table('dining_tables')->get()->map(function($ban) {
+                $tableQuery = DB::table('dining_tables');
+                if (Schema::hasColumn('dining_tables', 'branch_id')) {
+                    $tableQuery->where('branch_id', $branchId);
+                }
+                $danhSachBan = $tableQuery->get()->map(function($ban) {
                     $ban->name = $ban->name ?? $ban->table_name ?? $ban->ten_ban ?? ('Bàn ' . ($ban->id ?? ''));
                     $ban->status = $ban->status ?? 'empty';
                     return $ban;
                 });
             }
+
             if ($danhSachBan->isEmpty()) {
-                $danhSachBan = collect([
-                    (object)['id' => 1, 'name' => 'Bàn 01', 'status' => 'active'],
-                    (object)['id' => 2, 'name' => 'Bàn 02', 'status' => 'empty'],
-                    (object)['id' => 3, 'name' => 'Bàn 03', 'status' => 'active'],
-                ]);
+                for ($i = 1; $i <= 20; $i++) {
+                    $danhSachBan->push((object)['id' => $i, 'name' => 'Bàn ' . $i, 'status' => 'empty']);
+                }
             }
 
-            // Lấy danh sách giao dịch mới nhất từ bảng orders
             $donHangs = collect();
             if (Schema::hasTable('orders')) {
-                $donHangs = DB::table('orders')->latest()->take(5)->get();
+                $orderListQuery = DB::table('orders');
+                if (Schema::hasColumn('orders', 'branch_id')) {
+                    $orderListQuery->where('branch_id', $branchId);
+                }
+                $donHangs = $orderListQuery->latest()->take(5)->get();
             }
+
             if ($donHangs->isEmpty()) {
-                $donHangs = collect([
-                    (object)['id' => 1024, 'total_amount' => 180000, 'created_at' => now()],
-                    (object)['id' => 1023, 'total_amount' => 250000, 'created_at' => now()->subMinutes(15)]
-                ]);
+                $donHangs = collect([(object)['id' => 1024, 'total_amount' => 180000, 'created_at' => now()]]);
             }
 
-            // Dữ liệu mẫu cho top món bán chạy / ít nhất
-            $monBanChay = (object)['total_qty' => 45, 'dish' => (object)['name' => 'Phở Bò Đặc Biệt', 'price' => 65000]];
-            $monItOrder = (object)['total_qty' => 3, 'dish' => (object)['name' => 'Phở Gà Ta', 'price' => 50000]];
-
-            // Danh sách chi nhánh mẫu cho dropdown
-            $branches = collect([
-                (object)['id' => 1, 'name' => 'Chi nhánh chính - Hà Nội'],
-                (object)['id' => 2, 'name' => 'Chi nhánh phụ - Quảng Bình']
-            ]);
+            $monBanChay = (object)['total_qty' => 45, 'dish' => (object)['name' => 'Phở Bò', 'price' => 65000]];
+            $monItOrder = (object)['total_qty' => 3, 'dish' => (object)['name' => 'Phở Gà', 'price' => 50000]];
 
         } catch (\Exception $e) {
-            // Fallback an toàn tuyệt đối khi có sự cố
-            $user = null;
-            $currentRoles = collect();
+            $branchId = 1;
             $doanhThu = 3450000;
             $tongDon = 24;
+            $filter = $request->input('filter', 'week');
             $chartLabels = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
             $chartData = [1200000, 1500000, 1800000, 1400000, 2200000, 3100000, 2900000];
-            $branches = collect([(object)['id' => 1, 'name' => 'Chi nhánh chính']]);
-            $danhSachBan = collect([(object)['id' => 1, 'name' => 'Bàn 01', 'status' => 'active']]);
+            $branches = collect([(object)['id' => 1, 'name' => 'Phở MESA - Chi nhánh 1 (Quận 1)']]);
+
+            $danhSachBan = collect();
+            for ($i = 1; $i <= 20; $i++) {
+                $danhSachBan->push((object)['id' => $i, 'name' => 'Bàn ' . $i, 'status' => 'empty']);
+            }
             $donHangs = collect([(object)['id' => 1024, 'total_amount' => 180000, 'created_at' => now()]]);
             $monBanChay = (object)['total_qty' => 45, 'dish' => (object)['name' => 'Phở Bò', 'price' => 65000]];
             $monItOrder = (object)['total_qty' => 3, 'dish' => (object)['name' => 'Phở Gà', 'price' => 50000]];
@@ -110,52 +116,70 @@ class DashboardController extends Controller
         return view('admin.dashboard', compact(
             'doanhThu', 'tongDon', 'danhSachBan', 'donHangs',
             'monBanChay', 'monItOrder', 'chartLabels', 'chartData',
-            'branches', 'branchId', 'filter', 'title', 'user', 'currentRoles'
+            'branches', 'branchId', 'filter', 'title'
         ));
     }
 
-    /**
-     * [NOTE - MODULE 9 REPORTS]:
-     * - Kết nối dữ liệu báo cáo từ bảng orders, order_items, menu_items và ingredients.
-     */
     public function reports(Request $request)
     {
         $fromDate = $request->input('from_date', now()->subDays(7)->toDateString());
         $toDate = $request->input('to_date', now()->toDateString());
+
+        $branches = collect();
+        if (Schema::hasTable('branches')) {
+            $branches = DB::table('branches')->get();
+        }
+        if ($branches->isEmpty()) {
+            $branches = collect([
+                (object)['id' => 1, 'name' => 'Phở MESA - Chi nhánh 1 (Quận 1)'],
+                (object)['id' => 2, 'name' => 'Phở MESA - Chi nhánh 2 (Cầu Giấy)'],
+            ]);
+        }
+
+        $branchId = session('current_branch_id', $request->input('branch_id', $branches->first()->id ?? 1));
+        session(['current_branch_id' => $branchId]);
+
         $title = 'Báo cáo chi tiết kinh doanh';
 
         try {
-            $tongDoanhThuKy = 24500000;
-            if (Schema::hasTable('orders')) {
-                $reportStats = DB::table('orders')
-                    ->whereBetween(DB::raw('DATE(created_at)'), [$fromDate, $toDate])
-                    ->select([
-                        DB::raw('SUM(total_amount) as total_revenue'),
-                        DB::raw('COUNT(id) as total_orders')
-                    ])->first();
-                if ($reportStats && $reportStats->total_revenue > 0) {
-                    $tongDoanhThuKy = $reportStats->total_revenue;
-                }
+            $orderReportQuery = DB::table('orders')->whereBetween(DB::raw('DATE(created_at)'), [$fromDate, $toDate]);
+            if (Schema::hasTable('orders') && Schema::hasColumn('orders', 'branch_id')) {
+                $orderReportQuery->where('branch_id', $branchId);
             }
 
-            $tongSoTo = 380;
+            $reportStats = $orderReportQuery->select([
+                DB::raw('SUM(total_amount) as total_revenue'),
+                DB::raw('COUNT(id) as total_orders')
+            ])->first();
+
+            $tongDoanhThuKy = $reportStats && $reportStats->total_revenue ? $reportStats->total_revenue : 24500000;
+
+            $tongSoTo = 0;
             if (Schema::hasTable('order_items') && Schema::hasTable('orders')) {
-                $sumQty = DB::table('order_items')
+                $itemQuery = DB::table('order_items')
                     ->join('orders', 'order_items.order_id', '=', 'orders.id')
-                    ->whereBetween(DB::raw('DATE(orders.created_at)'), [$fromDate, $toDate])
-                    ->sum('order_items.quantity');
-                if ($sumQty > 0) {
-                    $tongSoTo = $sumQty;
+                    ->whereBetween(DB::raw('DATE(orders.created_at)'), [$fromDate, $toDate]);
+
+                if (Schema::hasColumn('orders', 'branch_id')) {
+                    $itemQuery->where('orders.branch_id', $branchId);
                 }
+
+                $tongSoTo = (int) $itemQuery->sum('order_items.quantity');
             }
+            $tongSoTo = $tongSoTo > 0 ? $tongSoTo : 380;
 
             $topMonAn = collect();
-            if (Schema::hasTable('order_items') && Schema::hasTable('orders') && Schema::hasTable('menu_items')) {
-                $topMonAn = DB::table('order_items')
+            if (Schema::hasTable('order_items') && Schema::hasTable('menu_items') && Schema::hasTable('orders')) {
+                $topQuery = DB::table('order_items')
                     ->join('orders', 'order_items.order_id', '=', 'orders.id')
                     ->join('menu_items', 'order_items.menu_item_id', '=', 'menu_items.id')
-                    ->whereBetween(DB::raw('DATE(orders.created_at)'), [$fromDate, $toDate])
-                    ->select(
+                    ->whereBetween(DB::raw('DATE(orders.created_at)'), [$fromDate, $toDate]);
+
+                if (Schema::hasColumn('orders', 'branch_id')) {
+                    $topQuery->where('orders.branch_id', $branchId);
+                }
+
+                $topMonAn = $topQuery->select(
                         'menu_items.name as dish_name',
                         'menu_items.price as dish_price',
                         DB::raw('SUM(order_items.quantity) as total_qty'),
@@ -169,10 +193,9 @@ class DashboardController extends Controller
 
             if ($topMonAn->isEmpty()) {
                 $topMonAn = collect([
-                    (object)['total_qty' => 150, 'total_revenue' => 9750000, 'dish' => (object)['name' => 'Phở Bò Đặc Biệt', 'price' => 65000]],
-                    (object)['total_qty' => 120, 'total_revenue' => 6000000, 'dish' => (object)['name' => 'Phở Gà Ta', 'price' => 50000]],
-                    (object)['total_qty' => 85, 'total_revenue' => 5100000, 'dish' => (object)['name' => 'Bún Bò Huế', 'price' => 60000]],
-                    (object)['total_qty' => 45, 'total_revenue' => 2475000, 'dish' => (object)['name' => 'Mì Xào Bò', 'price' => 55000]],
+                    (object)['total_qty' => 180, 'total_revenue' => 11700000, 'dish' => (object)['name' => 'Phở Bò Tái Nạm', 'price' => 65000]],
+                    (object)['total_qty' => 125, 'total_revenue' => 6250000, 'dish' => (object)['name' => 'Phở Gà Ta', 'price' => 50000]],
+                    (object)['total_qty' => 75, 'total_revenue' => 4500000, 'dish' => (object)['name' => 'Phở Bò Chín', 'price' => 60000]],
                 ]);
             } else {
                 $topMonAn = $topMonAn->map(function($item) {
@@ -186,27 +209,43 @@ class DashboardController extends Controller
 
             $ingredients = collect();
             if (Schema::hasTable('ingredients')) {
-                $ingredients = DB::table('ingredients')->get();
+                $ingQuery = DB::table('ingredients');
+                if (Schema::hasColumn('ingredients', 'branch_id')) {
+                    $ingQuery->where('branch_id', $branchId);
+                }
+                $ingredients = $ingQuery->get();
             }
+
             if ($ingredients->isEmpty()) {
                 $ingredients = collect([
-                    (object)['name' => 'Thịt bò tươi nguyên lõi', 'stock_quantity' => 18, 'unit' => 'Kg', 'quality_status' => 'Sắp hết hạn'],
-                    (object)['name' => 'Xương ống heo nguyên chất', 'stock_quantity' => 25, 'unit' => 'Kg', 'quality_status' => 'An toàn'],
-                    (object)['name' => 'Bánh phở tươi mỗi ngày', 'stock_quantity' => 5, 'unit' => 'Kg', 'quality_status' => 'Sắp hết'],
+                    (object)['name' => 'Thịt bò (tái/chín/nạm)', 'stock_quantity' => 12, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
+                    (object)['name' => 'Bánh phở tươi', 'stock_quantity' => 25, 'unit' => 'Kg', 'quality_status' => 'Sắp hết'],
+                    (object)['name' => 'Xương ống (nấu nước dùng)', 'stock_quantity' => 15, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
+                    (object)['name' => 'Hành hoa & Hành tây', 'stock_quantity' => 3, 'unit' => 'Kg', 'quality_status' => 'Cần nhập thêm'],
+                    (object)['name' => 'Giá đỗ & Rau thơm các loại', 'stock_quantity' => 5, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
+                    (object)['name' => 'Gói gia vị (Quế, Hồi, Thảo quả)', 'stock_quantity' => 1.5, 'unit' => 'Kg', 'quality_status' => 'Sắp hết'],
+                    (object)['name' => 'Chanh & Ớt tươi', 'stock_quantity' => 2, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
                 ]);
             }
+
         } catch (\Exception $e) {
             $tongDoanhThuKy = 24500000;
             $tongSoTo = 380;
             $topMonAn = collect([
-                (object)['total_qty' => 150, 'total_revenue' => 9750000, 'dish' => (object)['name' => 'Phở Bò Đặc Biệt', 'price' => 65000]],
+                (object)['total_qty' => 180, 'total_revenue' => 11700000, 'dish' => (object)['name' => 'Phở Bò Tái Nạm', 'price' => 65000]],
             ]);
             $ingredients = collect([
-                (object)['name' => 'Thịt bò tươi nguyên lõi', 'stock_quantity' => 18, 'unit' => 'Kg', 'quality_status' => 'Sắp hết hạn'],
+                (object)['name' => 'Thịt bò (tái/chín/nạm)', 'stock_quantity' => 12, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
+                (object)['name' => 'Bánh phở tươi', 'stock_quantity' => 25, 'unit' => 'Kg', 'quality_status' => 'Sắp hết'],
+                (object)['name' => 'Xương ống (nấu nước dùng)', 'stock_quantity' => 15, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
+                (object)['name' => 'Hành hoa & Hành tây', 'stock_quantity' => 3, 'unit' => 'Kg', 'quality_status' => 'Cần nhập thêm'],
+                (object)['name' => 'Giá đỗ & Rau thơm các loại', 'stock_quantity' => 5, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
+                (object)['name' => 'Gói gia vị (Quế, Hồi, Thảo quả)', 'stock_quantity' => 1.5, 'unit' => 'Kg', 'quality_status' => 'Sắp hết'],
+                (object)['name' => 'Chanh & Ớt tươi', 'stock_quantity' => 2, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
             ]);
         }
 
-        return view('admin.reports', compact('fromDate', 'toDate', 'tongDoanhThuKy', 'tongSoTo', 'topMonAn', 'ingredients', 'title'));
+        return view('admin.reports', compact('fromDate', 'toDate', 'tongDoanhThuKy', 'tongSoTo', 'topMonAn', 'ingredients', 'title', 'branches', 'branchId'));
     }
 
     public function getPaymentMethodStats(Request $request)
