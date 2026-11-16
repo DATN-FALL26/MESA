@@ -20,9 +20,10 @@ Route::prefix('admin')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
     Route::get('/reports', [DashboardController::class, 'reports'])->name('admin.reports');
     Route::get('/api/revenue', [DashboardController::class, 'getRevenueApi'])->name('admin.api.revenue');
-    Route::get('/menu-items', [App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('menu.items.index');
-    Route::get('/categories', [App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('menu.categories.index');
-    Route::get('/modifier-groups', [App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('menu.modifier-groups.index');
+    Route::resource('menu-items', \App\Http\Controllers\Menu\MenuItemController::class)->names('menu.items');
+    Route::patch('menu-items/{menu_item}/toggle', [\App\Http\Controllers\Menu\MenuItemController::class, 'toggleStatus'])->name('menu.items.toggle');
+    Route::resource('categories', \App\Http\Controllers\Menu\CategoryController::class)->names('menu.categories');
+    Route::resource('modifier-groups', \App\Http\Controllers\Menu\ModifierGroupController::class)->names('menu.modifier-groups');
 });
 
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
