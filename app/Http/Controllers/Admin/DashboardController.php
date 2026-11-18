@@ -218,7 +218,7 @@ class DashboardController extends Controller
 
             if ($ingredients->isEmpty()) {
                 $ingredients = collect([
-                    (object)['name' => 'Thịt bò (tái/chín/nạm)', 'stock_quantity' => 12, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
+                    (object)['name' => 'Thịt bò', 'stock_quantity' => 12, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
                     (object)['name' => 'Bánh phở tươi', 'stock_quantity' => 25, 'unit' => 'Kg', 'quality_status' => 'Sắp hết'],
                     (object)['name' => 'Xương ống (nấu nước dùng)', 'stock_quantity' => 15, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
                     (object)['name' => 'Hành hoa & Hành tây', 'stock_quantity' => 3, 'unit' => 'Kg', 'quality_status' => 'Cần nhập thêm'],
@@ -235,7 +235,7 @@ class DashboardController extends Controller
                 (object)['total_qty' => 180, 'total_revenue' => 11700000, 'dish' => (object)['name' => 'Phở Bò Tái Nạm', 'price' => 65000]],
             ]);
             $ingredients = collect([
-                (object)['name' => 'Thịt bò (tái/chín/nạm)', 'stock_quantity' => 12, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
+                (object)['name' => 'Thịt bò', 'stock_quantity' => 12, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
                 (object)['name' => 'Bánh phở tươi', 'stock_quantity' => 25, 'unit' => 'Kg', 'quality_status' => 'Sắp hết'],
                 (object)['name' => 'Xương ống (nấu nước dùng)', 'stock_quantity' => 15, 'unit' => 'Kg', 'quality_status' => 'Ổn định'],
                 (object)['name' => 'Hành hoa & Hành tây', 'stock_quantity' => 3, 'unit' => 'Kg', 'quality_status' => 'Cần nhập thêm'],
