@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\UserController;
 use App\Http\Controllers\Kitchen\KitchenDailyCheckinController;
 use App\Http\Controllers\Kitchen\KitchenDisplayController;
 use App\Http\Controllers\Kitchen\ServeController;
+use App\Http\Controllers\Payment\PaymentController;
 use App\Http\Controllers\Menu\BranchMenuController;
 use App\Http\Controllers\Menu\CategoryController;
 use App\Http\Controllers\Menu\ItemVariantController;
@@ -26,6 +27,10 @@ use App\Http\Controllers\OrderController;
 Route::middleware(['auth', 'permission:dashboard.view'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/reports', [DashboardController::class, 'reports'])->name('reports');
+
+    // Bổ sung route xuất Excel cho báo cáo kinh doanh
+    Route::get('/reports/export-excel', [DashboardController::class, 'exportExcel'])->name('reports.export');
+
     Route::get('/api/revenue', [DashboardController::class, 'getRevenueApi'])->name('api.revenue');
 
     // Route API cho biểu đồ Dashboard (Thanh toán & Khung giờ)
@@ -42,7 +47,7 @@ Route::middleware(['auth', 'permission:dashboard.view'])->prefix('admin')->name(
 | Điều hướng mặc định khi truy cập hệ thống
 */
 Route::get('/', function () {
-    return redirect()->route('dashboard');
+    return redirect()->route('admin.dashboard');
 });
 
 /*
@@ -80,6 +85,9 @@ Route::middleware('guest')->group(function () {
 });
     // Đăng nhập thành công từ link Url , hoặc Qr code
 Route::get('/dashboard', [PublicDashboardController::class, 'show'])->name('dashboard');
+
+// Trang public dashboard qua QR code hoặc link ngoài
+Route::get('/public-dashboard', [PublicDashboardController::class, 'show'])->name('public.dashboard');
 
 /*
 |--------------------------------------------------------------------------
@@ -362,3 +370,25 @@ Route::middleware('auth')->prefix('menu')->name('menu.')->group(function () {
             return view('inventory.adjustments', compact('branches', 'warehouses'));
         })->name('adjustments');
     });
+
+/*
+|--------------------------------------------------------------------------
+| MOD04 - Thanh toán
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->prefix('payments')->name('payments.')->group(function () {
+    // Hóa đơn tạm tính của bàn (INV-19)
+    Route::get('/orders/{order}', [PaymentController::class, 'show'])
+        ->middleware('permission:payment.request')
+        ->name('show');
+
+    // Thu tiền: tiền mặt / QR mô phỏng (INV-20, INV-22)
+    Route::middleware('permission:payment.request')->group(function () {
+        Route::post('/orders/{order}/start', [PaymentController::class, 'start'])->name('start');
+        Route::get('/orders/{order}/cash', [PaymentController::class, 'cash'])->name('cash');
+        Route::post('/orders/{order}/cash', [PaymentController::class, 'payCash'])->name('cash.pay');
+        Route::get('/{payment}/qr', [PaymentController::class, 'qr'])->name('qr');
+        Route::post('/{payment}/qr/confirm', [PaymentController::class, 'confirmQr'])->name('qr.confirm');
+        Route::post('/{payment}/qr/fail', [PaymentController::class, 'failQr'])->name('qr.fail');
+    });
+});

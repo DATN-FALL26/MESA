@@ -14,12 +14,18 @@
         <section class="grid gap-5 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 md:grid-cols-2">
             <div>
                 <label for="code" class="mb-1 block text-sm font-medium text-slate-700">Mã vai trò</label>
-                <input id="code" name="code" value="{{ old('code', $role->code) }}" required maxlength="50"
-                    @readonly($role->is_system)
-                    class="w-full rounded-lg border border-slate-300 px-3.5 py-2 text-sm text-slate-900 shadow-sm transition duration-200 {{ $role->is_system ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'hover:border-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/20' }}">
-                     <p class="mt-1 text-sm text-slate-500">Mã vai trò được sử dụng để định danh trong hệ thống (ví dụ: ai_report).</p>
-                @if ($role->is_system)
-                    <p class="mt-1 text-xs text-slate-500">Mã vai trò hệ thống không thể thay đổi.</p>
+                @if ($isEditing)
+                    <input id="code" name="code" value="{{ old('code', $role->code) }}" required maxlength="50"
+                        @readonly($role->is_system)
+                        class="w-full rounded-lg border border-slate-300 px-3.5 py-2 text-sm text-slate-900 shadow-sm transition duration-200 {{ $role->is_system ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'hover:border-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/20' }}">
+                    @if ($role->is_system)
+                        <p class="mt-1 text-xs text-slate-500">Mã vai trò hệ thống không thể thay đổi.</p>
+                    @endif
+                @else
+                    <input id="code" name="code" value="" readonly aria-readonly="true" maxlength="50"
+                        placeholder="MANAGER"
+                        class="w-full rounded-lg border border-slate-300 bg-slate-50 px-3.5 py-2 text-sm text-slate-600 shadow-sm">
+                    <p class="mt-1 text-sm text-slate-500">Mã được tự động tạo từ tên vai trò, viết hoa và bỏ dấu.</p>
                 @endif
             </div>
             <div>
@@ -80,4 +86,39 @@
                 vai trò</button>
         </div>
     </form>
+
+    @unless ($isEditing)
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const nameInput = document.getElementById('name');
+                const codeInput = document.getElementById('code');
+                const aliases = {
+                    'quan_tri_vien': 'ADMIN',
+                    'quan_tri_vien_he_thong': 'ADMIN',
+                    'quan_ly': 'MANAGER',
+                    'quan_ly_chi_nhanh': 'MANAGER',
+                    'thu_ngan': 'CASHIER',
+                    'phuc_vu': 'WAITER',
+                    'nhan_vien_phuc_vu': 'WAITER',
+                    'dau_bep': 'CHEF',
+                    'nhan_vien_bep': 'CHEF',
+                };
+
+                const updateCode = () => {
+                    const normalizedName = nameInput.value
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/đ/gi, 'd')
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '_')
+                        .replace(/^_+|_+$/g, '');
+
+                    codeInput.value = aliases[normalizedName] ?? normalizedName.toUpperCase();
+                };
+
+                nameInput.addEventListener('input', updateCode);
+                updateCode();
+            });
+        </script>
+    @endunless
 @endsection

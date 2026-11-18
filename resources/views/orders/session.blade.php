@@ -299,7 +299,7 @@
                         {{-- =====================================
                             DANH SÁCH MÓN
                         ====================================== --}}
-                        <div class="space-y-3 px-3 py-3 sm:px-4 sm:py-4 xl:flex-1 xl:overflow-y-auto">
+                        <div class="space-y-3 px-3 py-3 sm:px-4 sm:py-4 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
 
                             @forelse ($orderItems as $orderItem)
 
@@ -639,6 +639,30 @@
                                     Đã gửi bếp
                                 </button>
 
+                            @endif
+
+                            {{-- MOD04 – Thanh toán: hiện khi đã có món được gửi bếp --}}
+                            @if (
+                                $orderItems->whereNotIn('status', ['pending', 'cancelled'])->isNotEmpty()
+                                && auth()->user()->hasPermission('payment.request')
+                            )
+                                @php
+                                    // Còn phải trả = tổng món đã gửi bếp − đã trả; gọi thêm và gửi bếp thì nút đỏ hiện lại.
+                                    $paymentSummary = app(\App\Services\Payment\OrderPaymentService::class)
+                                        ->summary(\App\Models\Order::query()->findOrFail($order->id));
+                                @endphp
+                                @if ($paymentSummary['remaining'] > 0)
+                                    <a href="{{ route('payments.show', $order->id) }}"
+                                       class="mt-3 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700">
+                                        Thanh toán
+                                    </a>
+                                @else
+                                    <a href="{{ route('payments.show', $order->id) }}"
+                                       class="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                                        Đã thanh toán
+                                    </a>
+                                @endif
                             @endif
 
                         </div>

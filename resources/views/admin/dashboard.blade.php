@@ -4,17 +4,20 @@
 
 @section('content')
 <div class="space-y-6">
-    {{-- Header: Tiêu đề, Dropdown chọn chi nhánh & Bộ lọc Tuần/Tháng/Năm --}}
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-            <h2 class="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">Tổng quan Dashboard Kinh doanh</h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400">Thống kê dữ liệu thực tế theo chi nhánh và mốc thời gian.</p>
+            <h2 class="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">Tổng Quan Kinh Doanh</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Số liệu hoạt động trực tuyến theo thời gian thực tại chi nhánh.</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
-            {{-- Form chọn chi nhánh --}}
-            <form method="GET" action="{{ route('admin.dashboard') }}" class="flex items-center gap-2">
-                <input type="hidden" name="filter" value="{{ $filter ?? 'week' }}">
+            {{-- Bổ sung nút làm mới (Refresh) dữ liệu nhanh --}}
+            <button onclick="window.location.reload();" class="inline-flex items-center gap-1.5 rounded-xl bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm border border-slate-300 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200" title="Cập nhật số liệu mới nhất">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                Làm mới
+            </button>
+
+            <form method="GET" action="{{ route('admin.dashboard') }}" class="flex flex-wrap items-center gap-3">
                 <select name="branch_id" onchange="this.form.submit()"
                         class="rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                     @foreach($branches ?? [] as $branch)
@@ -27,146 +30,125 @@
                         </option>
                     @endforeach
                 </select>
+
+                <select name="filter" onchange="this.form.submit()"
+                        class="rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                    <option value="week" {{ (isset($filter) && $filter == 'week') ? 'selected' : '' }}>Theo Tuần</option>
+                    <option value="month" {{ (isset($filter) && $filter == 'month') ? 'selected' : '' }}>Theo Tháng</option>
+                    <option value="year" {{ (isset($filter) && $filter == 'year') ? 'selected' : '' }}>Theo Năm</option>
+                </select>
             </form>
-
-            {{-- Nút chuyển đổi bộ lọc Tuần / Tháng / Năm --}}
-            <div class="flex rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
-                <a href="{{ route('admin.dashboard', ['branch_id' => $branchId ?? 1, 'filter' => 'week']) }}"
-                   class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-all {{ ($filter ?? 'week') == 'week' ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900' }}">
-                   Tuần
-                </a>
-                <a href="{{ route('admin.dashboard', ['branch_id' => $branchId ?? 1, 'filter' => 'month']) }}"
-                   class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-all {{ ($filter ?? '') == 'month' ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900' }}">
-                   Tháng
-                </a>
-                <a href="{{ route('admin.dashboard', ['branch_id' => $branchId ?? 1, 'filter' => 'year']) }}"
-                   class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-all {{ ($filter ?? '') == 'year' ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900' }}">
-                   Năm
-                </a>
-            </div>
         </div>
     </div>
 
-    {{-- Thống kê nhanh (KPI Cards - Đầy đủ 4 ô như bản cũ) --}}
-    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {{-- Doanh thu --}}
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    {{-- TẦNG 1: 4 Ô THỐNG KÊ NHANH VỚI 4 MÀU KHÁC NHAU --}}
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        {{-- Ô 1: Doanh thu hôm nay (Xanh Emerald) --}}
+        <div class="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-6 shadow-sm transition-all hover:shadow-md dark:border-emerald-800/60 dark:bg-emerald-950/30">
             <div class="flex items-center justify-between">
-                <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Doanh thu hôm nay</span>
-                <span class="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-600 dark:text-emerald-400">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.03-.659-1.172-.879-1.172-2.303 0-3.182s3.07-.879 4.242 0L15 9" />
-                    </svg>
+                <span class="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Doanh thu hôm nay</span>
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                 </span>
             </div>
-            <div class="mt-4">
-                <h3 class="text-2xl font-bold text-slate-900 dark:text-white">{{ number_format($doanhThu ?? 0, 0, ',', '.') }} đ</h3>
-            </div>
+            <h3 class="mt-3 text-2xl font-extrabold text-emerald-950 dark:text-white">{{ number_format($doanhThu ?? 0, 0, ',', '.') }} đ</h3>
+            <p class="mt-1 text-xs font-medium text-emerald-700/80 dark:text-emerald-300/70">Cập nhật trực tiếp từ quầy thu ngân</p>
         </div>
 
-        {{-- Tổng đơn --}}
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        {{-- Ô 2: Tổng số đơn hàng (Xanh Indigo) --}}
+        <div class="rounded-2xl border border-indigo-200/80 bg-indigo-50/70 p-6 shadow-sm transition-all hover:shadow-md dark:border-indigo-800/60 dark:bg-indigo-950/30">
             <div class="flex items-center justify-between">
-                <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Tổng số đơn hàng</span>
-                <span class="rounded-xl bg-indigo-500/10 p-2.5 text-indigo-600 dark:text-indigo-400">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-                    </svg>
+                <span class="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Tổng số đơn hàng</span>
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007Z" /></svg>
                 </span>
             </div>
-            <div class="mt-4">
-                <h3 class="text-2xl font-bold text-slate-900 dark:text-white">{{ $tongDon ?? 0 }} đơn</h3>
-            </div>
+            <h3 class="mt-3 text-2xl font-extrabold text-indigo-950 dark:text-white">{{ $tongDon ?? 0 }} đơn</h3>
+            <p class="mt-1 text-xs font-medium text-indigo-700/80 dark:text-indigo-300/70">Đơn hoàn tất trong ngày</p>
         </div>
 
-        {{-- Món bán chạy nhất --}}
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        {{-- Ô 3: Món ăn bán chạy (Cam Amber) --}}
+        <div class="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-6 shadow-sm transition-all hover:shadow-md dark:border-amber-800/60 dark:bg-amber-950/30">
             <div class="flex items-center justify-between">
-                <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Món bán chạy nhất</span>
-                <span class="rounded-xl bg-amber-500/10 p-2.5 text-amber-600 dark:text-amber-400">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385c.132.553-.47 1.016-.942.715l-4.728-2.985a.563.563 0 0 0-.586 0L6.982 20.54c-.472.301-1.074-.162-0.942-.715l1.285-5.385a.563.563 0 0 0-.182-.557l-4.204-3.602c-.38-.325-.178-.948.321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
-                    </svg>
+                <span class="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">Món ăn bán chạy</span>
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z" /></svg>
                 </span>
             </div>
-            <div class="mt-4">
-                <h3 class="text-lg font-bold text-slate-900 dark:text-white">{{ is_object($monBanChay ?? null) && isset($monBanChay->dish) ? ($monBanChay->dish->name ?? 'Phở Bò') : 'Phở Bò' }}</h3>
-                <p class="text-xs text-slate-500 mt-0.5">Số lượng: {{ is_object($monBanChay ?? null) ? ($monBanChay->total_qty ?? 45) : 45 }}</p>
-            </div>
+            <h3 class="mt-3 text-xl font-extrabold text-amber-950 dark:text-white truncate">
+                {{ $monBanChay->dish->name ?? 'Chưa có' }}
+            </h3>
+            <p class="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                Đã bán: {{ $monBanChay->total_qty ?? 0 }} phần
+            </p>
         </div>
 
-        {{-- Món bán ít nhất --}}
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        {{-- Ô 4: Món ăn ít được lên món (Đỏ Rose) --}}
+        <div class="rounded-2xl border border-rose-200/80 bg-rose-50/70 p-6 shadow-sm transition-all hover:shadow-md dark:border-rose-800/60 dark:bg-rose-950/30">
             <div class="flex items-center justify-between">
-                <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Món bán ít nhất</span>
-                <span class="rounded-xl bg-rose-500/10 p-2.5 text-rose-600 dark:text-rose-400">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
-                    </svg>
+                <span class="text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">Ít được lên món</span>
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/15 text-rose-600 dark:text-rose-400">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6 9 12.75l4.286-4.286a11.948 11.948 0 0 1 4.306 6.43l.776 2.898m0 0 3.182-5.511m-3.182 5.51-5.511-3.181" /></svg>
                 </span>
             </div>
-            <div class="mt-4">
-                <h3 class="text-lg font-bold text-slate-900 dark:text-white">{{ is_object($monItOrder ?? null) && isset($monItOrder->dish) ? ($monItOrder->dish->name ?? 'Phở Gà') : 'Phở Gà' }}</h3>
-                <p class="text-xs text-slate-500 mt-0.5">Số lượng: {{ is_object($monItOrder ?? null) ? ($monItOrder->total_qty ?? 3) : 3 }}</p>
-            </div>
+            <h3 class="mt-3 text-xl font-extrabold text-rose-950 dark:text-white truncate">
+                {{ $monItOrder->dish->name ?? 'Chưa có' }}
+            </h3>
+            <p class="mt-1 text-xs font-semibold text-rose-700 dark:text-rose-400">
+                Chỉ đạt: {{ $monItOrder->total_qty ?? 0 }} phần
+            </p>
         </div>
     </div>
 
-    {{-- BIỂU ĐỒ TĂNG TRƯỞNG DOANH THU (CHART.JS) --}}
+    {{-- Biểu đồ phân tích doanh thu --}}
     <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-base font-bold text-slate-900 dark:text-white">Biểu đồ tăng trưởng doanh thu</h3>
-            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300 uppercase">
-                Theo {{ ($filter ?? 'week') == 'month' ? 'Tháng' : (($filter ?? '') == 'year' ? 'Năm' : 'Tuần') }}
-            </span>
+            <h3 class="text-base font-bold text-slate-900 dark:text-white">Biểu Đồ Tăng Trưởng Doanh Thu</h3>
+            <span class="text-xs text-slate-400 italic">Dữ liệu thực tế theo thời gian thực</span>
         </div>
         <div class="relative h-72 w-full">
             <canvas id="revenueChart"></canvas>
         </div>
     </div>
 
-    {{-- Phần Danh sách bàn ăn & Đơn hàng gần đây --}}
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h3 class="text-base font-bold text-slate-900 dark:text-white mb-4">Trạng thái bàn ăn</h3>
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+    {{-- Sơ đồ bàn ăn & đơn hàng mới --}}
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div class="lg:col-span-2 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h3 class="text-base font-bold text-slate-900 dark:text-white mb-4">Sơ Đồ Trạng Thái Bàn Ăn</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-80 overflow-y-auto pr-2">
                 @forelse($danhSachBan ?? [] as $ban)
                     @php
-                        $banStatus = is_object($ban) ? ($ban->status ?? 'empty') : 'empty';
                         $banName = is_object($ban) ? ($ban->name ?? 'Bàn') : 'Bàn';
+                        $banStatus = is_object($ban) ? ($ban->status ?? 'empty') : 'empty';
+                        $isBusy = $banStatus == 'busy' || $banStatus == 'occupied';
                     @endphp
-                    <div class="p-3 rounded-xl border {{ $banStatus == 'active' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-slate-50 border-slate-200 text-slate-700' }} dark:bg-slate-800/50 dark:border-slate-700">
-                        <div class="font-bold text-sm">{{ $banName }}</div>
-                        <div class="text-xs mt-1 font-medium {{ $banStatus == 'active' ? 'text-amber-600' : 'text-slate-500' }}">
-                            {{ $banStatus == 'active' ? 'Đang phục vụ' : 'Trống' }}
-                        </div>
+                    <div class="p-3 rounded-xl border {{ $isBusy ? 'bg-rose-500/10 border-rose-200 text-rose-700 dark:border-rose-900 dark:text-rose-400' : 'bg-emerald-500/10 border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-400' }} flex flex-col justify-between">
+                        <span class="font-bold text-sm">{{ $banName }}</span>
+                        <span class="text-xs font-semibold mt-1">{{ $isBusy ? 'Đang phục vụ' : 'Trống' }}</span>
                     </div>
                 @empty
-                    <p class="text-sm text-slate-500">Chưa có dữ liệu bàn ăn.</p>
+                    <p class="text-sm text-slate-500">Chưa có thông tin bàn ăn trong hệ thống.</p>
                 @endforelse
             </div>
         </div>
 
         <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h3 class="text-base font-bold text-slate-900 dark:text-white mb-4">Đơn hàng gần đây</h3>
+            <h3 class="text-base font-bold text-slate-900 dark:text-white mb-4">Đơn Hàng Gần Đây</h3>
             <div class="space-y-3">
-                @forelse($donHangs ?? [] as $don)
+                @forelse($donHangs ?? [] as $dh)
                     @php
-                        $donId = is_object($don) ? ($don->id ?? 1) : 1;
-                        $donTotal = is_object($don) ? ($don->total_amount ?? 0) : 0;
-                        $donTime = is_object($don) && isset($don->created_at) ? \Carbon\Carbon::parse($don->created_at)->format('H:i - d/m/Y') : now()->format('H:i - d/m/Y');
+                        $dhId = is_object($dh) ? ($dh->id ?? 1) : 1;
+                        $dhTotal = is_object($dh) ? ($dh->total_amount ?? 0) : 0;
                     @endphp
-                    <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                         <div>
-                            <span class="font-bold text-sm text-slate-800 dark:text-white">Đơn #{{ $donId }}</span>
-                            <div class="text-xs text-slate-500">{{ $donTime }}</div>
+                            <span class="font-bold text-sm text-slate-800 dark:text-white">Đơn #{{ $dhId }}</span>
+                            <div class="text-xs text-slate-500 mt-0.5">Thành công</div>
                         </div>
-                        <div class="font-bold text-sm text-indigo-600 dark:text-indigo-400">
-                            {{ number_format($donTotal, 0, ',', '.') }} đ
-                        </div>
+                        <span class="font-bold text-xs text-indigo-600 dark:text-indigo-400">{{ number_format($dhTotal, 0, ',', '.') }} đ</span>
                     </div>
                 @empty
-                    <p class="text-sm text-slate-500">Chưa có đơn hàng nào.</p>
+                    <p class="text-sm text-slate-500">Chưa có giao dịch đơn hàng nào.</p>
                 @endforelse
             </div>
         </div>
@@ -177,43 +159,43 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        const ctx = document.getElementById('revenueChart').getContext('2d');
-        const chartLabels = {!! json_encode($chartLabels ?? []) !!};
-        const chartData = {!! json_encode($chartData ?? []) !!};
+        const ctx = document.getElementById('revenueChart');
+        if (ctx) {
+            const labels = @json($chartLabels ?? []);
+            const data = @json($chartData ?? []);
 
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: chartLabels,
-                datasets: [{
-                    label: 'Doanh thu (VNĐ)',
-                    data: chartData,
-                    borderColor: '#6366f1',
-                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                    borderWidth: 3,
-                    fill: true,
-                    tension: 0.35,
-                    pointBackgroundColor: '#6366f1',
-                    pointRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Doanh thu (VNĐ)',
+                        data: data,
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.3
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: 'rgba(203, 213, 225, 0.2)' }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
                     },
-                    x: {
-                        grid: { display: false }
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
     });
 </script>
 @endpush
