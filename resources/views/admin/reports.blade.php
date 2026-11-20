@@ -11,7 +11,7 @@
         </div>
 
         <div class="flex items-center gap-3">
-            <button onclick="window.print()" class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-sm border border-slate-300 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">
+            <button onclick="window.print()" type="button" class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-sm border border-slate-300 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.725 14.406v-2.481c0-1.08.872-1.954 1.953-1.954h6.644c1.08 0 1.953.874 1.953 1.954v2.481M6.725 14.406H4.85c-.966 0-1.75-.784-1.75-1.75v-3.5c0-.966.784-1.75 1.75-1.75h14.3c.966 0 1.75.784 1.75 1.75v3.5c0 .966-.784 1.75-1.75 1.75h-1.875M6.725 14.406v3.25c0 .966.784 1.75 1.75 1.75h6.644c.966 0 1.75-.784 1.75-1.75v-3.25M9.75 10.5h4.5" /></svg>
                 In báo cáo
             </button>
@@ -30,8 +30,12 @@
                 <select name="branch_id" onchange="this.form.submit()"
                         class="rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 w-full sm:w-64">
                     @foreach($branches ?? [] as $branch)
-                        <option value="{{ $branch->id }}" {{ (isset($branchId) && $branchId == $branch->id) ? 'selected' : '' }}>
-                            {{ $branch->name }}
+                        @php
+                            $bId = data_get($branch, 'id');
+                            $bName = data_get($branch, 'name', 'Chi nhánh');
+                        @endphp
+                        <option value="{{ $bId }}" {{ (isset($branchId) && $branchId == $bId) ? 'selected' : '' }}>
+                            {{ $bName }}
                         </option>
                     @endforeach
                 </select>
@@ -53,7 +57,7 @@
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 pt-2">
             <div class="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-5 shadow-sm dark:border-emerald-800/60 dark:bg-emerald-950/30">
                 <span class="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Tổng doanh thu kỳ</span>
-                <h3 class="mt-2 text-2xl font-extrabold text-emerald-950 dark:text-white">{{ number_format($tongDoanhThuKy ?? 0, 0, ',', '.') }} đ</h3>
+                <h3 class="mt-2 text-2xl font-extrabold text-emerald-950 dark:text-white">{{ number_format((float) ($tongDoanhThuKy ?? 0), 0, ',', '.') }} đ</h3>
             </div>
 
             <div class="rounded-2xl border border-indigo-200/80 bg-indigo-50/70 p-5 shadow-sm dark:border-indigo-800/60 dark:bg-indigo-950/30">
@@ -68,13 +72,18 @@
         <h3 class="text-base font-bold text-slate-900 dark:text-white mb-4">Top Món Ăn Doanh Thu Cao Trong Kỳ</h3>
         <div class="space-y-3">
             @forelse($topMonAn ?? [] as $item)
+                @php
+                    $dishName = data_get($item, 'dish.name', data_get($item, 'name', 'Món ăn'));
+                    $totalQty = data_get($item, 'total_qty', 0);
+                    $totalRevenue = (float) data_get($item, 'total_revenue', 0);
+                @endphp
                 <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                     <div>
-                        <span class="font-bold text-sm text-slate-800 dark:text-white">{{ $item->dish->name ?? 'Món ăn' }}</span>
-                        <div class="text-xs text-slate-500 mt-0.5">Số lượng: {{ $item->total_qty }} phần</div>
+                        <span class="font-bold text-sm text-slate-800 dark:text-white">{{ $dishName }}</span>
+                        <div class="text-xs text-slate-500 mt-0.5">Số lượng: {{ $totalQty }} phần</div>
                     </div>
                     <div class="font-bold text-sm text-indigo-600 dark:text-indigo-400">
-                        {{ number_format($item->total_revenue ?? 0, 0, ',', '.') }} đ
+                        {{ number_format($totalRevenue, 0, ',', '.') }} đ
                     </div>
                 </div>
             @empty
@@ -114,10 +123,10 @@
                 <tbody class="divide-y divide-slate-100 text-xs font-medium text-slate-700 dark:divide-slate-800 dark:text-slate-300">
                     @forelse($ingredients ?? [] as $index => $ing)
                         @php
-                            $sku = $ing->sku ?? ('NL_' . strtoupper(Str::slug($ing->name ?? 'item', '_')));
-                            $name = $ing->name ?? 'Nguyên liệu';
-                            $stock = $ing->stock_quantity ?? 0;
-                            $status = $ing->quality_status ?? 'Ổn định';
+                            $name = (string) data_get($ing, 'name', 'Nguyên liệu');
+                            $sku = (string) (data_get($ing, 'sku') ?: ('NL_' . strtoupper(\Illuminate\Support\Str::slug($name, '_'))));
+                            $stock = data_get($ing, 'stock_quantity', 0);
+                            $status = (string) data_get($ing, 'quality_status', 'Ổn định');
 
                             $nameLower = mb_strtolower($name);
 
@@ -129,7 +138,7 @@
                                 $categoryBg = 'bg-sky-500/10 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400';
                             }
 
-                            $unit = $ing->unit ?? 'Kg';
+                            $unit = (string) (data_get($ing, 'unit') ?: 'Kg');
                             if (str_contains($nameLower, 'nước dùng')) {
                                 $unit = 'ml';
                             } elseif (str_contains($nameLower, 'nước ngọt') || str_contains($nameLower, 'lon')) {
@@ -143,7 +152,7 @@
                             }
 
                             $badgeClass = 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400';
-                            if ($status == 'Sắp hết' || $status == 'Cần nhập thêm') {
+                            if ($status === 'Sắp hết' || $status === 'Cần nhập thêm') {
                                 $badgeClass = 'bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400';
                             }
                         @endphp
@@ -203,7 +212,9 @@
             }
         });
 
-        menu.classList.toggle('hidden');
+        if (menu) {
+            menu.classList.toggle('hidden');
+        }
     }
 
     window.addEventListener('click', function(e) {
