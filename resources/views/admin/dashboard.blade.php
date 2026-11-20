@@ -4,6 +4,7 @@
 
 @section('content')
 <div class="space-y-6">
+    {{-- Header & Bộ lọc --}}
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
             <h2 class="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">Tổng Quan Kinh Doanh</h2>
@@ -40,7 +41,7 @@
         </div>
     </div>
 
-    {{-- 4 Ô Thống Kê --}}
+    {{-- Tầng 1: 4 Ô Thống Kê --}}
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <div class="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-6 shadow-sm dark:border-emerald-800/60 dark:bg-emerald-950/30">
             <span class="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Doanh thu hôm nay</span>
@@ -75,7 +76,7 @@
         </div>
     </div>
 
-    {{-- Tầng biểu đồ: Doanh thu + Cơ cấu thanh toán --}}
+    {{-- Tầng 2: Biểu đồ doanh thu & Cơ cấu thanh toán --}}
     @php
         $cashVal = (float) data_get($paymentStats ?? [], 'cash', 0);
         $transferVal = (float) data_get($paymentStats ?? [], 'transfer', 0);
@@ -125,62 +126,35 @@
         </div>
     </div>
 
-    {{-- Sơ đồ bàn & Đơn hàng gần đây --}}
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div class="lg:col-span-2 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="flex items-center justify-between mb-4">
-                <div>
-                    <h3 class="text-base font-bold text-slate-900 dark:text-white">Sơ Đồ Trạng Thái Bàn Ăn</h3>
+    {{-- Tầng 3: Đơn hàng gần đây (1 tầng riêng full-width) --}}
+    <section class="w-full rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white">Đơn Hàng Gần Đây</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Danh sách giao dịch mới nhất tại chi nhánh</p>
+            </div>
+        </div>
+
+        <div class="space-y-3">
+            @forelse($donHangs ?? [] as $dh)
+                @php
+                    $dhId = data_get($dh, 'id', '');
+                    $dhCode = data_get($dh, 'order_code') ?: data_get($dh, 'code') ?: ('#' . $dhId);
+                    $dhAmount = (float) (data_get($dh, 'total_amount') ?? data_get($dh, 'grand_total') ?? data_get($dh, 'amount') ?? 0);
+                    $dhStatus = data_get($dh, 'status', '');
+                @endphp
+                <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                    <div>
+                        <span class="font-bold text-sm text-slate-800 dark:text-white">Đơn {{ $dhCode }}</span>
+                        <div class="text-xs text-slate-500 mt-0.5">{{ $dhStatus !== '' ? $dhStatus : 'Đã ghi nhận' }}</div>
+                    </div>
+                    <span class="font-bold text-xs text-indigo-600 dark:text-indigo-400">{{ number_format($dhAmount, 0, ',', '.') }} đ</span>
                 </div>
-
-                {{-- Nút dẫn đến POS & Sơ đồ bàn --}}
-                <a href="{{ route('tables.index') }}" class="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm border border-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors">
-                    <svg class="h-4 w-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>
-                    POS &amp; Sơ đồ bàn &rarr;
-                </a>
-            </div>
-
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-80 overflow-y-auto pr-2">
-                @forelse($danhSachBan ?? [] as $ban)
-                    @php
-                        $banId = data_get($ban, 'id', '');
-                        $banName = data_get($ban, 'name') ?: data_get($ban, 'table_name') ?: data_get($ban, 'ten_ban') ?: ('Bàn ' . $banId);
-                        $banStatus = data_get($ban, 'status', 'empty');
-                        $isBusy = in_array($banStatus, ['busy', 'occupied', 'serving', 'dang_phuc_vu'], true);
-                    @endphp
-                    <div class="p-3 rounded-xl border {{ $isBusy ? 'bg-rose-500/10 border-rose-200 text-rose-700' : 'bg-emerald-500/10 border-emerald-200 text-emerald-700' }} flex flex-col justify-between">
-                        <span class="font-bold text-sm">{{ $banName }}</span>
-                        <span class="text-xs font-semibold mt-1">{{ $isBusy ? 'Đang phục vụ' : 'Trống' }}</span>
-                    </div>
-                @empty
-                    <p class="text-sm text-slate-500 col-span-full py-4 text-center">Chưa có thông tin bàn ăn trong Database.</p>
-                @endforelse
-            </div>
+            @empty
+                <p class="text-sm text-slate-500 py-4 text-center">Chưa có giao dịch đơn hàng nào.</p>
+            @endforelse
         </div>
-
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h3 class="text-base font-bold text-slate-900 dark:text-white mb-4">Đơn Hàng Gần Đây</h3>
-            <div class="space-y-3">
-                @forelse($donHangs ?? [] as $dh)
-                    @php
-                        $dhId = data_get($dh, 'id', '');
-                        $dhCode = data_get($dh, 'order_code') ?: data_get($dh, 'code') ?: ('#' . $dhId);
-                        $dhAmount = (float) (data_get($dh, 'total_amount') ?? data_get($dh, 'grand_total') ?? data_get($dh, 'amount') ?? 0);
-                        $dhStatus = data_get($dh, 'status', '');
-                    @endphp
-                    <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                        <div>
-                            <span class="font-bold text-sm text-slate-800 dark:text-white">Đơn {{ $dhCode }}</span>
-                            <div class="text-xs text-slate-500 mt-0.5">{{ $dhStatus !== '' ? $dhStatus : 'Đã ghi nhận' }}</div>
-                        </div>
-                        <span class="font-bold text-xs text-indigo-600 dark:text-indigo-400">{{ number_format($dhAmount, 0, ',', '.') }} đ</span>
-                    </div>
-                @empty
-                    <p class="text-sm text-slate-500 py-4 text-center">Chưa có giao dịch đơn hàng nào.</p>
-                @endforelse
-            </div>
-        </div>
-    </div>
+    </section>
 </div>
 
 @push('scripts')
