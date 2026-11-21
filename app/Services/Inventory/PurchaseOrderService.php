@@ -20,6 +20,7 @@ class PurchaseOrderService
     public function __construct(
         protected PurchaseOrderRepositoryInterface $poRepository,
         protected StockLedgerService $stockLedger,
+        protected StockBatchService $batchService,
     ) {}
 
     /**
@@ -217,6 +218,8 @@ class PurchaseOrderService
                     $receivedMap[(int) $item['ingredient_id']] = [
                         'qty' => (float) $item['received_qty'],
                         'unit_price' => isset($item['unit_price']) ? (float) $item['unit_price'] : null,
+                        'batch_no' => isset($item['batch_no']) ? (string) $item['batch_no'] : null,
+                        'expiry_date' => isset($item['expiry_date']) ? (string) $item['expiry_date'] : null,
                     ];
                 }
             }
@@ -231,13 +234,18 @@ class PurchaseOrderService
                     ? $receivedMap[$ingId]['unit_price']
                     : (float) $poItem->unit_price;
 
+                $batchNo = $receivedMap[$ingId]['batch_no'] ?? $poItem->batch_no ?? null;
+                $expiryDate = $receivedMap[$ingId]['expiry_date'] ?? $poItem->expiry_date ?? null;
+
                 // Cập nhật số lượng thực nhận trên dòng PO item
                 $poItem->update([
                     'received_qty' => $receivedQty,
                     'unit_price' => $unitPrice,
+                    'batch_no' => $batchNo,
+                    'expiry_date' => $expiryDate,
                 ]);
 
-                // Nếu số lượng thực nhận > 0 thì ghi nhận biến động kho
+                // Nếu số lượng thực nhận > 0 thì ghi nhận biến động kho và tạo Lô hàng (Batch)
                 if ($receivedQty > 0) {
                     $dto = new StockMovementDTO(
                         warehouseId: (int) $po->warehouse_id,
@@ -253,6 +261,24 @@ class PurchaseOrderService
                     );
 
                     $this->stockLedger->recordMovement($dto);
+
+                    // Tự động khởi tạo lô hàng để quản lý HSD
+                    $batchCode = $batchNo ?: ('LOT-' . date('Ymd') . '-PO' . $po->id . '-' . $ingId);
+                    $finalExpiry = $expiryDate ?: now()->addDays(30)->toDateString();
+
+                    $this->batchService->createBatch([
+                        'batch_code' => $batchCode,
+                        'warehouse_id' => (int) $po->warehouse_id,
+                        'ingredient_id' => $ingId,
+                        'purchase_order_id' => $po->id,
+                        'supplier_id' => $po->supplier_id,
+                        'initial_quantity' => $receivedQty,
+                        'current_quantity' => $receivedQty,
+                        'unit_cost' => $unitPrice,
+                        'import_date' => now()->toDateString(),
+                        'expiry_date' => $finalExpiry,
+                        'created_by' => $receiverId,
+                    ]);
                 }
             }
 

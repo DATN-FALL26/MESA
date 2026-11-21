@@ -18,6 +18,9 @@ class IngredientResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $totalStock = (float) ($this->relationLoaded('stockLevels') ? $this->stockLevels->sum('quantity') : 0);
+        $minStock = (float) $this->min_stock;
+
         return [
             'id' => $this->id,
             'sku' => $this->sku,
@@ -25,7 +28,9 @@ class IngredientResource extends JsonResource
             'ingredient_type' => $this->ingredient_type->value,
             'ingredient_type_label' => $this->ingredient_type->label(),
             'base_uom' => $this->base_uom,
-            'min_stock' => (float) $this->min_stock,
+            'min_stock' => $minStock,
+            'total_stock' => $totalStock,
+            'is_low_stock' => $totalStock <= $minStock,
             'is_active' => (bool) $this->is_active,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

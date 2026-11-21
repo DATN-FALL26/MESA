@@ -17,7 +17,7 @@ class EloquentIngredientRepository implements IngredientRepositoryInterface
      */
     public function paginate(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Ingredient::query();
+        $query = Ingredient::query()->with('stockLevels');
 
         if (! empty($filters['search'])) {
             $search = (string) $filters['search'];
