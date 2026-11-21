@@ -92,20 +92,33 @@ class DeductStockForOrderItemJob implements ShouldQueue
         // 3. Bóc tách định lượng nguyên vật liệu tiêu hao (gồm món chính + variant + topping)
         $consumedIngredients = $explosion->explodeOrderItem($orderItem);
 
-        DB::transaction(function () use ($consumedIngredients, $warehouse, $orderItem, $ledger, $batchService): void {
+        // Lấy giá vốn bình quân (avg_cost) của các nguyên vật liệu liên quan tại thời điểm trừ kho
+        $ingredientIds = array_map(fn ($ing) => (int) $ing->ingredientId, $consumedIngredients);
+        $avgCosts = DB::table('stock_levels')
+            ->where('warehouse_id', $warehouse->id)
+            ->whereIn('ingredient_id', $ingredientIds)
+            ->pluck('avg_cost', 'ingredient_id')
+            ->map(fn ($cost) => (float) $cost)
+            ->toArray();
+
+        DB::transaction(function () use ($consumedIngredients, $warehouse, $orderItem, $ledger, $batchService, $avgCosts): void {
+            $totalCogs = 0.0;
+
             foreach ($consumedIngredients as $ingredient) {
                 if ($ingredient->quantity <= 0) {
                     continue;
                 }
 
                 $qtyToDeduct = abs($ingredient->quantity);
+                $unitCost = (float) ($avgCosts[$ingredient->ingredientId] ?? 0.0);
+                $totalCogs += round($qtyToDeduct * $unitCost, 2);
 
                 $dto = new StockMovementDTO(
                     warehouseId: $warehouse->id,
                     ingredientId: $ingredient->ingredientId,
                     movementType: MovementType::SALE_OUT,
                     quantity: -$qtyToDeduct, // Số lượng âm biểu thị xuất kho
-                    unitCost: null,
+                    unitCost: $unitCost > 0 ? $unitCost : null,
                     refType: 'order_item',
                     refId: $orderItem->id,
                     idempotencyKey: "order_item_{$orderItem->id}_ing_{$ingredient->ingredientId}",
@@ -119,8 +132,16 @@ class DeductStockForOrderItemJob implements ShouldQueue
                 $batchService->deductFefo($warehouse->id, $ingredient->ingredientId, $qtyToDeduct);
             }
 
-            // Đánh dấu mốc thời gian trừ kho thành công
+            $totalCogs = round($totalCogs, 2);
+            $itemQty = max(1, (int) $orderItem->quantity);
+            $unitCogs = round($totalCogs / $itemQty, 2);
+            $grossProfit = round((float) $orderItem->line_total - $totalCogs, 2);
+
+            // Đánh dấu mốc thời gian trừ kho thành công và chốt snapshot giá vốn + lợi nhuận
             $orderItem->update([
+                'cost_price_snapshot' => $unitCogs,
+                'cogs_total' => $totalCogs,
+                'gross_profit' => $grossProfit,
                 'stock_deducted_at' => now(),
             ]);
         });

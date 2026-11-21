@@ -291,6 +291,30 @@ class DashboardController extends Controller
             $tongSoTo = (clone $qi)->sum('order_items.quantity') ?? 0;
         }
 
+        $tongGiaVonKy = 0;
+        $tongLoiNhuanKy = 0;
+        if (Schema::hasTable('order_items') && Schema::hasColumn('order_items', 'cogs_total')) {
+            $qCogs = DB::table('order_items');
+            if (Schema::hasTable('orders') && Schema::hasColumn('order_items', 'order_id')) {
+                $qCogs->join('orders', 'order_items.order_id', '=', 'orders.id')
+                    ->whereBetween('orders.created_at', [$fromDate . ' 00:00:00', $toDate . ' 23:59:59']);
+                if (Schema::hasColumn('orders', 'branch_id')) {
+                    $qCogs->where('orders.branch_id', $branchId);
+                }
+            } else {
+                $qCogs->whereBetween('order_items.created_at', [$fromDate . ' 00:00:00', $toDate . ' 23:59:59']);
+            }
+            $tongGiaVonKy = (float) ((clone $qCogs)->sum('order_items.cogs_total') ?? 0);
+            $tongLoiNhuanKy = (float) ((clone $qCogs)->sum('order_items.gross_profit') ?? 0);
+        }
+
+        if ($tongLoiNhuanKy == 0 && $tongDoanhThuKy > 0 && $tongGiaVonKy > 0) {
+            $tongLoiNhuanKy = max(0, $tongDoanhThuKy - $tongGiaVonKy);
+        }
+
+        $foodCostPercentage = $tongDoanhThuKy > 0 ? round(($tongGiaVonKy / $tongDoanhThuKy) * 100, 1) : 0;
+        $marginPercentage = $tongDoanhThuKy > 0 ? round(($tongLoiNhuanKy / $tongDoanhThuKy) * 100, 1) : 0;
+
         $topMonAn = [];
         if (Schema::hasTable('order_items') && Schema::hasTable('menu_items')) {
             $priceColumn = null;
@@ -301,9 +325,14 @@ class DashboardController extends Controller
                 }
             }
 
-            $selectRaw = $priceColumn
+            $hasCogs = Schema::hasColumn('order_items', 'cogs_total');
+            $cogsSelect = $hasCogs
+                ? ', SUM(COALESCE(order_items.cogs_total, 0)) as total_cogs, SUM(COALESCE(order_items.gross_profit, 0)) as total_profit'
+                : ', 0 as total_cogs, 0 as total_profit';
+
+            $selectRaw = ($priceColumn
                 ? 'SUM(order_items.quantity) as total_qty, SUM(order_items.quantity * menu_items.' . $priceColumn . ') as total_revenue'
-                : 'SUM(order_items.quantity) as total_qty, 0 as total_revenue';
+                : 'SUM(order_items.quantity) as total_qty, 0 as total_revenue') . $cogsSelect;
 
             $topMonAn = DB::table('order_items')
                 ->join('menu_items', 'order_items.menu_item_id', '=', 'menu_items.id')
@@ -322,6 +351,8 @@ class DashboardController extends Controller
                         'dish' => (object) ['name' => $item->name],
                         'total_qty' => $item->total_qty,
                         'total_revenue' => $item->total_revenue ?? 0,
+                        'total_cogs' => (float) ($item->total_cogs ?? 0),
+                        'total_profit' => (float) ($item->total_profit ?? 0),
                     ];
                 });
         }
@@ -388,6 +419,10 @@ class DashboardController extends Controller
             'toDate',
             'tongDoanhThuKy',
             'tongSoTo',
+            'tongGiaVonKy',
+            'tongLoiNhuanKy',
+            'foodCostPercentage',
+            'marginPercentage',
             'topMonAn',
             'ingredients',
             'alertSummary'

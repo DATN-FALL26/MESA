@@ -54,15 +54,50 @@
             </div>
         </form>
 
-        <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 pt-2">
-            <div class="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-5 shadow-sm dark:border-emerald-800/60 dark:bg-emerald-950/30">
-                <span class="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Tổng doanh thu kỳ</span>
-                <h3 class="mt-2 text-2xl font-extrabold text-emerald-950 dark:text-white">{{ number_format((float) ($tongDoanhThuKy ?? 0), 0, ',', '.') }} đ</h3>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 pt-2">
+            {{-- Card 1: Doanh thu --}}
+            <div class="rounded-2xl border border-indigo-200/80 bg-indigo-50/70 p-5 shadow-sm dark:border-indigo-800/60 dark:bg-indigo-950/30">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Doanh thu kỳ</span>
+                    <span class="rounded-full bg-indigo-200/60 px-2 py-0.5 text-[10px] font-bold text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">{{ $tongSoTo ?? 0 }} món</span>
+                </div>
+                <h3 class="mt-2 text-2xl font-extrabold text-indigo-950 dark:text-white">{{ number_format((float) ($tongDoanhThuKy ?? 0), 0, ',', '.') }} đ</h3>
+                <p class="mt-1 text-[11px] text-indigo-600/80 dark:text-indigo-300/80">Tổng doanh thu bán hàng thực tế</p>
             </div>
 
-            <div class="rounded-2xl border border-indigo-200/80 bg-indigo-50/70 p-5 shadow-sm dark:border-indigo-800/60 dark:bg-indigo-950/30">
-                <span class="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Tổng sản lượng bán ra</span>
-                <h3 class="mt-2 text-2xl font-extrabold text-indigo-950 dark:text-white">{{ $tongSoTo ?? 0 }} sản phẩm</h3>
+            {{-- Card 2: Giá vốn hàng bán (COGS) --}}
+            <div class="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-5 shadow-sm dark:border-amber-800/60 dark:bg-amber-950/30">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">Giá vốn xuất bán (COGS)</span>
+                    <span class="rounded-full bg-amber-200/60 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-900 dark:text-amber-200">Kho NVL</span>
+                </div>
+                <h3 class="mt-2 text-2xl font-extrabold text-amber-950 dark:text-white">{{ number_format((float) ($tongGiaVonKy ?? 0), 0, ',', '.') }} đ</h3>
+                <p class="mt-1 text-[11px] text-amber-600/80 dark:text-amber-300/80">Chi phí NVL tiêu hao theo định lượng</p>
+            </div>
+
+            {{-- Card 3: Lợi nhuận gộp --}}
+            <div class="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-5 shadow-sm dark:border-emerald-800/60 dark:bg-emerald-950/30">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Lợi nhuận gộp (Lãi)</span>
+                    <span class="rounded-full bg-emerald-200/60 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">Biên {{ $marginPercentage ?? 0 }}%</span>
+                </div>
+                <h3 class="mt-2 text-2xl font-extrabold text-emerald-950 dark:text-white">{{ number_format((float) ($tongLoiNhuanKy ?? 0), 0, ',', '.') }} đ</h3>
+                <p class="mt-1 text-[11px] text-emerald-600/80 dark:text-emerald-300/80">Doanh thu trừ giá vốn nguyên liệu</p>
+            </div>
+
+            {{-- Card 4: Tỷ lệ Food Cost % --}}
+            <div class="rounded-2xl border border-slate-200/80 bg-slate-50 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-800/40">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Tỷ lệ Food Cost</span>
+                    @php
+                        $fc = (float) ($foodCostPercentage ?? 0);
+                        $badgeColor = $fc <= 35 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : ($fc <= 45 ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300');
+                        $badgeText = $fc <= 35 ? 'Lý tưởng' : ($fc <= 45 ? 'Chấp nhận' : 'Cao');
+                    @endphp
+                    <span class="rounded-full px-2 py-0.5 text-[10px] font-bold {{ $badgeColor }}">{{ $badgeText }}</span>
+                </div>
+                <h3 class="mt-2 text-2xl font-extrabold text-slate-900 dark:text-white">{{ $foodCostPercentage ?? 0 }}%</h3>
+                <p class="mt-1 text-[11px] text-slate-500">Mục tiêu chuẩn F&B: 30% - 35%</p>
             </div>
         </div>
     </div>
@@ -76,14 +111,23 @@
                     $dishName = data_get($item, 'dish.name', data_get($item, 'name', 'Món ăn'));
                     $totalQty = data_get($item, 'total_qty', 0);
                     $totalRevenue = (float) data_get($item, 'total_revenue', 0);
+                    $totalCogs = (float) data_get($item, 'total_cogs', 0);
+                    $totalProfit = (float) data_get($item, 'total_profit', 0);
                 @endphp
                 <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                     <div>
                         <span class="font-bold text-sm text-slate-800 dark:text-white">{{ $dishName }}</span>
                         <div class="text-xs text-slate-500 mt-0.5">Số lượng: {{ $totalQty }} phần</div>
                     </div>
-                    <div class="font-bold text-sm text-indigo-600 dark:text-indigo-400">
-                        {{ number_format($totalRevenue, 0, ',', '.') }} đ
+                    <div class="text-right">
+                        <div class="font-bold text-sm text-indigo-600 dark:text-indigo-400">
+                            {{ number_format($totalRevenue, 0, ',', '.') }} đ
+                        </div>
+                        @if($totalCogs > 0)
+                            <div class="text-[11px] text-slate-500">
+                                Vốn: {{ number_format($totalCogs, 0, ',', '.') }} đ · <span class="text-emerald-600 font-semibold">Lãi: {{ number_format($totalProfit, 0, ',', '.') }} đ</span>
+                            </div>
+                        @endif
                     </div>
                 </div>
             @empty

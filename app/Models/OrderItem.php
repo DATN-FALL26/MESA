@@ -23,6 +23,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $unit_price_snapshot
  * @property int $quantity
  * @property string $line_total
+ * @property string|null $cost_price_snapshot
+ * @property string|null $cogs_total
+ * @property string|null $gross_profit
  * @property string|null $note
  * @property OrderItemStatus $status
  * @property string|null $cancelled_reason
@@ -55,6 +58,9 @@ class OrderItem extends Model
             'unit_price_snapshot' => 'decimal:0',
             'quantity' => 'integer',
             'line_total' => 'decimal:0',
+            'cost_price_snapshot' => 'decimal:2',
+            'cogs_total' => 'decimal:2',
+            'gross_profit' => 'decimal:2',
             'status' => OrderItemStatus::class,
             'cancelled_at' => 'datetime',
             'stock_deducted_at' => 'datetime',

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\Inventory\IngredientController;
+use App\Http\Controllers\Api\Inventory\MenuCostAnalysisController;
 use App\Http\Controllers\Api\Inventory\PurchaseOrderController;
 use App\Http\Controllers\Api\Inventory\RecipeController;
 use App\Http\Controllers\Api\Inventory\StockAdjustmentController;
@@ -77,6 +78,16 @@ Route::middleware('web')->prefix('v1/inventory')->group(function () {
     // Bóc tách BOM định lượng của món ăn theo size & multiplier
     Route::post('/recipes/explode', [StockLedgerController::class, 'explodeRecipe'])
         ->name('api.inventory.recipes.explode');
+
+    // ==========================================
+    // 1.1 PHÂN TÍCH GIÁ VỐN & LỢI NHUẬN MÓN ĂN (DISH COST & PROFIT ANALYSIS)
+    // ==========================================
+    Route::get('/cost-analysis/dishes', [MenuCostAnalysisController::class, 'index'])
+        ->name('api.inventory.cost-analysis.dishes');
+    Route::get('/cost-analysis/dishes/{id}', [MenuCostAnalysisController::class, 'show'])
+        ->name('api.inventory.cost-analysis.dish-detail');
+    Route::get('/cost-analysis/sales-profit', [MenuCostAnalysisController::class, 'salesProfitReport'])
+        ->name('api.inventory.cost-analysis.sales-profit');
 
     // ==========================================
     // 2. MASTER DATA: NGUYÊN VẬT LIỆU (INGREDIENTS)
