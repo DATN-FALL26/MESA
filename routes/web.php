@@ -206,37 +206,40 @@ Route::middleware('auth')->prefix('orders')->name('orders.')->group(function () 
 
     // Xem màn gọi món của Dining Session
     Route::get('/session/{sessionId}', [OrderController::class, 'showSession'])
-        ->middleware('permission:order.view')
+        ->middleware(['permission:order.view', 'branch.access:order.view'])
         ->name('session');
 
     // Tạo Order cho Dining Session
     Route::post('/session/{sessionId}/start', [OrderController::class, 'startOrder'])
-        ->middleware('permission:order.create')
+        ->middleware(['permission:order.create', 'branch.access:order.create'])
         ->name('start');
 
     // Thêm / tăng món
     Route::post('/{orderId}/items/{menuItemId}', [OrderController::class, 'addItem'])
-        ->middleware('permission:order.update')
+        ->middleware(['permission:order.update', 'branch.access:order.update'])
         ->name('items.add');
 
     // Giảm món
     Route::post('/{orderId}/items/{orderItemId}/decrease', [OrderController::class, 'decreaseItem'])
-        ->middleware('permission:order.update')
+        ->middleware(['permission:order.update', 'branch.access:order.update'])
         ->name('items.decrease');
 
     // Ghi chú món
     Route::post('/{orderId}/items/{orderItemId}/note', [OrderController::class, 'updateItemNote'])
-        ->middleware('permission:order.update')
+        ->middleware(['permission:order.update', 'branch.access:order.update'])
         ->name('items.note');
 
     // Gửi Batch xuống bếp
     Route::post('/{orderId}/send-kitchen', [OrderController::class, 'sendToKitchen'])
-        ->middleware('permission:order.batch.release,order.update,order.create')
+        ->middleware([
+            'permission:order.batch.release,order.update,order.create',
+            'branch.access:order.batch.release,order.update,order.create',
+        ])
         ->name('send-kitchen');
 
     // Cập nhật món đã gửi nhưng bếp chưa bắt đầu
     Route::post('/{orderId}/update-kitchen', [OrderController::class, 'updateKitchen'])
-        ->middleware('permission:order.update')
+        ->middleware(['permission:order.update', 'branch.access:order.update'])
         ->name('update-kitchen');
 });
 

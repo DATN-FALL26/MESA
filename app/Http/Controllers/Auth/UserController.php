@@ -5,20 +5,27 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Enums\UserStatus;
+use App\Enums\BranchStatus;
+use App\Enums\ScopeType;
 use App\Helpers\ConstantHelper;
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRole;
+use App\Services\Auth\BranchAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class UserController extends Controller
 {
+    public function __construct(private BranchAccessService $branchAccess) {}
+
     public function index(Request $request): View
     {
         $filters = $request->validate([
@@ -77,7 +84,11 @@ class UserController extends Controller
             ]);
 
             if (array_key_exists('role_ids', $validated)) {
-                $this->syncRoles($user, $validated['role_ids'], (int) $request->user()->getKey());
+                $this->syncRoles(
+                    $user,
+                    $validated['role_assignments'],
+                    (int) $request->user()->getKey()
+                );
             }
         });
 
@@ -131,7 +142,11 @@ class UserController extends Controller
             $user->save();
 
             if (array_key_exists('role_ids', $validated)) {
-                $this->syncRoles($user, $validated['role_ids'], (int) $request->user()->getKey());
+                $this->syncRoles(
+                    $user,
+                    $validated['role_assignments'],
+                    (int) $request->user()->getKey()
+                );
             }
         });
 
@@ -148,6 +163,34 @@ class UserController extends Controller
         ?string $employeeCode = null
     ): View {
         $roles = Role::query()->orderBy('name')->get();
+        $assignableBranchIds = $this->branchAccess->accessibleBranchIds(
+            auth()->user(),
+            [ConstantHelper::PERM_USERS_ASSIGN_ROLES]
+        );
+        $branches = Branch::query()
+            ->where('status', BranchStatus::ACTIVE)
+            ->when(is_array($assignableBranchIds), fn ($query) => $query->whereIn('id', $assignableBranchIds))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+        $activeAssignments = $user->userRoles()
+            ->where('valid_from', '<=', now())
+            ->where(fn ($query) => $query->whereNull('valid_to')->orWhere('valid_to', '>=', now()))
+            ->get(['role_id', 'scope_type', 'scope_id'])
+            ->groupBy('role_id')
+            ->map(function ($assignments): array {
+                return [
+                    'all' => $assignments->contains(
+                        fn (UserRole $assignment): bool => $assignment->scope_type === ScopeType::ALL
+                    ),
+                    'branches' => $assignments
+                        ->where('scope_type', ScopeType::BRANCH)
+                        ->pluck('scope_id')
+                        ->map(fn (mixed $branchId): int => (int) $branchId)
+                        ->values()
+                        ->all(),
+                ];
+            })
+            ->all();
         $departments = DB::table(ConstantHelper::TABLE_DEPARTMENTS)
             ->where(fn ($query) => $query
                 ->where('is_active', true)
@@ -158,9 +201,11 @@ class UserController extends Controller
         return view($view, [
             'user' => $user,
             'roles' => $roles,
+            'branches' => $branches,
             'departments' => $departments,
             'statuses' => UserStatus::cases(),
             'selectedRoleIds' => $selectedRoleIds ?? [],
+            'selectedRoleAssignments' => $activeAssignments,
             'canAssignRoles' => $this->canAssignRoles(auth()->user()),
             'employeeCode' => $employeeCode,
         ]);
@@ -205,12 +250,14 @@ class UserController extends Controller
      *     department_id?: int|null,
      *     status: string,
      *     password?: string|null,
-     *     role_ids?: list<int>
+     *     role_ids?: list<int>,
+     *     role_assignments?: list<array{role_id: int, scope_type: ScopeType, scope_id: int|null}>
      * }
      */
     private function validatedUser(Request $request, ?User $user = null): array
     {
-        if ($request->exists('role_ids') && ! $request->boolean('assign_roles')) {
+        if (($request->exists('role_ids') || $request->exists('role_branch_ids') || $request->exists('role_all'))
+            && ! $request->boolean('assign_roles')) {
             abort(403);
         }
 
@@ -224,6 +271,15 @@ class UserController extends Controller
             'password' => [$user === null ? 'required' : 'nullable', 'string', 'min:8', 'confirmed'],
             'role_ids' => [$request->boolean('assign_roles') ? 'required' : 'sometimes', 'array', 'min:1'],
             'role_ids.*' => ['integer', 'distinct', Rule::exists(ConstantHelper::TABLE_ROLES, 'id')],
+            'role_branch_ids' => ['sometimes', 'array'],
+            'role_branch_ids.*' => ['array'],
+            'role_branch_ids.*.*' => [
+                'integer',
+                'distinct',
+                Rule::exists(ConstantHelper::TABLE_BRANCHES, 'id')->where('status', BranchStatus::ACTIVE->value),
+            ],
+            'role_all' => ['sometimes', 'array'],
+            'role_all.*' => ['boolean'],
             'assign_roles' => [$user === null ? 'required' : 'sometimes', 'accepted'],
         ];
 
@@ -240,6 +296,64 @@ class UserController extends Controller
 
         if ($request->boolean('assign_roles')) {
             $validated['role_ids'] = array_map('intval', $validated['role_ids'] ?? []);
+
+            $assignableBranchIds = $this->branchAccess->accessibleBranchIds(
+                $request->user(),
+                [ConstantHelper::PERM_USERS_ASSIGN_ROLES]
+            );
+            $adminRoleId = (int) Role::query()
+                ->where('code', ConstantHelper::ROLE_ADMIN)
+                ->value('id');
+            $roleAssignments = [];
+
+            foreach ($validated['role_ids'] as $roleId) {
+                $branchIds = array_values(array_unique(array_map(
+                    'intval',
+                    $validated['role_branch_ids'][$roleId] ?? []
+                )));
+                $isAllScope = filter_var(
+                    $validated['role_all'][$roleId] ?? false,
+                    FILTER_VALIDATE_BOOLEAN
+                );
+
+                if ($roleId === $adminRoleId) {
+                    if (count($validated['role_ids']) !== 1 || ! $isAllScope || $branchIds !== []) {
+                        throw ValidationException::withMessages([
+                            'role_ids' => 'Vai trò quản trị hệ thống phải được gán riêng với phạm vi toàn chuỗi.',
+                        ]);
+                    }
+
+                    $roleAssignments[] = [
+                        'role_id' => $roleId,
+                        'scope_type' => ScopeType::ALL,
+                        'scope_id' => null,
+                    ];
+
+                    continue;
+                }
+
+                if ($isAllScope || $branchIds === []) {
+                    throw ValidationException::withMessages([
+                        'role_branch_ids' => 'Mỗi vai trò nghiệp vụ phải được gán ít nhất một chi nhánh cụ thể.',
+                    ]);
+                }
+
+                foreach ($branchIds as $branchId) {
+                    abort_unless(
+                        $assignableBranchIds === null || in_array($branchId, $assignableBranchIds, true),
+                        403,
+                        'Bạn không có quyền gán người dùng vào chi nhánh này.'
+                    );
+
+                    $roleAssignments[] = [
+                        'role_id' => $roleId,
+                        'scope_type' => ScopeType::BRANCH,
+                        'scope_id' => $branchId,
+                    ];
+                }
+            }
+
+            $validated['role_assignments'] = $roleAssignments;
         }
 
         unset($validated['assign_roles']);
@@ -248,61 +362,71 @@ class UserController extends Controller
     }
 
     /**
-     * @param  list<int>  $roleIds
+     * @param  list<array{role_id: int, scope_type: ScopeType, scope_id: int|null}>  $desiredAssignments
      */
-    private function syncRoles(User $user, array $roleIds, int $grantedBy): void
+    private function syncRoles(User $user, array $desiredAssignments, int $grantedBy): void
     {
-        $roleIds = array_values(array_unique(array_map('intval', $roleIds)));
         $now = now();
         $revokedAt = $now->copy()->subSecond();
-
         $activeAssignments = $user->userRoles()
             ->where('valid_from', '<=', $now)
             ->where(fn ($query) => $query
                 ->whereNull('valid_to')
                 ->orWhere('valid_to', '>=', $now))
             ->get();
+        $assignmentKey = static fn (int $roleId, ScopeType $scopeType, ?int $scopeId): string =>
+            implode(':', [$roleId, $scopeType->value, $scopeId ?? 'null']);
+        $desiredKeys = [];
 
-        $activeRoleIds = $activeAssignments->pluck('role_id')->map(fn ($roleId): int => (int) $roleId)->unique()->all();
-        $roleIdsToRevoke = array_values(array_diff($activeRoleIds, $roleIds));
-
-        if ($roleIdsToRevoke !== []) {
-            $user->userRoles()
-                ->whereIn('role_id', $roleIdsToRevoke)
-                ->where('valid_from', '<=', $now)
-                ->where(fn ($query) => $query
-                    ->whereNull('valid_to')
-                    ->orWhere('valid_to', '>=', $now))
-                ->update(['valid_to' => $revokedAt, 'updated_at' => $now]);
+        foreach ($desiredAssignments as $assignment) {
+            $desiredKeys[$assignmentKey($assignment['role_id'], $assignment['scope_type'], $assignment['scope_id'])] = true;
         }
 
-        foreach (array_diff($roleIds, $activeRoleIds) as $roleId) {
-            $assignment = UserRole::query()
-                ->where('user_id', $user->getKey())
-                ->where('role_id', $roleId)
-                ->where('scope_type', 'ALL')
-                ->whereNull('scope_id')
-                ->first();
+        foreach ($activeAssignments as $assignment) {
+            $key = $assignmentKey(
+                (int) $assignment->role_id,
+                $assignment->scope_type,
+                $assignment->scope_id === null ? null : (int) $assignment->scope_id
+            );
+            if (! isset($desiredKeys[$key])) {
+                $assignment->update(['valid_to' => $revokedAt]);
+            }
+        }
 
-            if ($assignment) {
+        foreach ($desiredAssignments as $desired) {
+            $query = UserRole::query()
+                ->where('user_id', $user->getKey())
+                ->where('role_id', $desired['role_id'])
+                ->where('scope_type', $desired['scope_type']);
+
+            if ($desired['scope_id'] === null) {
+                $query->whereNull('scope_id');
+            } else {
+                $query->where('scope_id', $desired['scope_id']);
+            }
+
+            $assignment = $query->first();
+            $isCurrentlyActive = $assignment !== null
+                && $assignment->valid_from->lte($now)
+                && ($assignment->valid_to === null || $assignment->valid_to->gte($now));
+
+            if ($assignment !== null && ! $isCurrentlyActive) {
                 $assignment->forceFill([
                     'valid_from' => $now,
                     'valid_to' => null,
                     'granted_by' => $grantedBy,
                 ])->save();
-
-                continue;
+            } elseif ($assignment === null) {
+                UserRole::query()->create([
+                    'user_id' => $user->getKey(),
+                    'role_id' => $desired['role_id'],
+                    'scope_type' => $desired['scope_type'],
+                    'scope_id' => $desired['scope_id'],
+                    'valid_from' => $now,
+                    'valid_to' => null,
+                    'granted_by' => $grantedBy,
+                ]);
             }
-
-            UserRole::query()->create([
-                'user_id' => $user->getKey(),
-                'role_id' => $roleId,
-                'scope_type' => 'ALL',
-                'scope_id' => null,
-                'valid_from' => $now,
-                'valid_to' => null,
-                'granted_by' => $grantedBy,
-            ]);
         }
     }
 }

@@ -3,32 +3,63 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\UserStatus;
+use App\Enums\BranchStatus;
 use App\Helpers\ConstantHelper;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Branch;
 use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\Order;
 use App\Models\User;
+use App\Services\Auth\BranchAccessService;
 
 class DashboardController extends Controller
 {
+    public function __construct(private BranchAccessService $branchAccess) {}
+
     /**
      * Trang Tổng quan Dashboard (Code gốc của team + Dữ liệu tĩnh dự phòng an toàn)
      */
     public function index(Request $request)
     {
         $user = $request->user();
+        $branchId = $this->resolveBranchId($request);
+        if ($branchId === false) {
+            return view('branches.select', [
+                'branches' => $this->selectableBranches($user),
+                'action' => route('admin.dashboard'),
+            ]);
+        }
+
         $currentRoles = $user->activeRoles()->orderBy('name')->get();
-        $totalUsers = User::query()->count();
+        $totalUsers = User::query()
+            ->when($branchId !== null, fn ($query) => $query->whereHas('userRoles', fn ($roleQuery) => $roleQuery
+                ->where('scope_type', 'BRANCH')
+                ->where('scope_id', $branchId)
+                ->where('valid_from', '<=', now())
+                ->where(fn ($validityQuery) => $validityQuery
+                    ->whereNull('valid_to')
+                    ->orWhere('valid_to', '>=', now()))))
+            ->distinct()
+            ->count('users.id');
         $activeUsers = User::query()
             ->where('status', UserStatus::ACTIVE->value)
+            ->when($branchId !== null, fn ($query) => $query->whereHas('userRoles', fn ($roleQuery) => $roleQuery
+                ->where('scope_type', 'BRANCH')
+                ->where('scope_id', $branchId)
+                ->where('valid_from', '<=', now())
+                ->where(fn ($validityQuery) => $validityQuery
+                    ->whereNull('valid_to')
+                    ->orWhere('valid_to', '>=', now()))))
+            ->distinct()
             ->count();
         $totalRoles = Role::query()->count();
         $totalPermissions = Permission::query()->count();
         $recentActivities = AuditLog::query()
+            ->when($branchId !== null, fn ($query) => $query->where('branch_id', $branchId))
             ->orderByDesc('created_at')
             ->limit(6)
             ->get();
@@ -69,98 +100,66 @@ class DashboardController extends Controller
             ],
         ];
 
-        $branchId = $request->input('branch_id', 1);
         $title = 'Tổng quan Dashboard';
         $today = today();
 
-        try {
-            // 1. Thống kê tổng quan trong ngày từ DB
-            $orderStats = DB::table('orders')
-                ->whereDate('created_at', $today)
-                ->select([
-                    DB::raw('SUM(total_amount) as total_revenue'),
-                    DB::raw('COUNT(id) as total_orders'),
-                    DB::raw("SUM(CASE WHEN TIME(created_at) >= '06:00:00' AND TIME(created_at) < '11:00:00' THEN total_amount ELSE 0 END) as ca_sang"),
-                    DB::raw("SUM(CASE WHEN TIME(created_at) >= '11:00:00' AND TIME(created_at) < '17:00:00' THEN total_amount ELSE 0 END) as ca_trua"),
-                    DB::raw("SUM(CASE WHEN TIME(created_at) >= '17:00:00' AND TIME(created_at) < '22:00:00' THEN total_amount ELSE 0 END) as ca_toi"),
-                ])
-                ->first();
+        $orderStats = DB::table('orders')
+            ->whereDate('created_at', $today)
+            ->when($branchId !== null, fn ($query) => $query->where('branch_id', $branchId))
+            ->select([
+                DB::raw('SUM(total_amount) as total_revenue'),
+                DB::raw('COUNT(id) as total_orders'),
+                DB::raw("SUM(CASE WHEN TIME(created_at) >= '06:00:00' AND TIME(created_at) < '11:00:00' THEN total_amount ELSE 0 END) as ca_sang"),
+                DB::raw("SUM(CASE WHEN TIME(created_at) >= '11:00:00' AND TIME(created_at) < '17:00:00' THEN total_amount ELSE 0 END) as ca_trua"),
+                DB::raw("SUM(CASE WHEN TIME(created_at) >= '17:00:00' AND TIME(created_at) < '22:00:00' THEN total_amount ELSE 0 END) as ca_toi"),
+            ])
+            ->first();
 
-            if (!$orderStats || $orderStats->total_orders == 0) {
-                throw new \Exception("Database trống");
-            }
+        $doanhThu = $orderStats->total_revenue ?? 0;
+        $tongDon = $orderStats->total_orders ?? 0;
+        $chartData = [
+            (float) ($orderStats->ca_sang ?? 0),
+            (float) ($orderStats->ca_trua ?? 0),
+            (float) ($orderStats->ca_toi ?? 0),
+        ];
 
-            $doanhThu = $orderStats->total_revenue ?? 0;
-            $tongDon = $orderStats->total_orders ?? 0;
-            $chartData = [
-                (float) ($orderStats->ca_sang ?? 0),
-                (float) ($orderStats->ca_trua ?? 0),
-                (float) ($orderStats->ca_toi ?? 0),
-            ];
+        $danhSachBan = DB::table('dining_tables')
+            ->when($branchId !== null, fn ($query) => $query->where('branch_id', $branchId))
+            ->select('code as name', 'status')
+            ->get();
+        $donHangs = DB::table('orders')
+            ->when($branchId !== null, fn ($query) => $query->where('branch_id', $branchId))
+            ->latest()
+            ->take(5)
+            ->get();
 
-            $danhSachBan = DB::table('dining_tables')->get();
-            $donHangs = DB::table('orders')->latest()->take(5)->get();
+        $thongKeMon = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('menu_items', 'order_items.menu_item_id', '=', 'menu_items.id')
+            ->whereDate('orders.created_at', $today)
+            ->when($branchId !== null, fn ($query) => $query->where('orders.branch_id', $branchId))
+            ->where('order_items.status', '!=', 'cancelled')
+            ->select(
+                'menu_items.id as dish_id',
+                'menu_items.name as dish_name',
+                'menu_items.base_price as dish_price',
+                DB::raw('SUM(order_items.quantity) as total_qty'),
+                DB::raw('SUM(order_items.line_total) as total_revenue')
+            )
+            ->groupBy('menu_items.id', 'menu_items.name', 'menu_items.base_price')
+            ->orderByDesc('total_qty')
+            ->get()
+            ->map(function ($item) {
+                $item->dish = (object)[
+                    'name' => $item->dish_name,
+                    'price' => $item->dish_price ?? 0
+                ];
+                return $item;
+            });
 
-            $thongKeMon = DB::table('order_items')
-                ->join('orders', 'order_items.order_id', '=', 'orders.id')
-                ->join('menu_items', function ($join) {
-                    $join->on('order_items.menu_item_id', '=', 'menu_items.id')
-                         ->orOn('order_items.dish_id', '=', 'menu_items.id');
-                })
-                ->whereDate('orders.created_at', $today)
-                ->select(
-                    DB::raw('COALESCE(order_items.menu_item_id, order_items.dish_id) as dish_id'),
-                    'menu_items.name as dish_name',
-                    'menu_items.price as dish_price',
-                    DB::raw('SUM(order_items.quantity) as total_qty'),
-                    DB::raw('SUM(order_items.price * order_items.quantity) as total_revenue')
-                )
-                ->groupBy('dish_id', 'menu_items.name', 'menu_items.price')
-                ->orderByDesc('total_qty')
-                ->get()
-                ->map(function ($item) {
-                    $item->dish = (object)[
-                        'name' => $item->dish_name,
-                        'price' => $item->dish_price ?? 0
-                    ];
-                    return $item;
-                });
-
-            $monBanChay = $thongKeMon->first();
-            $monItOrder = $thongKeMon->last();
-            $branches = DB::table('branches')->get();
-
-        } catch (\Exception $e) {
-            // === DỮ LIỆU TĨNH DỰ PHÒNG KHI DB CHƯA CÓ BẢN GHI ===
-            $doanhThu = 3450000;
-            $tongDon = 24;
-            $chartData = [850000, 1800000, 800000];
-
-            $branches = collect([
-                (object)['id' => 1, 'name' => 'Chi nhánh chính'],
-            ]);
-
-            $danhSachBan = collect([
-                (object)['id' => 1, 'name' => 'Bàn 01', 'status' => 'active'],
-                (object)['id' => 2, 'name' => 'Bàn 02', 'status' => 'empty'],
-                (object)['id' => 3, 'name' => 'Bàn 03', 'status' => 'active'],
-            ]);
-
-            $donHangs = collect([
-                (object)['id' => 1024, 'total_amount' => 180000, 'created_at' => now()->subMinutes(5)],
-                (object)['id' => 1023, 'total_amount' => 120000, 'created_at' => now()->subMinutes(15)],
-            ]);
-
-            $monBanChay = (object)[
-                'total_qty' => 45,
-                'dish' => (object)['name' => 'Phở Bò Đặc Biệt', 'price' => 65000]
-            ];
-
-            $monItOrder = (object)[
-                'total_qty' => 3,
-                'dish' => (object)['name' => 'Phở Gà Ta', 'price' => 50000]
-            ];
-        }
+        $monBanChay = $thongKeMon->first();
+        $monItOrder = $thongKeMon->last();
+        $branches = $this->selectableBranches($user);
 
         return view('admin.dashboard', compact(
             'user',
@@ -191,84 +190,54 @@ class DashboardController extends Controller
      */
     public function reports(Request $request)
     {
+        $branchId = $this->resolveBranchId($request);
+        if ($branchId === false) {
+            return view('branches.select', [
+                'branches' => $this->selectableBranches($request->user()),
+                'action' => route('admin.reports'),
+            ]);
+        }
+
         $fromDate = $request->input('from_date', now()->subDays(30)->toDateString());
         $toDate = $request->input('to_date', now()->toDateString());
         $title = 'Báo cáo chi tiết';
 
-        try {
-            $tongDoanhThuKy = DB::table('orders')
-                ->whereBetween(DB::raw('DATE(created_at)'), [$fromDate, $toDate])
-                ->sum('total_amount');
+        $tongDoanhThuKy = DB::table('orders')
+            ->whereBetween(DB::raw('DATE(created_at)'), [$fromDate, $toDate])
+            ->when($branchId !== null, fn ($query) => $query->where('branch_id', $branchId))
+            ->sum('total_amount');
 
-            if ($tongDoanhThuKy == 0) {
-                throw new \Exception("Chưa có dữ liệu báo cáo");
-            }
+        $tongSoTo = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereBetween(DB::raw('DATE(orders.created_at)'), [$fromDate, $toDate])
+            ->when($branchId !== null, fn ($query) => $query->where('orders.branch_id', $branchId))
+            ->sum('order_items.quantity');
 
-            $tongSoTo = DB::table('order_items')
-                ->join('orders', 'order_items.order_id', '=', 'orders.id')
-                ->whereBetween(DB::raw('DATE(orders.created_at)'), [$fromDate, $toDate])
-                ->sum('order_items.quantity');
+        $topMonAn = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('menu_items', 'order_items.menu_item_id', '=', 'menu_items.id')
+            ->whereBetween(DB::raw('DATE(orders.created_at)'), [$fromDate, $toDate])
+            ->when($branchId !== null, fn ($query) => $query->where('orders.branch_id', $branchId))
+            ->where('order_items.status', '!=', 'cancelled')
+            ->select(
+                'menu_items.id as dish_id',
+                'menu_items.name as dish_name',
+                'menu_items.base_price as dish_price',
+                DB::raw('SUM(order_items.quantity) as total_qty'),
+                DB::raw('SUM(order_items.line_total) as total_revenue')
+            )
+            ->groupBy('menu_items.id', 'menu_items.name', 'menu_items.base_price')
+            ->orderByDesc('total_qty')
+            ->get()
+            ->map(function ($item) {
+                $item->dish = (object)[
+                    'name' => $item->dish_name,
+                    'price' => $item->dish_price ?? 0
+                ];
+                return $item;
+            });
 
-            $topMonAn = DB::table('order_items')
-                ->join('orders', 'order_items.order_id', '=', 'orders.id')
-                ->join('menu_items', function ($join) {
-                    $join->on('order_items.menu_item_id', '=', 'menu_items.id')
-                         ->orOn('order_items.dish_id', '=', 'menu_items.id');
-                })
-                ->whereBetween(DB::raw('DATE(orders.created_at)'), [$fromDate, $toDate])
-                ->select(
-                    DB::raw('COALESCE(order_items.menu_item_id, order_items.dish_id) as dish_id'),
-                    'menu_items.name as dish_name',
-                    'menu_items.price as dish_price',
-                    DB::raw('SUM(order_items.quantity) as total_qty'),
-                    DB::raw('SUM(order_items.price * order_items.quantity) as total_revenue')
-                )
-                ->groupBy('dish_id', 'menu_items.name', 'menu_items.price')
-                ->orderByDesc('total_qty')
-                ->get()
-                ->map(function ($item) {
-                    $item->dish = (object)[
-                        'name' => $item->dish_name,
-                        'price' => $item->dish_price ?? 0
-                    ];
-                    return $item;
-                });
-
-            // Thử lấy dữ liệu kho thực tế
-            $ingredients = DB::table('ingredients')
-                ->select('name', 'stock_quantity', 'unit', 'import_date', 'expiry_date', 'quality_status')
-                ->orderBy('expiry_date', 'asc')
-                ->get();
-
-            if ($ingredients->isEmpty()) {
-                throw new \Exception("Empty ingredients");
-            }
-
-        } catch (\Exception $e) {
-            $tongDoanhThuKy = 24500000;
-            $tongSoTo = 380;
-            $topMonAn = collect([
-                (object)[
-                    'total_qty' => 150,
-                    'total_revenue' => 9750000,
-                    'dish' => (object)['name' => 'Phở Bò Đặc Biệt', 'price' => 65000]
-                ],
-                (object)[
-                    'total_qty' => 110,
-                    'total_revenue' => 5500000,
-                    'dish' => (object)['name' => 'Phở Tái Nạm', 'price' => 50000]
-                ],
-            ]);
-
-            // Dữ liệu ảo dự phòng đầy đủ cho bảng bảo quản thực phẩm
-            $ingredients = collect([
-                (object)['name' => 'Thịt bò tươi nguyên lõi', 'stock_quantity' => 18, 'unit' => 'Kg', 'import_date' => now()->subDays(2)->format('Y-m-d'), 'expiry_date' => now()->addDays(1)->format('Y-m-d'), 'quality_status' => 'Sắp hết hạn'],
-                (object)['name' => 'Rau thơm các loại', 'stock_quantity' => 6, 'unit' => 'Kg', 'import_date' => now()->subDay()->format('Y-m-d'), 'expiry_date' => now()->addDays(2)->format('Y-m-d'), 'quality_status' => 'Cần lưu ý'],
-                (object)['name' => 'Xương ống heo nấu nước dùng', 'stock_quantity' => 30, 'unit' => 'Kg', 'import_date' => now()->subDays(3)->format('Y-m-d'), 'expiry_date' => now()->addDays(1)->format('Y-m-d'), 'quality_status' => 'Sắp hết hạn'],
-                (object)['name' => 'Bánh phở tươi truyền thống', 'stock_quantity' => 45, 'unit' => 'Kg', 'import_date' => now()->subDay()->format('Y-m-d'), 'expiry_date' => now()->addDays(3)->format('Y-m-d'), 'quality_status' => 'Cần lưu ý'],
-                (object)['name' => 'Gạo phở khô đóng gói', 'stock_quantity' => 120, 'unit' => 'Kg', 'import_date' => now()->subDays(25)->format('Y-m-d'), 'expiry_date' => now()->addMonths(4)->format('Y-m-d'), 'quality_status' => 'Tốt'],
-            ]);
-        }
+        $ingredients = $this->stockReportRows($branchId);
 
         return view('admin.reports', compact('fromDate', 'toDate', 'tongDoanhThuKy', 'tongSoTo', 'topMonAn', 'ingredients', 'title'));
     }
@@ -278,30 +247,22 @@ class DashboardController extends Controller
      */
     public function getPaymentMethodStats(Request $request)
     {
-        try {
-            $stats = Order::select('payment_method', DB::raw('count(*) as total'))
-                ->groupBy('payment_method')
-                ->pluck('total', 'payment_method');
+        $branchId = $this->resolveBranchId($request);
+        abort_if($branchId === false, 422, 'Vui lòng chọn chi nhánh trước khi xem thống kê.');
 
-            $cashCount = $stats['cash'] ?? 120;
-            $transferCount = $stats['transfer'] ?? 250;
+        $stats = Order::query()
+            ->when($branchId !== null, fn ($query) => $query->where('branch_id', $branchId))
+            ->select('payment_method', DB::raw('count(*) as total'))
+            ->groupBy('payment_method')
+            ->pluck('total', 'payment_method');
 
-            return response()->json([
-                'status' => 'success',
-                'data' => [
-                    'cash' => $cashCount,
-                    'transfer' => $transferCount
-                ]
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'success',
-                'data' => [
-                    'cash' => 120,
-                    'transfer' => 250
-                ]
-            ]);
-        }
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'cash' => (int) ($stats['cash'] ?? 0),
+                'transfer' => (int) ($stats['transfer'] ?? 0),
+            ],
+        ]);
     }
 
    
@@ -310,26 +271,81 @@ class DashboardController extends Controller
      */
     public function getFoodStorageReport(Request $request)
     {
-        try {
-            $ingredients = DB::table('ingredients')
-                ->select('name', 'stock_quantity', 'unit', 'import_date', 'expiry_date', 'quality_status')
-                ->orderBy('expiry_date', 'asc')
-                ->get();
+        $branchId = $this->resolveBranchId($request);
+        abort_if($branchId === false, 422, 'Vui lòng chọn chi nhánh trước khi xem báo cáo.');
 
-            if ($ingredients->isEmpty()) {
-                throw new \Exception("Empty data");
+        $ingredients = $this->stockReportRows($branchId);
+
+        return view('admin.reports', compact('ingredients'));
+    }
+
+    private function resolveBranchId(Request $request): int|false|null
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+        $branchIds = $this->branchAccess->accessibleBranchIds($user, [ConstantHelper::PERM_DASHBOARD_VIEW]);
+
+        if (is_array($branchIds) && $branchIds === []) {
+            abort(403, 'Bạn chưa được cấp quyền xem chi nhánh nào.');
+        }
+
+        if ($request->filled('branch_id')) {
+            $branchId = $request->integer('branch_id');
+            $this->branchAccess->authorizeBranch($user, $branchId, [ConstantHelper::PERM_DASHBOARD_VIEW]);
+            $request->session()->put('branch_id', $branchId);
+
+            return $branchId;
+        }
+
+        if (! is_array($branchIds)) {
+            return null;
+        }
+
+        $sessionBranchId = $request->session()->get('branch_id');
+        if (is_numeric($sessionBranchId)) {
+            $sessionBranchId = (int) $sessionBranchId;
+            if ($this->branchAccess->canAccessBranch($user, $sessionBranchId, [ConstantHelper::PERM_DASHBOARD_VIEW])) {
+                return $sessionBranchId;
             }
 
-            return view('admin.reports', compact('ingredients'));
-        } catch (\Exception $e) {
-            $ingredients = collect([
-                (object)['name' => 'Thịt bò tươi', 'stock_quantity' => 15, 'unit' => 'Kg', 'import_date' => now()->subDays(2)->format('Y-m-d'), 'expiry_date' => now()->addDays(1)->format('Y-m-d'), 'quality_status' => 'Sắp hết hạn'],
-                (object)['name' => 'Rau thơm các loại', 'stock_quantity' => 5, 'unit' => 'Kg', 'import_date' => now()->subDay()->format('Y-m-d'), 'expiry_date' => now()->addDays(2)->format('Y-m-d'), 'quality_status' => 'Cần lưu ý'],
-                (object)['name' => 'Gạo phở khô', 'stock_quantity' => 100, 'unit' => 'Kg', 'import_date' => now()->subDays(30)->format('Y-m-d'), 'expiry_date' => now()->addMonths(3)->format('Y-m-d'), 'quality_status' => 'Tốt'],
-                (object)['name' => 'Xương ống heo', 'stock_quantity' => 25, 'unit' => 'Kg', 'import_date' => now()->subDays(3)->format('Y-m-d'), 'expiry_date' => now()->addDays(1)->format('Y-m-d'), 'quality_status' => 'Sắp hết hạn'],
-            ]);
-
-            return view('admin.reports', compact('ingredients'));
+            $request->session()->forget('branch_id');
         }
+
+        if (count($branchIds) === 1) {
+            $request->session()->put('branch_id', $branchIds[0]);
+
+            return $branchIds[0];
+        }
+
+        return false;
+    }
+
+    private function selectableBranches(User $user): \Illuminate\Database\Eloquent\Collection
+    {
+        $branchIds = $this->branchAccess->accessibleBranchIds($user, [ConstantHelper::PERM_DASHBOARD_VIEW]);
+
+        return Branch::query()
+            ->where('status', BranchStatus::ACTIVE)
+            ->when(is_array($branchIds), fn ($query) => $query->whereIn('id', $branchIds))
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function stockReportRows(?int $branchId)
+    {
+        return DB::table('stock_levels')
+            ->join('warehouses', 'stock_levels.warehouse_id', '=', 'warehouses.id')
+            ->join('ingredients', 'stock_levels.ingredient_id', '=', 'ingredients.id')
+            ->when($branchId !== null, fn ($query) => $query->where('warehouses.branch_id', $branchId))
+            ->select(
+                'ingredients.name',
+                'stock_levels.quantity as stock_quantity',
+                'ingredients.base_uom as unit',
+                DB::raw('NULL as import_date'),
+                DB::raw('NULL as expiry_date'),
+                DB::raw('NULL as quality_status')
+            )
+            ->orderBy('ingredients.name')
+            ->get();
     }
 }

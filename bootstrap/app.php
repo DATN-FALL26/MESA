@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureUserHasPermission;
+use App\Http\Middleware\EnsureBranchAccess;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'permission' => EnsureUserHasPermission::class,
+            'branch.access' => EnsureBranchAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

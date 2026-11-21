@@ -31,6 +31,14 @@ class StockAdjustmentController extends Controller
     {
         $perPage = (int) $request->input('per_page', 15);
         $filters = $request->only(['branch_id', 'warehouse_id', 'reason', 'status', 'search']);
+        $selectedBranchId = $request->attributes->get('selected_branch_id');
+        $allowedBranchIds = $request->attributes->get('authorized_branch_ids');
+
+        if ($selectedBranchId !== null) {
+            $filters['branch_id'] = $selectedBranchId;
+        } elseif (is_array($allowedBranchIds)) {
+            $filters['branch_ids'] = $allowedBranchIds;
+        }
 
         $adjustments = $this->adjustmentRepository->paginate($filters, $perPage);
 
@@ -46,7 +54,7 @@ class StockAdjustmentController extends Controller
         $reason = AdjustmentReason::from((string) $request->input('reason'));
         $note = $request->input('note');
         $ingredientIds = $request->input('ingredient_ids');
-        $userId = auth()->id() ? (int) auth()->id() : 1;
+        $userId = (int) $request->user()->getKey();
 
         $adjustment = $this->adjustmentService->createDraft(
             warehouseId: $warehouseId,
@@ -87,7 +95,7 @@ class StockAdjustmentController extends Controller
      */
     public function submit(StockAdjustment $stockAdjustment): StockAdjustmentResource
     {
-        $userId = auth()->id() ? (int) auth()->id() : 1;
+        $userId = (int) auth()->id();
         $updated = $this->adjustmentService->submitForApproval($stockAdjustment, $userId);
 
         return new StockAdjustmentResource($updated);
@@ -98,7 +106,7 @@ class StockAdjustmentController extends Controller
      */
     public function approve(Request $request, StockAdjustment $stockAdjustment): StockAdjustmentResource
     {
-        $approverId = auth()->id() ? (int) auth()->id() : 1;
+        $approverId = (int) $request->user()->getKey();
         $note = $request->input('note');
 
         $updated = $this->adjustmentService->approve($stockAdjustment, $approverId, $note);
@@ -111,7 +119,7 @@ class StockAdjustmentController extends Controller
      */
     public function reject(Request $request, StockAdjustment $stockAdjustment): StockAdjustmentResource
     {
-        $deciderId = auth()->id() ? (int) auth()->id() : 1;
+        $deciderId = (int) $request->user()->getKey();
         $note = $request->input('note');
 
         $updated = $this->adjustmentService->reject($stockAdjustment, $deciderId, $note);
@@ -124,7 +132,7 @@ class StockAdjustmentController extends Controller
      */
     public function waste(RecordDirectWasteRequest $request): JsonResponse
     {
-        $userId = auth()->id() ? (int) auth()->id() : 1;
+        $userId = (int) $request->user()->getKey();
 
         $adjustment = $this->adjustmentService->recordDirectWaste(
             warehouseId: (int) $request->input('warehouse_id'),

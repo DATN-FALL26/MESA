@@ -11,6 +11,7 @@ use App\Enums\MovementType;
 use App\Enums\PurchaseOrderStatus;
 use App\Models\ApprovalRequest;
 use App\Models\PurchaseOrder;
+use App\Models\Warehouse;
 use App\Repositories\Contracts\PurchaseOrderRepositoryInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -30,6 +31,13 @@ class PurchaseOrderService
      */
     public function create(array $data, array $items, int $userId): PurchaseOrder
     {
+        $warehouse = Warehouse::query()->findOrFail((int) $data['warehouse_id']);
+        if ((int) $warehouse->branch_id !== (int) $data['branch_id']) {
+            throw ValidationException::withMessages([
+                'warehouse_id' => 'Kho nhận hàng phải thuộc chi nhánh của phiếu nhập.',
+            ]);
+        }
+
         $data['created_by'] = $userId;
         $data['status'] = PurchaseOrderStatus::DRAFT;
         $data['source'] = $data['source'] ?? \App\Enums\PurchaseOrderSource::MANUAL;
@@ -50,6 +58,14 @@ class PurchaseOrderService
         if ($po->status !== PurchaseOrderStatus::DRAFT) {
             throw ValidationException::withMessages([
                 'status' => 'Không thể sửa đổi đơn nhập hàng khi đã được gửi duyệt hoặc đã nhận hàng.',
+            ]);
+        }
+
+        $warehouseId = isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : (int) $po->warehouse_id;
+        $warehouse = Warehouse::query()->findOrFail($warehouseId);
+        if ((int) $warehouse->branch_id !== (int) $po->branch_id) {
+            throw ValidationException::withMessages([
+                'warehouse_id' => 'Kho nhận hàng phải thuộc chi nhánh của phiếu nhập.',
             ]);
         }
 

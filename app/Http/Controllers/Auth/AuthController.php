@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+use App\Services\Auth\BranchAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,7 +19,7 @@ class AuthController extends Controller
         return view('auth.login');
     }
 
-    public function login(Request $request): RedirectResponse
+    public function login(Request $request, BranchAccessService $branchAccess): RedirectResponse
     {
         $validated = $request->validate([
             'login' => ['required', 'string', 'max:150'],
@@ -39,7 +40,8 @@ class AuthController extends Controller
                 ->onlyInput('login');
         }
 
-        if (! Auth::user()?->activeRoles()->exists()) {
+        $user = Auth::user();
+        if (! $user?->activeRoles()->exists()) {
             Auth::logout();
 
             return back()
@@ -49,8 +51,23 @@ class AuthController extends Controller
                 ->onlyInput('login');
         }
 
+        $accessibleBranchIds = $branchAccess->accessibleBranchIds($user);
+        if (is_array($accessibleBranchIds) && $accessibleBranchIds === []) {
+            Auth::logout();
+
+            return back()
+                ->withErrors([
+                    'login' => 'Tài khoản chưa được cấp quyền truy cập chi nhánh đang hoạt động.',
+                ])
+                ->onlyInput('login');
+        }
+
         $request->session()->regenerate();
-        Auth::user()?->forceFill(['last_login_at' => now()])->save();
+        $request->session()->forget('branch_id');
+        if (is_array($accessibleBranchIds) && count($accessibleBranchIds) === 1) {
+            $request->session()->put('branch_id', $accessibleBranchIds[0]);
+        }
+        $user->forceFill(['last_login_at' => now()])->save();
 
         return redirect()->route('admin.dashboard');
     }

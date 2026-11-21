@@ -152,10 +152,18 @@
                 <h3 class="text-base font-bold text-slate-800 mb-4">Trạng Thái Bàn</h3>
                 <div class="grid grid-cols-2 gap-3">
                     @foreach($danhSachBan as $ban)
-                        <div class="p-3 rounded-lg border flex items-center justify-between {{ ($ban->status ?? '') == 'active' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-600' }}">
+                        @php($tableStatus = $ban->status ?? '')
+                        @php($tableInUse = in_array($tableStatus, ['occupied', 'reserved'], true))
+                        @php($tableStatusLabel = match ($tableStatus) {
+                            'occupied' => 'Có khách',
+                            'reserved' => 'Đã đặt',
+                            'cleaning' => 'Đang dọn',
+                            default => 'Trống',
+                        })
+                        <div class="p-3 rounded-lg border flex items-center justify-between {{ $tableInUse ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-600' }}">
                             <span class="text-sm font-semibold">{{ $ban->name }}</span>
-                            <span class="text-xs px-2 py-0.5 rounded-full {{ ($ban->status ?? '') == 'active' ? 'bg-amber-200 text-amber-800' : 'bg-slate-200 text-slate-600' }}">
-                                {{ ($ban->status ?? '') == 'active' ? 'Có khách' : 'Trống' }}
+                            <span class="text-xs px-2 py-0.5 rounded-full {{ $tableInUse ? 'bg-amber-200 text-amber-800' : 'bg-slate-200 text-slate-600' }}">
+                                {{ $tableStatusLabel }}
                             </span>
                         </div>
                     @endforeach

@@ -77,19 +77,56 @@
             <section class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
                 <div class="mb-4">
                     <h2 class="font-semibold text-slate-900">Vai trò</h2>
-                    <p class="mt-1 text-sm text-slate-500">Vai trò mới được cấp trong phạm vi toàn hệ thống.</p>
+                    <p class="mt-1 text-sm text-slate-500">Vai trò nghiệp vụ chỉ áp dụng cho các chi nhánh được chọn.</p>
                 </div>
                 <input type="hidden" name="assign_roles" value="1">
-                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="grid gap-4">
                     @foreach ($roles as $role)
-                        <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-3.5 shadow-sm transition duration-150 hover:bg-slate-50/80 hover:border-slate-300 cursor-pointer">
-                            <input type="checkbox" name="role_ids[]" value="{{ $role->id }}" @checked(in_array($role->id, (array) old('role_ids', $selectedRoleIds))) 
-                                class="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600/20 focus:ring-2">
-                            <span>
-                                <span class="block text-sm font-medium text-slate-900">{{ $role->name }}</span>
-                                <span class="block text-xs text-slate-500">{{ $role->code }}</span>
-                            </span>
-                        </label>
+                        @php($roleId = (int) $role->id)
+                        @php($selectedAssignment = $selectedRoleAssignments[$roleId] ?? ['all' => false, 'branches' => []])
+                        @php($oldRoleAll = (array) old('role_all', []))
+                        @php($oldRoleBranches = (array) old('role_branch_ids', []))
+                        <section class="rounded-xl border border-slate-200 p-4">
+                            <label class="flex items-start gap-3 cursor-pointer">
+                                <input type="checkbox" name="role_ids[]" value="{{ $roleId }}"
+                                    @checked(in_array($roleId, array_map('intval', (array) old('role_ids', $selectedRoleIds)), true))
+                                    class="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600/20 focus:ring-2">
+                                <span>
+                                    <span class="block text-sm font-medium text-slate-900">{{ $role->name }}</span>
+                                    <span class="block text-xs text-slate-500">{{ $role->code }}</span>
+                                </span>
+                            </label>
+
+                            @if ($role->code === \App\Helpers\ConstantHelper::ROLE_ADMIN)
+                                <label class="mt-3 flex items-center gap-2 pl-7 text-sm text-slate-700">
+                                    <input type="hidden" name="role_all[{{ $roleId }}]" value="0">
+                                    <input type="checkbox" name="role_all[{{ $roleId }}]" value="1"
+                                        @checked(filter_var($oldRoleAll[$roleId] ?? $selectedAssignment['all'], FILTER_VALIDATE_BOOLEAN))
+                                        class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600/20 focus:ring-2">
+                                    Phạm vi toàn hệ thống (bắt buộc với vai trò này)
+                                </label>
+                            @else
+                                <fieldset class="mt-3 pl-7">
+                                    <legend class="mb-2 text-xs font-medium text-slate-600">Phạm vi chi nhánh của vai trò này</legend>
+                                    @if ($branches->isEmpty())
+                                        <p class="text-sm text-rose-700">Bạn không có quyền gán người dùng vào chi nhánh nào.</p>
+                                    @else
+                                        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                            @foreach ($branches as $branch)
+                                                @php($oldBranchSelection = $oldRoleBranches[$roleId] ?? $selectedAssignment['branches'])
+                                                <label class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                                                    <input type="checkbox" name="role_branch_ids[{{ $roleId }}][]"
+                                                        value="{{ $branch->id }}"
+                                                        @checked(in_array((int) $branch->id, array_map('intval', (array) $oldBranchSelection), true))
+                                                        class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600/20 focus:ring-2">
+                                                    {{ $branch->name }}
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </fieldset>
+                            @endif
+                        </section>
                     @endforeach
                 </div>
             </section>
