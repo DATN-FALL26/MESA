@@ -14,6 +14,7 @@ use App\Models\ApprovalRequest;
 use App\Models\Ingredient;
 use App\Models\StockAdjustment;
 use App\Models\StockLevel;
+use App\Models\User;
 use App\Repositories\Contracts\StockAdjustmentRepositoryInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -39,7 +40,7 @@ class StockAdjustmentService
         ?array $ingredientIds = null,
         ?int $userId = null
     ): StockAdjustment {
-        $userId = $userId ?? (auth()->id() ? (int) auth()->id() : 1);
+        $userId = $userId ?? (int) (auth()->id() ?? User::query()->value('id') ?? 1);
 
         // Lấy danh sách nguyên vật liệu cần kiểm kê
         $ingredientsQuery = Ingredient::query();

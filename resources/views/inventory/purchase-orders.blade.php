@@ -356,11 +356,11 @@
 
     <!-- MODAL 3: XÁC NHẬN NHẬP KHO (RECEIVE GOODS MODAL) -->
     <div id="modal-receive-po" class="fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-8">
+        <div class="bg-white w-full max-w-4xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-8">
             <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-emerald-50/50">
                 <div>
-                    <h3 class="text-sm font-bold text-emerald-950">Kiểm Nhận Hàng & Ghi Sổ Nhập Kho</h3>
-                    <p class="text-xs text-emerald-700" id="receive-po-subheading">Xác nhận số lượng thực nhận và ghi tăng tồn kho tức thời</p>
+                    <h3 class="text-sm font-bold text-emerald-950">Kiểm Nhận Hàng, Nhập Hạn Sử Dụng & Ghi Sổ Kho</h3>
+                    <p class="text-xs text-emerald-700" id="receive-po-subheading">Xác nhận số lượng thực nhận, số lô và hạn dùng để hệ thống theo dõi FEFO</p>
                 </div>
                 <button type="button" onclick="closeReceivePoModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -377,9 +377,11 @@
                         <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
                             <tr>
                                 <th class="py-2.5 px-3 text-left font-semibold">Nguyên vật liệu</th>
-                                <th class="py-2.5 px-3 text-right font-semibold">SL Đặt</th>
-                                <th class="py-2.5 px-3 text-right font-semibold w-28">SL Thực nhận</th>
-                                <th class="py-2.5 px-3 text-right font-semibold w-32">Đơn giá nhập (VND)</th>
+                                <th class="py-2.5 px-3 text-right font-semibold w-24">SL Đặt</th>
+                                <th class="py-2.5 px-3 text-right font-semibold w-28">SL Nhận *</th>
+                                <th class="py-2.5 px-3 text-right font-semibold w-28">Đơn giá (VND)</th>
+                                <th class="py-2.5 px-3 text-left font-semibold w-32">Số lô (Tùy chọn)</th>
+                                <th class="py-2.5 px-3 text-left font-semibold w-36">Hạn sử dụng (HSD) *</th>
                             </tr>
                         </thead>
                         <tbody id="receive-po-items-body" class="divide-y divide-slate-100">
@@ -388,8 +390,8 @@
                 </div>
 
                 <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800">
-                    <p class="font-semibold">Lưu ý nghiệp vụ:</p>
-                    <p>Khi xác nhận, hệ thống sẽ tự động cập nhật sổ cái kho (Immutable Ledger) và tính lại đơn giá vốn bình quân gia quyền cho từng nguyên liệu.</p>
+                    <p class="font-semibold">Lưu ý nghiệp vụ Lô & Hạn sử dụng:</p>
+                    <p>Hệ thống tự động khởi tạo Lô hàng (`stock_batches`) tương ứng với HSD vừa nhập để kích hoạt cảnh báo hết hạn và cơ chế tự động trừ kho theo lô hết hạn trước (FEFO).</p>
                 </div>
 
                 <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
@@ -969,6 +971,10 @@
                 document.getElementById('receive-po-subheading').textContent = `Đơn số: ${po.po_no} - Nhà cung cấp: ${po.supplier_name}`;
 
                 const tbody = document.getElementById('receive-po-items-body');
+                const defaultExp = new Date();
+                defaultExp.setDate(defaultExp.getDate() + 30);
+                const defaultExpStr = defaultExp.toISOString().split('T')[0];
+
                 tbody.innerHTML = (po.items || []).map(item => `
                     <tr data-ingredient-id="${item.ingredient_id}">
                         <td class="py-2.5 px-3">
@@ -977,10 +983,16 @@
                         </td>
                         <td class="py-2.5 px-3 text-right font-medium text-slate-700">${item.quantity}</td>
                         <td class="py-2.5 px-3">
-                            <input type="number" step="0.01" min="0" value="${item.quantity}" required class="recv-item-qty w-full px-2 py-1.5 text-xs text-right rounded border border-emerald-300 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                            <input type="number" step="0.01" min="0" value="${item.quantity}" required class="recv-item-qty w-full px-2 py-1.5 text-xs text-right rounded border border-emerald-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono">
                         </td>
                         <td class="py-2.5 px-3">
-                            <input type="number" step="1000" min="0" value="${item.unit_price}" required class="recv-item-price w-full px-2 py-1.5 text-xs text-right rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                            <input type="number" step="1000" min="0" value="${item.unit_price}" required class="recv-item-price w-full px-2 py-1.5 text-xs text-right rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono">
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <input type="text" placeholder="Tự sinh nếu trống" value="${item.batch_no || ''}" class="recv-item-batch w-full px-2 py-1.5 text-xs rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono">
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <input type="date" value="${item.expiry_date || defaultExpStr}" required class="recv-item-expiry w-full px-2 py-1.5 text-xs rounded border border-emerald-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono">
                         </td>
                     </tr>
                 `).join('');
@@ -1008,11 +1020,15 @@
                 const ingId = tr.dataset.ingredientId;
                 const qty = tr.querySelector('.recv-item-qty').value;
                 const price = tr.querySelector('.recv-item-price').value;
+                const batch = tr.querySelector('.recv-item-batch')?.value;
+                const expiry = tr.querySelector('.recv-item-expiry')?.value;
 
                 items.push({
                     ingredient_id: parseInt(ingId),
                     received_qty: parseFloat(qty),
-                    unit_price: parseFloat(price)
+                    unit_price: parseFloat(price),
+                    batch_no: batch ? batch.trim() : null,
+                    expiry_date: expiry || null
                 });
             });
 

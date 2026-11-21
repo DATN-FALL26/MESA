@@ -327,12 +327,58 @@ class DashboardController extends Controller
         }
 
         $ingredients = [];
+        $alertSummary = [];
         if (Schema::hasTable('ingredients')) {
-            $ingQuery = DB::table('ingredients');
-            if (Schema::hasColumn('ingredients', 'branch_id')) {
-                $ingQuery->where('branch_id', $branchId);
-            }
-            $ingredients = $ingQuery->get();
+            $alertService = app(\App\Services\Inventory\StockAlertService::class);
+            $stockPaginator = $alertService->getBranchStockOverview((int) $branchId, [
+                'search' => $request->query('search'),
+                'type' => $request->query('type'),
+                'status_filter' => $request->query('status_filter'),
+            ], 100);
+
+            $alertSummary = $alertService->getAlertSummary((int) $branchId);
+
+            $todayStr = \Carbon\Carbon::today()->toDateString();
+            $threeDaysStr = \Carbon\Carbon::today()->addDays(3)->toDateString();
+
+            $ingredients = collect($stockPaginator->items())->map(function ($item) use ($todayStr, $threeDaysStr) {
+                $currentQty = (float) $item->current_quantity;
+                $minStock = (float) $item->min_stock;
+                $expiry = $item->earliest_expiry;
+
+                if ($currentQty <= 0) {
+                    $status = 'Hết hàng';
+                    $statusClass = 'danger';
+                } elseif ($expiry !== null && $expiry < $todayStr) {
+                    $status = 'Đã hết hạn';
+                    $statusClass = 'danger';
+                } elseif ($expiry !== null && $expiry <= $threeDaysStr) {
+                    $status = 'Sắp hết hạn';
+                    $statusClass = 'warning';
+                } elseif ($currentQty <= $minStock) {
+                    $status = 'Sắp hết';
+                    $statusClass = 'warning';
+                } else {
+                    $status = 'Ổn định';
+                    $statusClass = 'success';
+                }
+
+                return (object) [
+                    'id' => $item->ingredient_id,
+                    'sku' => $item->sku,
+                    'name' => $item->name,
+                    'ingredient_type' => $item->ingredient_type,
+                    'unit' => $item->base_uom,
+                    'stock_quantity' => $currentQty,
+                    'min_stock' => $minStock,
+                    'avg_cost' => (float) $item->avg_cost,
+                    'total_value' => (float) $item->total_value,
+                    'expiry_date' => $expiry,
+                    'active_batches_count' => (int) $item->active_batches_count,
+                    'quality_status' => $status,
+                    'status_class' => $statusClass,
+                ];
+            });
         }
 
         return view('admin.reports', compact(
@@ -343,7 +389,8 @@ class DashboardController extends Controller
             'tongDoanhThuKy',
             'tongSoTo',
             'topMonAn',
-            'ingredients'
+            'ingredients',
+            'alertSummary'
         ));
     }
 
@@ -423,15 +470,44 @@ class DashboardController extends Controller
      */
     public function getFoodStorageReport(Request $request)
     {
-        $branchId = session('current_branch_id', $request->input('branch_id', 1));
+        $branchId = (int) session('current_branch_id', $request->input('branch_id', 1));
         $ingredients = collect();
 
         if (Schema::hasTable('ingredients')) {
-            $query = DB::table('ingredients');
-            if ($branchId && Schema::hasColumn('ingredients', 'branch_id')) {
-                $query->where('branch_id', $branchId);
-            }
-            $ingredients = $query->select('name', 'stock_quantity', 'unit', 'quality_status')->get();
+            $alertService = app(\App\Services\Inventory\StockAlertService::class);
+            $stockPaginator = $alertService->getBranchStockOverview($branchId, [], 100);
+
+            $todayStr = \Carbon\Carbon::today()->toDateString();
+            $threeDaysStr = \Carbon\Carbon::today()->addDays(3)->toDateString();
+
+            $ingredients = collect($stockPaginator->items())->map(function ($item) use ($todayStr, $threeDaysStr) {
+                $currentQty = (float) $item->current_quantity;
+                $minStock = (float) $item->min_stock;
+                $expiry = $item->earliest_expiry;
+
+                if ($currentQty <= 0) {
+                    $status = 'Hết hàng';
+                } elseif ($expiry !== null && $expiry < $todayStr) {
+                    $status = 'Đã hết hạn';
+                } elseif ($expiry !== null && $expiry <= $threeDaysStr) {
+                    $status = 'Sắp hết hạn';
+                } elseif ($currentQty <= $minStock) {
+                    $status = 'Sắp hết';
+                } else {
+                    $status = 'Ổn định';
+                }
+
+                return [
+                    'id' => $item->ingredient_id,
+                    'sku' => $item->sku,
+                    'name' => $item->name,
+                    'stock_quantity' => $currentQty,
+                    'unit' => $item->base_uom,
+                    'min_stock' => $minStock,
+                    'expiry_date' => $expiry,
+                    'quality_status' => $status,
+                ];
+            });
         }
 
         return response()->json([

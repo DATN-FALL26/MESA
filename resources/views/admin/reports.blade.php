@@ -92,106 +92,209 @@
         </div>
     </div>
 
-    {{-- BẢNG QUẢN LÝ / CẢNH BÁO TỒN KHO NGUYÊN LIỆU --}}
-    <div class="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
-        <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+    {{-- BẢNG QUẢN LÝ / CẢNH BÁO TỒN KHO NGUYÊN LIỆU & HẠN SỬ DỤNG --}}
+    <div class="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden space-y-4 p-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
             <div>
-                <h3 class="text-base font-bold text-slate-900 dark:text-white">Bảng Kiểm Soát & Cảnh Báo Tồn Kho Nguyên Liệu</h3>
-                <p class="text-xs text-slate-500 mt-0.5">Theo dõi trạng thái tồn kho thực tế tại kho chi nhánh.</p>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Kiểm Soát Tồn Kho & Cảnh Báo Hạn Sử Dụng</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">Thời gian thực</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">Theo dõi số lượng tồn thực tế theo kho chi nhánh, mức cảnh báo tối thiểu và hạn dùng của các lô hàng.</p>
             </div>
 
-            {{-- Nút dẫn đến Thẻ kho & Biến động --}}
-            <a href="{{ url('/inventory/stock-movements') }}" class="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm border border-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors">
-                <svg class="h-4 w-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h16.5M3.75 3v11.25M20.25 3v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-12 0h12m-12 0v3.75A1.5 1.5 0 0 0 5.25 21.75h13.5a1.5 1.5 0 0 0 1.5-1.5V16.5m-15 0h15" /></svg>
-                Xem Thẻ kho & Biến động &rarr;
-            </a>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="triggerStockScan()" id="btn-scan-alerts" class="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700">
+                    <svg class="h-4 w-4 text-emerald-600" id="scan-icon" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                    <span>Quét cảnh báo kho</span>
+                </button>
+                <a href="{{ url('/inventory/stock-movements') }}" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900 transition-colors border border-indigo-200 dark:border-indigo-800">
+                    <svg class="h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h16.5M3.75 3v11.25M20.25 3v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-12 0h12m-12 0v3.75A1.5 1.5 0 0 0 5.25 21.75h13.5a1.5 1.5 0 0 0 1.5-1.5V16.5m-15 0h15" /></svg>
+                    <span>Thẻ kho</span>
+                </a>
+                <a href="{{ url('/inventory/purchase-orders') }}" class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm transition-colors">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    <span>Tạo đơn nhập (PO)</span>
+                </a>
+            </div>
         </div>
 
-        <div class="overflow-x-auto">
+        {{-- THỐNG KÊ NHANH (KPI CARDS) --}}
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-slate-800 dark:bg-slate-800/40">
+                <span class="text-[11px] font-semibold text-slate-500 uppercase">Tổng mặt hàng</span>
+                <div class="mt-1 flex items-baseline gap-2">
+                    <span class="text-xl font-black text-slate-900 dark:text-white font-mono">{{ $alertSummary['total_ingredients'] ?? count($ingredients) }}</span>
+                    <span class="text-[11px] text-slate-400">nguyên liệu</span>
+                </div>
+            </div>
+
+            <div class="rounded-xl border border-rose-200 bg-rose-50/50 p-3.5 dark:border-rose-900/40 dark:bg-rose-950/20">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-semibold text-rose-700 dark:text-rose-400 uppercase">Cần nhập gấp</span>
+                    <span class="h-2 w-2 rounded-full bg-rose-500 animate-pulse"></span>
+                </div>
+                <div class="mt-1 flex items-baseline gap-1.5">
+                    <span class="text-xl font-black text-rose-600 dark:text-rose-400 font-mono">{{ ($alertSummary['out_of_stock_count'] ?? 0) + ($alertSummary['low_stock_count'] ?? 0) }}</span>
+                    <span class="text-[10px] text-rose-600/80">({{ $alertSummary['out_of_stock_count'] ?? 0 }} hết / {{ $alertSummary['low_stock_count'] ?? 0 }} sắp hết)</span>
+                </div>
+            </div>
+
+            <div class="rounded-xl border border-amber-200 bg-amber-50/50 p-3.5 dark:border-amber-900/40 dark:bg-amber-950/20">
+                <span class="text-[11px] font-semibold text-amber-700 dark:text-amber-400 uppercase">Lô sắp hết hạn (&le; 3 ngày)</span>
+                <div class="mt-1 flex items-baseline gap-2">
+                    <span class="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">{{ $alertSummary['expiring_soon_batches_count'] ?? 0 }}</span>
+                    <span class="text-[11px] text-amber-600/80">lô cần ưu tiên</span>
+                </div>
+            </div>
+
+            <div class="rounded-xl border border-red-200 bg-red-50/50 p-3.5 dark:border-red-900/40 dark:bg-red-950/20">
+                <span class="text-[11px] font-semibold text-red-700 dark:text-red-400 uppercase">Lô đã quá hạn</span>
+                <div class="mt-1 flex items-baseline gap-2">
+                    <span class="text-xl font-black text-red-600 dark:text-red-400 font-mono">{{ $alertSummary['expired_batches_count'] ?? 0 }}</span>
+                    <span class="text-[11px] text-red-600/80">yêu cầu hủy</span>
+                </div>
+            </div>
+        </div>
+
+        {{-- BỘ LỌC TÌM KIẾM & TRẠNG THÁI --}}
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+            <div class="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
+                <a href="{{ request()->fullUrlWithQuery(['status_filter' => null]) }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors {{ !request('status_filter') ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300' }}">
+                    Tất cả ({{ count($ingredients) }})
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'out_of_stock']) }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors {{ request('status_filter') === 'out_of_stock' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300' }}">
+                    Đã hết hàng
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'low_stock']) }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors {{ request('status_filter') === 'low_stock' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300' }}">
+                    Sắp hết hàng
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'expiring_soon']) }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors {{ request('status_filter') === 'expiring_soon' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300' }}">
+                    Sắp hết hạn
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'expired']) }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors {{ request('status_filter') === 'expired' ? 'bg-red-700 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300' }}">
+                    Đã hết hạn
+                </a>
+            </div>
+
+            <form method="GET" action="{{ url()->current() }}" class="flex items-center gap-2 w-full sm:w-auto">
+                <input type="hidden" name="branch_id" value="{{ $branchId }}">
+                <input type="hidden" name="from_date" value="{{ $fromDate }}">
+                <input type="hidden" name="to_date" value="{{ $toDate }}">
+                @if(request('status_filter'))
+                    <input type="hidden" name="status_filter" value="{{ request('status_filter') }}">
+                @endif
+                <div class="relative w-full sm:w-64">
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Tìm theo tên hoặc SKU..." class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:border-indigo-500">
+                    <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+                </div>
+                <button type="submit" class="px-3 py-1.5 bg-slate-800 text-white hover:bg-slate-900 text-xs font-semibold rounded-lg transition-colors shrink-0 dark:bg-slate-700">Lọc</button>
+            </form>
+        </div>
+
+        {{-- BẢNG DỮ LIỆU TỒN KHO THỰC TẾ --}}
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:bg-slate-800/50 dark:border-slate-800 dark:text-slate-400">
-                        <th class="py-3.5 px-6">Mã SKU</th>
-                        <th class="py-3.5 px-6">Tên Nguyên Vật Liệu</th>
-                        <th class="py-3.5 px-6">Phân Loại</th>
-                        <th class="py-3.5 px-6">Đơn Vị Cơ Sở (UOM)</th>
-                        <th class="py-3.5 px-6">Tồn Kho Hiện Tại</th>
-                        <th class="py-3.5 px-6">Trạng Thái</th>
-                        <th class="py-3.5 px-6 text-right">Thao Tác</th>
+                        <th class="py-3 px-4">Mã SKU</th>
+                        <th class="py-3 px-4">Tên Nguyên Vật Liệu</th>
+                        <th class="py-3 px-4">Phân Loại</th>
+                        <th class="py-3 px-4 text-right">Tồn tối thiểu</th>
+                        <th class="py-3 px-4 text-right">Tồn thực tế</th>
+                        <th class="py-3 px-4">HSD gần nhất</th>
+                        <th class="py-3 px-4 text-center">Trạng Thái</th>
+                        <th class="py-3 px-4 text-right">Thao Tác</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 text-xs font-medium text-slate-700 dark:divide-slate-800 dark:text-slate-300">
                     @forelse($ingredients ?? [] as $index => $ing)
                         @php
-                            $name = (string) data_get($ing, 'name', 'Nguyên liệu');
-                            $sku = (string) (data_get($ing, 'sku') ?: ('NL_' . strtoupper(\Illuminate\Support\Str::slug($name, '_'))));
-                            $stock = data_get($ing, 'stock_quantity', 0);
-                            $status = (string) data_get($ing, 'quality_status', 'Ổn định');
+                            $qty = (float) ($ing->stock_quantity ?? 0);
+                            $min = (float) ($ing->min_stock ?? 0);
+                            $uom = $ing->unit ?? 'g';
+                            $status = $ing->quality_status ?? 'Ổn định';
+                            $statusClass = $ing->status_class ?? 'success';
 
-                            $nameLower = mb_strtolower($name);
-
-                            $category = 'Thô (raw)';
-                            $categoryBg = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
-
-                            if (str_contains($nameLower, 'nước dùng') || str_contains($nameLower, 'nước lèo') || str_contains($nameLower, 'sốt')) {
-                                $category = 'Sơ chế (semi_finished)';
-                                $categoryBg = 'bg-sky-500/10 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400';
-                            }
-
-                            $unit = (string) (data_get($ing, 'unit') ?: 'Kg');
-                            if (str_contains($nameLower, 'nước dùng')) {
-                                $unit = 'ml';
-                            } elseif (str_contains($nameLower, 'nước ngọt') || str_contains($nameLower, 'lon')) {
-                                $unit = 'lon';
-                            } elseif (str_contains($nameLower, 'quẩy')) {
-                                $unit = 'cái';
-                            } elseif (str_contains($nameLower, 'trà')) {
-                                $unit = 'g';
-                            } elseif (str_contains($nameLower, 'bánh phở') || str_contains($nameLower, 'thịt') || str_contains($nameLower, 'xương') || str_contains($nameLower, 'hành') || str_contains($nameLower, 'rau')) {
-                                $unit = 'Kg';
-                            }
-
-                            $badgeClass = 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400';
-                            if ($status === 'Sắp hết' || $status === 'Cần nhập thêm') {
-                                $badgeClass = 'bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400';
-                            }
+                            $typeLabel = ($ing->ingredient_type ?? 'raw') === 'semi_finished' ? 'Sơ chế' : 'Thô';
+                            $typeBg = ($ing->ingredient_type ?? 'raw') === 'semi_finished'
+                                ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300'
+                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
                         @endphp
-                        <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                            <td class="py-4 px-6 font-semibold text-slate-900 dark:text-white">{{ $sku }}</td>
-                            <td class="py-4 px-6 font-bold text-slate-900 dark:text-white">{{ $name }}</td>
-                            <td class="py-4 px-6">
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold {{ $categoryBg }}">
-                                    {{ $category }}
+                        <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors {{ $qty <= 0 ? 'bg-rose-50/20' : '' }}">
+                            <td class="py-3 px-4 font-mono font-semibold text-slate-900 dark:text-white">{{ $ing->sku }}</td>
+                            <td class="py-3 px-4">
+                                <div class="font-bold text-slate-900 dark:text-white">{{ $ing->name }}</div>
+                                @if(($ing->active_batches_count ?? 0) > 0)
+                                    <span class="text-[10px] text-slate-400">{{ $ing->active_batches_count }} lô đang lưu kho</span>
+                                @endif
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold {{ $typeBg }}">
+                                    {{ $typeLabel }}
                                 </span>
                             </td>
-                            <td class="py-4 px-6 text-slate-500 font-semibold">{{ $unit }}</td>
-                            <td class="py-4 px-6 font-bold text-indigo-600 dark:text-indigo-400">{{ $stock }}</td>
-                            <td class="py-4 px-6">
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold {{ $badgeClass }}">
-                                    {{ $status }}
-                                </span>
+                            <td class="py-3 px-4 text-right text-slate-500 font-mono">
+                                {{ number_format($min, 2) }} <span class="text-[10px] text-slate-400">{{ $uom }}</span>
                             </td>
-                            <td class="py-4 px-6 text-right relative">
-                                <div class="inline-block text-left">
-                                    <button onclick="toggleActionMenu({{ $index }})" type="button" class="inline-flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400 hover:underline focus:outline-none">
-                                        Xem
-                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-                                    </button>
-
-                                    <div id="actionMenu-{{ $index }}" class="hidden absolute right-6 z-20 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-slate-800 dark:ring-slate-700 py-1 text-left">
-                                        <a href="{{ url('/inventory/suppliers') }}" class="block px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700">
-                                            📦 Xem nhà cung cấp
-                                        </a>
-                                        <a href="{{ url('/inventory/purchase-orders') }}" class="block px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700">
-                                            📋 Xem đơn nhập hàng
-                                        </a>
+                            <td class="py-3 px-4 text-right">
+                                <div class="font-black font-mono {{ $qty <= 0 ? 'text-rose-600 dark:text-rose-400' : ($qty <= $min ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400') }}">
+                                    {{ number_format($qty, 2) }} <span class="text-[10px] font-normal text-slate-400">{{ $uom }}</span>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4">
+                                @if(!empty($ing->expiry_date))
+                                    @php
+                                        $expDate = \Carbon\Carbon::parse($ing->expiry_date);
+                                        $daysLeft = (int) \Carbon\Carbon::today()->diffInDays($expDate, false);
+                                    @endphp
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="font-mono text-[11px] {{ $daysLeft < 0 ? 'text-red-600 font-bold' : ($daysLeft <= 3 ? 'text-amber-600 font-bold' : 'text-slate-600 dark:text-slate-400') }}">
+                                            {{ $ing->expiry_date }}
+                                        </span>
+                                        @if($daysLeft < 0)
+                                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">Hết hạn</span>
+                                        @elseif($daysLeft <= 3)
+                                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">{{ $daysLeft }} ngày</span>
+                                        @endif
                                     </div>
+                                @else
+                                    <span class="text-slate-400 text-[11px] italic">Chưa có lô</span>
+                                @endif
+                            </td>
+                            <td class="py-3 px-4 text-center">
+                                @if($status === 'Hết hàng' || $status === 'Đã hết hạn')
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 ring-1 ring-rose-500/20">
+                                        ⚠️ {{ $status }}
+                                    </span>
+                                @elseif($status === 'Sắp hết' || $status === 'Sắp hết hạn')
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 ring-1 ring-amber-500/20">
+                                        ⚡ {{ $status }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 ring-1 ring-emerald-500/20">
+                                        ✅ {{ $status }}
+                                    </span>
+                                @endif
+                            </td>
+                            <td class="py-3 px-4 text-right">
+                                <div class="inline-flex items-center gap-1">
+                                    <a href="{{ url('/inventory/stock-movements') }}?ingredient_id={{ $ing->id }}" class="px-2 py-1 text-[11px] font-semibold text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors" title="Tra cứu thẻ kho">
+                                        Thẻ kho
+                                    </a>
+                                    @if($qty <= $min)
+                                        <a href="{{ url('/inventory/purchase-orders') }}" class="px-2 py-1 text-[11px] font-bold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40 rounded transition-colors" title="Nhập hàng ngay">
+                                            + Nhập
+                                        </a>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="py-8 text-center text-slate-400 italic">Chưa có dữ liệu kho nguyên liệu trong cơ sở dữ liệu.</td>
+                            <td colspan="8" class="py-10 text-center text-slate-400 italic">
+                                Không tìm thấy dữ liệu nguyên liệu phù hợp với bộ lọc.
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -201,29 +304,80 @@
 </div>
 
 @push('scripts')
+{{-- FLOATING TOAST NOTIFICATION --}}
+<div id="toast-notification" class="fixed top-5 right-5 z-50 transform transition-all duration-300 translate-y-[-20px] opacity-0 pointer-events-none">
+    <div class="flex items-center gap-3 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-3 rounded-xl shadow-2xl border border-slate-700/30 text-xs">
+        <div id="toast-icon" class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+        </div>
+        <div>
+            <div id="toast-title" class="font-bold text-sm">Quét kho hoàn tất</div>
+            <div id="toast-msg" class="text-slate-300 dark:text-slate-600 mt-0.5">Hệ thống đã cập nhật cảnh báo tồn kho và HSD.</div>
+        </div>
+    </div>
+</div>
+
 <script>
-    function toggleActionMenu(index) {
-        const menu = document.getElementById(`actionMenu-${index}`);
-        const allMenus = document.querySelectorAll('[id^="actionMenu-"]');
+    function showToast(title, msg, isError = false) {
+        const toast = document.getElementById('toast-notification');
+        const titleEl = document.getElementById('toast-title');
+        const msgEl = document.getElementById('toast-msg');
+        const iconEl = document.getElementById('toast-icon');
 
-        allMenus.forEach(m => {
-            if (m.id !== `actionMenu-${index}`) {
-                m.classList.add('hidden');
-            }
-        });
+        titleEl.innerText = title;
+        msgEl.innerText = msg;
 
-        if (menu) {
-            menu.classList.toggle('hidden');
+        if (isError) {
+            iconEl.className = 'w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0';
+            iconEl.innerHTML = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>';
+        } else {
+            iconEl.className = 'w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0';
+            iconEl.innerHTML = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>';
         }
+
+        toast.classList.remove('translate-y-[-20px]', 'opacity-0', 'pointer-events-none');
+        toast.classList.add('translate-y-0', 'opacity-100');
+
+        setTimeout(() => {
+            toast.classList.remove('translate-y-0', 'opacity-100');
+            toast.classList.add('translate-y-[-20px]', 'opacity-0', 'pointer-events-none');
+        }, 3500);
     }
 
-    window.addEventListener('click', function(e) {
-        if (!e.target.closest('button[onclick^="toggleActionMenu"]')) {
-            document.querySelectorAll('[id^="actionMenu-"]').forEach(m => {
-                m.classList.add('hidden');
-            });
-        }
-    });
+    function triggerStockScan() {
+        const btn = document.getElementById('btn-scan-alerts');
+        const icon = document.getElementById('scan-icon');
+        if (!btn || !icon) return;
+
+        btn.disabled = true;
+        icon.classList.add('animate-spin');
+
+        fetch('/api/v1/inventory/alerts/scan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+            },
+            body: JSON.stringify({ branch_id: {{ $branchId }} })
+        })
+        .then(res => res.json())
+        .then(data => {
+            const lowCount = (data.data?.low_stock?.created || 0) + (data.data?.low_stock?.updated || 0);
+            const expCount = (data.data?.expiry?.created || 0) + (data.data?.expiry?.updated || 0);
+            showToast('Quét kho hoàn tất!', `Đã phát hiện & ghi nhận ${lowCount} cảnh báo tồn kho và ${expCount} cảnh báo hạn sử dụng.`);
+            setTimeout(() => {
+                window.location.reload();
+            }, 1200);
+        })
+        .catch(err => {
+            console.error(err);
+            showToast('Lỗi khi quét kho', err.message, true);
+        })
+        .finally(() => {
+            btn.disabled = false;
+            icon.classList.remove('animate-spin');
+        });
+    }
 </script>
 @endpush
 @endsection
