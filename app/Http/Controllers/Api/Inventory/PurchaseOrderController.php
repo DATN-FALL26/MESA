@@ -10,7 +10,6 @@ use App\Http\Requests\Inventory\StorePurchaseOrderRequest;
 use App\Http\Requests\Inventory\UpdatePurchaseOrderRequest;
 use App\Http\Resources\Inventory\PurchaseOrderResource;
 use App\Models\PurchaseOrder;
-use App\Models\User;
 use App\Repositories\Contracts\PurchaseOrderRepositoryInterface;
 use App\Services\Inventory\PurchaseOrderService;
 use Illuminate\Http\JsonResponse;
@@ -31,6 +30,14 @@ class PurchaseOrderController extends Controller
     {
         $perPage = (int) $request->input('per_page', 15);
         $filters = $request->only(['branch_id', 'warehouse_id', 'supplier_id', 'status', 'source', 'search']);
+        $selectedBranchId = $request->attributes->get('selected_branch_id');
+        $allowedBranchIds = $request->attributes->get('authorized_branch_ids');
+
+        if ($selectedBranchId !== null) {
+            $filters['branch_id'] = $selectedBranchId;
+        } elseif (is_array($allowedBranchIds)) {
+            $filters['branch_ids'] = $allowedBranchIds;
+        }
 
         $orders = $this->poRepository->paginate($filters, $perPage);
 
@@ -44,7 +51,7 @@ class PurchaseOrderController extends Controller
     {
         $data = $request->safe()->except('items');
         $items = $request->input('items', []);
-        $userId = $this->resolveUserId();
+        $userId = (int) $request->user()->getKey();
 
         $po = $this->poService->create($data, $items, $userId);
 
@@ -79,9 +86,9 @@ class PurchaseOrderController extends Controller
     /**
      * Gửi đơn nhập hàng đi phê duyệt.
      */
-    public function submit(PurchaseOrder $purchaseOrder): PurchaseOrderResource
+    public function submit(Request $request, PurchaseOrder $purchaseOrder): PurchaseOrderResource
     {
-        $userId = $this->resolveUserId();
+        $userId = (int) $request->user()->getKey();
         $updated = $this->poService->submitForApproval($purchaseOrder, $userId);
 
         return new PurchaseOrderResource($updated);
@@ -92,7 +99,7 @@ class PurchaseOrderController extends Controller
      */
     public function approve(Request $request, PurchaseOrder $purchaseOrder): PurchaseOrderResource
     {
-        $approverId = $this->resolveUserId();
+        $approverId = (int) $request->user()->getKey();
         $note = $request->input('note');
 
         $updated = $this->poService->approve($purchaseOrder, $approverId, $note);
@@ -105,7 +112,7 @@ class PurchaseOrderController extends Controller
      */
     public function reject(Request $request, PurchaseOrder $purchaseOrder): PurchaseOrderResource
     {
-        $deciderId = $this->resolveUserId();
+        $deciderId = (int) $request->user()->getKey();
         $note = $request->input('note');
 
         $updated = $this->poService->reject($purchaseOrder, $deciderId, $note);
@@ -118,7 +125,7 @@ class PurchaseOrderController extends Controller
      */
     public function cancel(Request $request, PurchaseOrder $purchaseOrder): PurchaseOrderResource
     {
-        $userId = $this->resolveUserId();
+        $userId = (int) $request->user()->getKey();
         $note = $request->input('note');
 
         $updated = $this->poService->cancel($purchaseOrder, $userId, $note);
@@ -131,16 +138,11 @@ class PurchaseOrderController extends Controller
      */
     public function receive(ReceivePurchaseOrderRequest $request, PurchaseOrder $purchaseOrder): PurchaseOrderResource
     {
-        $receiverId = $this->resolveUserId();
+        $receiverId = (int) $request->user()->getKey();
         $receivedItems = $request->input('items');
 
         $updated = $this->poService->receive($purchaseOrder, $receiverId, $receivedItems);
 
         return new PurchaseOrderResource($updated);
-    }
-
-    protected function resolveUserId(): int
-    {
-        return (int) (auth()->id() ?? User::query()->value('id') ?? 1);
     }
 }

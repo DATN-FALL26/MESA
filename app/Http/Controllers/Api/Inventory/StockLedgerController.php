@@ -96,7 +96,7 @@ class StockLedgerController extends Controller
      */
     public function stockOverview(Request $request, StockAlertService $alertService): JsonResponse
     {
-        $branchId = (int) ($request->query('branch_id') ?? 1);
+        $branchId = $this->requireSelectedBranchId($request);
         $perPage = (int) ($request->query('per_page') ?? 20);
 
         $overview = $alertService->getBranchStockOverview($branchId, [
@@ -113,7 +113,7 @@ class StockLedgerController extends Controller
      */
     public function alertSummary(Request $request, StockAlertService $alertService): JsonResponse
     {
-        $branchId = (int) ($request->query('branch_id') ?? 1);
+        $branchId = $this->requireSelectedBranchId($request);
         $summary = $alertService->getAlertSummary($branchId);
 
         return response()->json([
@@ -127,7 +127,7 @@ class StockLedgerController extends Controller
      */
     public function scanAlerts(Request $request, StockAlertService $alertService): JsonResponse
     {
-        $branchId = $request->filled('branch_id') ? (int) $request->input('branch_id') : null;
+        $branchId = $this->requireSelectedBranchId($request);
         $days = (int) ($request->input('days') ?? 3);
 
         $lowStock = $alertService->scanLowStockAlerts($branchId);
@@ -148,9 +148,16 @@ class StockLedgerController extends Controller
      */
     public function batches(Request $request, StockBatchService $batchService): JsonResponse
     {
+        $branchId = $request->attributes->get('selected_branch_id');
+        $warehouseId = $request->query('warehouse_id');
+
+        if ($branchId === null && ! is_numeric($warehouseId)) {
+            $branchId = $this->requireSelectedBranchId($request);
+        }
+
         $filters = [
-            'warehouse_id' => $request->query('warehouse_id'),
-            'branch_id' => $request->query('branch_id'),
+            'warehouse_id' => $warehouseId,
+            'branch_id' => $branchId,
             'ingredient_id' => $request->query('ingredient_id'),
             'status' => $request->query('status'),
             'search' => $request->query('search'),
@@ -161,6 +168,21 @@ class StockLedgerController extends Controller
         $batches = $batchService->paginate(array_filter($filters), (int) ($request->query('per_page') ?? 15));
 
         return response()->json($batches);
+    }
+
+    private function requireSelectedBranchId(Request $request): int
+    {
+        $branchId = $request->attributes->get('selected_branch_id');
+        if (is_numeric($branchId)) {
+            return (int) $branchId;
+        }
+
+        $allowedBranchIds = $request->attributes->get('authorized_branch_ids');
+        if (is_array($allowedBranchIds) && count($allowedBranchIds) === 1) {
+            return (int) $allowedBranchIds[0];
+        }
+
+        abort(422, 'Vui lòng chọn chi nhánh trước khi xem dữ liệu kho.');
     }
 
     /**

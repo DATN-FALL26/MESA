@@ -100,7 +100,8 @@ class MenuCostAnalysisController extends Controller
      */
     public function salesProfitReport(Request $request): JsonResponse
     {
-        $branchId = $request->query('branch_id');
+        $branchId = $this->selectedBranchId($request);
+        abort_if($branchId === null, 422, 'Vui lòng chọn chi nhánh trước khi xem báo cáo.');
         $fromDate = $request->query('from_date', Carbon::today()->startOfMonth()->toDateString());
         $toDate = $request->query('to_date', Carbon::today()->toDateString());
         $categoryId = $request->query('category_id');
@@ -111,9 +112,7 @@ class MenuCostAnalysisController extends Controller
             ->whereNotNull('order_items.stock_deducted_at')
             ->whereBetween('orders.created_at', [$fromDate . ' 00:00:00', $toDate . ' 23:59:59']);
 
-        if (! empty($branchId)) {
-            $query->where('orders.branch_id', (int) $branchId);
-        }
+        $query->where('orders.branch_id', $branchId);
 
         if (! empty($categoryId)) {
             $query->where('menu_items.category_id', (int) $categoryId);
@@ -195,25 +194,41 @@ class MenuCostAnalysisController extends Controller
             return (int) $request->query('warehouse_id');
         }
 
-        $branchId = $request->query('branch_id');
-        if ($branchId) {
-            $warehouse = Warehouse::query()
-                ->where('branch_id', (int) $branchId)
-                ->where('type', WarehouseType::BRANCH)
-                ->where('is_active', true)
-                ->first()
-                ?? Warehouse::query()
-                    ->where('branch_id', (int) $branchId)
-                    ->where('is_active', true)
-                    ->first();
-
-            if ($warehouse) {
-                return (int) $warehouse->id;
-            }
+        $branchId = $this->selectedBranchId($request);
+        if ($branchId === null) {
+            return null;
         }
 
-        $defaultWarehouse = Warehouse::query()->where('is_active', true)->first();
+        $warehouse = Warehouse::query()
+            ->where('branch_id', $branchId)
+            ->where('type', WarehouseType::BRANCH)
+            ->where('is_active', true)
+            ->first()
+            ?? Warehouse::query()
+                ->where('branch_id', $branchId)
+                ->where('is_active', true)
+                ->first();
 
-        return $defaultWarehouse ? (int) $defaultWarehouse->id : null;
+        return $warehouse ? (int) $warehouse->id : null;
+    }
+
+    private function selectedBranchId(Request $request): ?int
+    {
+        $branchId = $request->attributes->get('selected_branch_id');
+        if (is_numeric($branchId)) {
+            return (int) $branchId;
+        }
+
+        $branchId = $request->query('branch_id');
+        if (is_numeric($branchId)) {
+            return (int) $branchId;
+        }
+
+        $allowedBranchIds = $request->attributes->get('authorized_branch_ids');
+        if (is_array($allowedBranchIds) && count($allowedBranchIds) === 1) {
+            return (int) $allowedBranchIds[0];
+        }
+
+        return null;
     }
 }

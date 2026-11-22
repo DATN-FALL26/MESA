@@ -22,9 +22,11 @@ class WarehouseController extends Controller
             ->with('branch:id,code,name')
             ->where('is_active', true);
 
-        if ($request->filled('branch_id')) {
-            $query->where('branch_id', (int) $request->input('branch_id'));
-        }
+        $allowedBranchIds = $request->attributes->get('authorized_branch_ids');
+        $selectedBranchId = $request->attributes->get('selected_branch_id');
+        $query
+            ->when($selectedBranchId !== null, fn ($builder) => $builder->where('branch_id', $selectedBranchId))
+            ->when(is_array($allowedBranchIds), fn ($builder) => $builder->whereIn('branch_id', $allowedBranchIds));
 
         $warehouses = $query->orderBy('branch_id')->orderBy('name')->get();
 
@@ -45,9 +47,14 @@ class WarehouseController extends Controller
      */
     public function branches(Request $request): JsonResponse
     {
+        $allowedBranchIds = $request->attributes->get('authorized_branch_ids');
+        $selectedBranchId = $request->attributes->get('selected_branch_id');
+
         $branches = Branch::query()
             ->with(['warehouses' => fn ($q) => $q->where('is_active', true)])
             ->where('status', BranchStatus::ACTIVE)
+            ->when($selectedBranchId !== null, fn ($query) => $query->whereKey($selectedBranchId))
+            ->when(is_array($allowedBranchIds), fn ($query) => $query->whereIn('id', $allowedBranchIds))
             ->orderBy('id')
             ->get();
 
