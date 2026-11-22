@@ -106,6 +106,7 @@ class KitchenDisplayController extends Controller
         return view('kitchen.index', [
             'columns' => $columns,
             'printJobs' => $this->printJobsFor($columns),
+            'cancelledItems' => $this->cancelledItemsFor($columns),
             'phoBowlStats' => $this->phoBowlStats($filterBranchIds),
             'stationCode' => $stationCode,
             'stationCodes' => [StationCode::PHO, StationCode::SIDE],
@@ -141,6 +142,7 @@ class KitchenDisplayController extends Controller
         return view('kitchen.partials.board', [
             'columns' => $columns,
             'printJobs' => $this->printJobsFor($columns),
+            'cancelledItems' => $this->cancelledItemsFor($columns),
             'phoBowlStats' => $this->phoBowlStats($filterBranchIds),
             'overdueMinutes' => self::OVERDUE_MINUTES,
         ]);
@@ -199,6 +201,24 @@ class KitchenDisplayController extends Controller
     public function advanceTicket(Request $request, KitchenTicket $kitchenTicket): RedirectResponse|JsonResponse
     {
         $this->abortUnlessBranchAccessible($this->kitchenBranchIds($request->user()), (int) $kitchenTicket->branch_id);
+
+        // M04-T06: nước / quẩy đã xong nhưng bị sửa số lượng → bấm "Xong" là xác nhận số mới và in lại phiếu.
+        if ($kitchenTicket->status === TicketStatus::READY) {
+            $changedItems = $kitchenTicket->items()
+                ->with('orderItem')
+                ->where('status', '!=', TicketItemStatus::CANCELLED)
+                ->get()
+                ->filter(fn (KitchenTicketItem $item): bool => self::isQuantityChanged($item));
+
+            if ($changedItems->isEmpty()) {
+                return $this->respond($request, 'Phiếu này không còn món cần chế biến.', false);
+            }
+
+            $changedItems->each(fn (KitchenTicketItem $item) => $item->update(['notified_quantity' => $item->orderItem->quantity]));
+            $this->printer->reprint($kitchenTicket);
+
+            return $this->respond($request, 'Đã xác nhận số lượng mới và in lại phiếu.');
+        }
 
         $items = $kitchenTicket->items()
             ->with('orderItem.menuItem')
@@ -301,8 +321,17 @@ class KitchenDisplayController extends Controller
             ->orderBy('id')
             ->get();
 
+        // M04-T06: phiếu mà phục vụ đã hủy hết món thì không còn gì để làm → ẩn khỏi màn bếp.
+        $tickets = $tickets->filter(fn (KitchenTicket $ticket): bool => $ticket->items->isNotEmpty());
+
+        // Nước / quẩy đã xong nhưng phục vụ vừa sửa số lượng → quay lại cột "Nước & Quẩy" để chuẩn bị thêm.
+        $isReadyMadeChangedAfterDone = fn (KitchenTicket $ticket): bool => $ticket->status === TicketStatus::READY
+            && $this->isReadyMadeTicketItems($ticket->items)
+            && $this->hasQuantityChange($ticket);
+
         [$readyMadeTickets, $cookedTickets] = $tickets
-            ->whereIn('status', [TicketStatus::NEW, TicketStatus::PREPARING])
+            ->filter(fn (KitchenTicket $ticket): bool => in_array($ticket->status, [TicketStatus::NEW, TicketStatus::PREPARING], true)
+                || $isReadyMadeChangedAfterDone($ticket))
             ->partition(fn (KitchenTicket $ticket): bool => $this->isReadyMadeTicketItems($ticket->items));
 
         return [
@@ -311,10 +340,48 @@ class KitchenDisplayController extends Controller
             'quick' => $readyMadeTickets->values(),
             'done' => $tickets
                 ->where('status', TicketStatus::READY)
+                ->reject($isReadyMadeChangedAfterDone)
                 ->filter(fn (KitchenTicket $ticket): bool => $this->isStillShownAsDone($ticket))
                 ->sortByDesc('ready_at')
                 ->values(),
         ];
+    }
+
+    /**
+     * M04-T06: món đã gửi bếp bị phục vụ đổi số lượng mà bếp chưa xác nhận.
+     */
+    public static function isQuantityChanged(KitchenTicketItem $ticketItem): bool
+    {
+        return $ticketItem->notified_quantity !== null
+            && (int) $ticketItem->notified_quantity !== (int) $ticketItem->orderItem->quantity;
+    }
+
+    private function hasQuantityChange(KitchenTicket $ticket): bool
+    {
+        return $ticket->items->contains(fn (KitchenTicketItem $ticketItem): bool => self::isQuantityChanged($ticketItem));
+    }
+
+    /**
+     * M04-T06: món đã gửi bếp nhưng bị phục vụ hủy, để hiện gạch ngang "Đã hủy" trên thẻ.
+     *
+     * @param  array{new: Collection<int, KitchenTicket>, preparing: Collection<int, KitchenTicket>, quick: Collection<int, KitchenTicket>, done: Collection<int, KitchenTicket>}  $columns
+     * @return SupportCollection<int, SupportCollection<int, KitchenTicketItem>>
+     */
+    private function cancelledItemsFor(array $columns): SupportCollection
+    {
+        $ticketIds = collect($columns)->except('done')->flatten(1)->pluck('id');
+
+        if ($ticketIds->isEmpty()) {
+            return collect();
+        }
+
+        return KitchenTicketItem::query()
+            ->with('orderItem')
+            ->whereIn('ticket_id', $ticketIds->all())
+            ->where('status', TicketItemStatus::CANCELLED)
+            ->orderBy('id')
+            ->get()
+            ->groupBy('ticket_id');
     }
 
     /**
@@ -409,7 +476,8 @@ class KitchenDisplayController extends Controller
         $previousStatus = $item->status;
         $now = now();
 
-        $item->fill(['status' => $status]);
+        // Bếp bấm chuyển trạng thái nghĩa là đã xem số lượng hiện tại (M04-T06).
+        $item->fill(['status' => $status, 'notified_quantity' => $item->orderItem->quantity]);
 
         if ($status === TicketItemStatus::PREPARING) {
             $item->started_at = $now;

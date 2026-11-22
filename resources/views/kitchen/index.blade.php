@@ -249,6 +249,12 @@
 
     <style>
         .kds-card-overdue { box-shadow: 0 0 0 2px rgb(185 28 28); }
+        /* M04-T06: thẻ có món vừa bị phục vụ sửa số lượng hoặc hủy */
+        .kds-card-changed { box-shadow: 0 0 0 3px rgb(245 158 11); animation: kds-changed 1.4s ease-in-out infinite; }
+        @keyframes kds-changed {
+            0%, 100% { box-shadow: 0 0 0 3px rgb(245 158 11); }
+            50% { box-shadow: 0 0 0 3px rgb(245 158 11 / 0.25); }
+        }
         .kds-chip-overdue { background-color: rgb(254 226 226) !important; color: rgb(153 27 27) !important; }
         .kds-card-new { animation: kds-flash 1.2s ease-in-out 3; }
         @keyframes kds-flash {

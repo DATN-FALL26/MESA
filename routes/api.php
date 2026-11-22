@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\Inventory\IngredientController;
+use App\Http\Controllers\Api\Inventory\MenuCostAnalysisController;
 use App\Http\Controllers\Api\Inventory\PurchaseOrderController;
 use App\Http\Controllers\Api\Inventory\RecipeController;
 use App\Http\Controllers\Api\Inventory\StockAdjustmentController;
@@ -40,7 +41,7 @@ Route::middleware(['web', 'auth', 'permission:table.view'])->group(function (): 
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('v1/inventory')->group(function () {
+Route::middleware('web')->prefix('v1/inventory')->group(function () {
     // ==========================================
     // 1. SỔ CÁI & TỒN KHO (CORE ENGINE)
     // ==========================================
@@ -56,9 +57,37 @@ Route::prefix('v1/inventory')->group(function () {
     Route::get('/warehouses/{warehouseId}/ingredients/{ingredientId}/stock', [StockLedgerController::class, 'getStockLevel'])
         ->name('api.inventory.stock.level');
 
+    // Bảng tổng hợp tồn kho & HSD theo chi nhánh
+    Route::get('/stock-overview', [StockLedgerController::class, 'stockOverview'])
+        ->name('api.inventory.stock.overview');
+
+    // Thống kê cảnh báo tồn kho và HSD
+    Route::get('/alerts/summary', [StockLedgerController::class, 'alertSummary'])
+        ->name('api.inventory.alerts.summary');
+
+    // Kích hoạt quét cảnh báo thủ công
+    Route::post('/alerts/scan', [StockLedgerController::class, 'scanAlerts'])
+        ->name('api.inventory.alerts.scan');
+
+    // Quản lý lô hàng & hạn sử dụng (Batches)
+    Route::get('/batches', [StockLedgerController::class, 'batches'])
+        ->name('api.inventory.batches.index');
+    Route::post('/batches', [StockLedgerController::class, 'storeBatch'])
+        ->name('api.inventory.batches.store');
+
     // Bóc tách BOM định lượng của món ăn theo size & multiplier
     Route::post('/recipes/explode', [StockLedgerController::class, 'explodeRecipe'])
         ->name('api.inventory.recipes.explode');
+
+    // ==========================================
+    // 1.1 PHÂN TÍCH GIÁ VỐN & LỢI NHUẬN MÓN ĂN (DISH COST & PROFIT ANALYSIS)
+    // ==========================================
+    Route::get('/cost-analysis/dishes', [MenuCostAnalysisController::class, 'index'])
+        ->name('api.inventory.cost-analysis.dishes');
+    Route::get('/cost-analysis/dishes/{id}', [MenuCostAnalysisController::class, 'show'])
+        ->name('api.inventory.cost-analysis.dish-detail');
+    Route::get('/cost-analysis/sales-profit', [MenuCostAnalysisController::class, 'salesProfitReport'])
+        ->name('api.inventory.cost-analysis.sales-profit');
 
     // ==========================================
     // 2. MASTER DATA: NGUYÊN VẬT LIỆU (INGREDIENTS)

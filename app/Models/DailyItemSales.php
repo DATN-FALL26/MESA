@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $menu_item_id
  * @property int $quantity
  * @property string $gross_revenue
+ * @property string $total_cogs
+ * @property string $gross_profit
  * @property CarbonInterface|null $created_at
  * @property CarbonInterface|null $updated_at
  * @property-read Branch $branch
@@ -36,6 +38,8 @@ class DailyItemSales extends Model
             'sales_date' => 'date',
             'quantity' => 'integer',
             'gross_revenue' => 'decimal:0',
+            'total_cogs' => 'decimal:2',
+            'gross_profit' => 'decimal:2',
         ];
     }
 

@@ -24,7 +24,6 @@ use App\Http\Controllers\OrderController;
 // use Symfony\Component\Routing\Router;
 
 
-
 Route::middleware(['auth', 'permission:dashboard.view'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/orders/{id}/detail', [DashboardController::class, 'orderDetail'])->name('dashboard.order-detail');

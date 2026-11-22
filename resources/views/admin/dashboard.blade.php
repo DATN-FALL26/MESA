@@ -3,8 +3,44 @@
 @section('heading', $title ?? 'Tổng quan Dashboard Kinh doanh')
 
 @section('content')
+@php
+    $recentItemsByOrder = collect();
+    if (
+        \Illuminate\Support\Facades\Schema::hasTable('order_items') &&
+        \Illuminate\Support\Facades\Schema::hasColumn('order_items', 'order_id') &&
+        !empty($donHangs)
+    ) {
+        $orderIds = collect($donHangs)->pluck('id')->filter()->values()->all();
+        if (!empty($orderIds)) {
+            $q = \Illuminate\Support\Facades\DB::table('order_items')
+                ->whereIn('order_items.order_id', $orderIds);
+
+            $qtyCol = \Illuminate\Support\Facades\Schema::hasColumn('order_items', 'quantity')
+                ? 'order_items.quantity'
+                : '1';
+
+            if (\Illuminate\Support\Facades\Schema::hasTable('menu_items') && \Illuminate\Support\Facades\Schema::hasColumn('order_items', 'menu_item_id')) {
+                $q->leftJoin('menu_items', 'order_items.menu_item_id', '=', 'menu_items.id');
+                $rows = $q->select(
+                    'order_items.order_id',
+                    \Illuminate\Support\Facades\DB::raw("COALESCE(menu_items.name, CONCAT('Món #', order_items.menu_item_id)) as item_name"),
+                    \Illuminate\Support\Facades\DB::raw($qtyCol . ' as qty')
+                )->get();
+            } else {
+                $rows = $q->select(
+                    'order_items.order_id',
+                    \Illuminate\Support\Facades\DB::raw("'Món ăn' as item_name"),
+                    \Illuminate\Support\Facades\DB::raw($qtyCol . ' as qty')
+                )->get();
+            }
+
+            $recentItemsByOrder = $rows->groupBy('order_id');
+        }
+    }
+@endphp
+
 <div class="space-y-6">
-    {{-- Header & Bộ lọc --}}
+    {{-- Header & Bộ lọc chi nhánh --}}
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
             <h2 class="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">Tổng Quan Kinh Doanh</h2>
@@ -18,6 +54,7 @@
             </button>
 
             <form method="GET" action="{{ route('admin.dashboard') }}" class="flex flex-wrap items-center gap-3">
+                <input type="hidden" name="filter" value="{{ $filter ?? 'week' }}">
                 <select name="branch_id" onchange="this.form.submit()"
                         class="rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                     @foreach($branches ?? [] as $branch)
@@ -29,13 +66,6 @@
                             {{ $bName }}
                         </option>
                     @endforeach
-                </select>
-
-                <select name="filter" onchange="this.form.submit()"
-                        class="rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                    <option value="week" {{ (($filter ?? 'week') == 'week') ? 'selected' : '' }}>Theo Tuần</option>
-                    <option value="month" {{ (($filter ?? 'week') == 'month') ? 'selected' : '' }}>Theo Tháng</option>
-                    <option value="year" {{ (($filter ?? 'week') == 'year') ? 'selected' : '' }}>Theo Năm</option>
                 </select>
             </form>
         </div>
@@ -96,8 +126,22 @@
     @endphp
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">{{ $revenueHeading }}</h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">{{ $revenueDesc }}</p>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">{{ $revenueHeading }}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ $revenueDesc }}</p>
+                </div>
+
+                <form method="GET" action="{{ route('admin.dashboard') }}" class="shrink-0">
+                    <input type="hidden" name="branch_id" value="{{ $branchId ?? 1 }}">
+                    <select name="filter" onchange="this.form.submit()"
+                            class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                        <option value="week" {{ (($filter ?? 'week') == 'week') ? 'selected' : '' }}>Theo Tuần</option>
+                        <option value="month" {{ (($filter ?? 'week') == 'month') ? 'selected' : '' }}>Theo Tháng</option>
+                        <option value="year" {{ (($filter ?? 'week') == 'year') ? 'selected' : '' }}>Theo Năm</option>
+                    </select>
+                </form>
+            </div>
             <div class="relative h-72 w-full">
                 <canvas id="revenueChart"></canvas>
             </div>
@@ -126,12 +170,12 @@
         </div>
     </div>
 
-    {{-- Tầng 3: Đơn hàng gần đây (1 tầng riêng full-width) --}}
+    {{-- Tầng 3: Đơn hàng gần đây & Chi tiết đơn (full-width) --}}
     <section class="w-full rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h3 class="text-base font-bold text-slate-900 dark:text-white">Đơn Hàng Gần Đây</h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Bấm vào từng đơn để xem chi tiết món và thanh toán</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Chi tiết món, thời gian và thanh toán — bấm vào từng đơn để xem đầy đủ</p>
             </div>
         </div>
 
@@ -142,16 +186,41 @@
                     $dhCode = data_get($dh, 'order_code') ?: data_get($dh, 'code') ?: ('#' . $dhId);
                     $dhAmount = (float) (data_get($dh, 'total_amount') ?? data_get($dh, 'grand_total') ?? data_get($dh, 'amount') ?? 0);
                     $dhStatus = data_get($dh, 'status', '');
+                    $dhPayment = data_get($dh, 'payment_method', '');
+                    $dhCreated = data_get($dh, 'created_at', '');
+                    $dhItems = $recentItemsByOrder->get($dhId, collect());
                 @endphp
                 <button type="button"
                         onclick="openOrderDetail({{ $dhId }})"
-                        class="w-full text-left flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-indigo-50/60 dark:bg-slate-800/50 dark:hover:bg-slate-800 border border-slate-100 hover:border-indigo-200 dark:border-slate-800 transition">
-                    <div>
-                        <span class="font-bold text-sm text-slate-800 dark:text-white">Đơn {{ $dhCode }}</span>
-                        <div class="text-xs text-slate-500 mt-0.5">{{ $dhStatus !== '' ? $dhStatus : 'Đã ghi nhận' }}</div>
+                        class="w-full text-left flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between p-4 rounded-xl bg-slate-50 hover:bg-indigo-50/60 dark:bg-slate-800/50 dark:hover:bg-slate-800 border border-slate-100 hover:border-indigo-200 dark:border-slate-800 transition">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-bold text-sm text-slate-800 dark:text-white">Đơn {{ $dhCode }}</span>
+                            <span class="rounded-md bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 border border-slate-200 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300">
+                                {{ $dhStatus !== '' ? $dhStatus : 'Đã ghi nhận' }}
+                            </span>
+                            @if($dhPayment !== '')
+                                <span class="text-[11px] text-slate-500 dark:text-slate-400">• TT: {{ $dhPayment }}</span>
+                            @endif
+                            @if($dhCreated !== '')
+                                <span class="text-[11px] text-slate-400">• {{ $dhCreated }}</span>
+                            @endif
+                        </div>
+
+                        @if($dhItems->isNotEmpty())
+                            <div class="mt-1.5 text-xs text-slate-600 dark:text-slate-300">
+                                <span class="font-medium text-slate-500 dark:text-slate-400">Món:</span>
+                                @foreach($dhItems as $idx => $rowItem)
+                                    <span>{{ $rowItem->item_name }} (x{{ (int) $rowItem->qty }})</span>{{ !$loop->last ? ', ' : '' }}
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="mt-1 text-xs text-slate-400">Bấm để xem chi tiết món của đơn hàng</div>
+                        @endif
                     </div>
-                    <div class="flex items-center gap-3">
-                        <span class="font-bold text-xs text-indigo-600 dark:text-indigo-400">{{ number_format($dhAmount, 0, ',', '.') }} đ</span>
+
+                    <div class="flex items-center gap-3 shrink-0">
+                        <span class="font-bold text-sm text-indigo-600 dark:text-indigo-400">{{ number_format($dhAmount, 0, ',', '.') }} đ</span>
                         <span class="text-xs font-semibold text-slate-400">Chi tiết →</span>
                     </div>
                 </button>
