@@ -9,6 +9,7 @@ use App\Http\Controllers\table\Concerns\ResolvesTableBranch;
 use App\Models\Area;
 use App\Models\AuditLog;
 use App\Models\DiningTable;
+use App\Models\Order;
 use App\Models\SessionTable;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -52,6 +53,62 @@ class TableController extends BaseController
         $openSessionsByTableId = $openSessionTables->mapWithKeys(
             fn (SessionTable $sessionTable) => [$sessionTable->table_id => $sessionTable->session],
         );
+        $ordersBySessionId = Order::query()
+            ->with(['items', 'payments'])
+            ->whereIn('session_id', $openSessionsByTableId->values()->pluck('id'))
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->get()
+            ->mapWithKeys(function (Order $order): array {
+                $items = $order->items
+                    ->whereNotNull('item_name_snapshot')
+                    ->reject(function ($item): bool {
+                        $status = $item->status instanceof \App\Enums\OrderItemStatus
+                            ? $item->status->value
+                            : (string) $item->status;
+
+                        return $status === 'cancelled';
+                    })
+                    ->map(fn ($item) => [
+                        'name' => $item->item_name_snapshot,
+                        'variant' => $item->variant_name_snapshot,
+                        'quantity' => (int) $item->quantity,
+                        'line_total' => (float) $item->line_total,
+                        'status' => $item->status instanceof \App\Enums\OrderItemStatus
+                            ? $item->status->value
+                            : (string) $item->status,
+                        'note' => $item->note,
+                    ])
+                    ->values();
+
+                return [$order->session_id => [
+                    'id' => $order->id,
+                    'number' => $order->order_no,
+                    'status' => $order->status instanceof \App\Enums\OrderStatus
+                        ? $order->status->value
+                        : (string) $order->status,
+                    'total' => (float) $order->total_amount,
+                    'paid' => (float) $order->payments
+                        ->where('status', 'success')
+                        ->sum('amount'),
+                    'pending_payment' => $order->payments
+                        ->where('status', 'pending')
+                        ->map(fn ($payment) => [
+                            'id' => $payment->id,
+                            'method' => $payment->method instanceof \App\Enums\PaymentMethod
+                                ? $payment->method->value
+                                : (string) $payment->method,
+                            'amount' => (float) $payment->amount,
+                        ])
+                        ->values()
+                        ->first(),
+                    'items' => $items,
+                ]];
+            });
+        $tableOrderSummariesByTableId = [];
+        foreach ($openSessionsByTableId as $tableId => $session) {
+            $tableOrderSummariesByTableId[$tableId] = $ordersBySessionId->get($session->id);
+        }
+        $tableOrderSummariesByTableId = collect($tableOrderSummariesByTableId);
         $transferLogs = AuditLog::query()
             ->where('branch_id', $currentBranchId)
             ->where('entity_type', 'dining_session')
@@ -101,6 +158,7 @@ class TableController extends BaseController
             'branches',
             'currentBranchId',
             'openSessionsByTableId',
+            'tableOrderSummariesByTableId',
             'tableTransferHistoryByTableId',
         ));
     }
@@ -219,6 +277,8 @@ class TableController extends BaseController
                     'id' => $openSession->getKey(),
                     'guest_count' => $openSession->guest_count,
                     'employee_name' => $openSession->openedByUser->full_name,
+                    'opened_by' => $openSession->opened_by,
+                    'note' => $openSession->note,
                 ]);
             } else {
                 $table->setAttribute('open_session', null);

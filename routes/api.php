@@ -24,8 +24,14 @@ Route::middleware(['web', 'auth', 'permission:table.view'])->group(function (): 
     });
 
     Route::post('/dining-sessions', [DiningSessionController::class, 'store'])->name('api.dining-sessions.store');
+    Route::put('/dining-sessions/{sessionId}', [DiningSessionController::class, 'update'])
+        ->name('api.dining-sessions.update');
     Route::post('/tables/{tableId}/dining-session/close', [DiningSessionController::class, 'closeByTable'])
         ->name('api.tables.dining-session.close');
+    Route::post('/tables/{tableId}/dining-session/merge', [DiningSessionController::class, 'mergeTables'])
+        ->name('api.tables.dining-session.merge');
+    Route::post('/tables/{tableId}/cleaned', [DiningSessionController::class, 'markCleaned'])
+        ->name('api.tables.cleaned');
     Route::post('/tables/{tableId}/dining-session/transfer', [DiningSessionController::class, 'transferTable'])
         ->name('api.tables.dining-session.transfer');
     Route::get('/dining-sessions/employees', [DiningSessionController::class, 'employees'])

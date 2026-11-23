@@ -235,6 +235,22 @@ class PaymentTest extends TestCase
         $this->assertSame(1, Payment::query()->where('order_id', $order->id)->where('status', PaymentStatus::PENDING)->count());
     }
 
+    public function test_waiter_can_cancel_pending_qr(): void
+    {
+        $order = $this->createSentOrder($this->branch, 'B05', [['Phở bò tái', StationCode::PHO]]);
+        $this->actingAs($this->waiter)->post(route('payments.start', $order), ['method' => 'qr']);
+        $payment = Payment::query()->where('order_id', $order->id)->sole();
+
+        $this->actingAs($this->waiter)
+            ->postJson(route('payments.qr.cancel', $payment))
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $payment->refresh();
+        $this->assertSame(PaymentStatus::FAILED, $payment->status);
+        $this->assertSame('Nhân viên hủy giao dịch QR', $payment->gateway_payload['failure_reason']);
+    }
+
     public function test_failed_qr_then_switch_to_cash(): void
     {
         $order = $this->createSentOrder($this->branch, 'B05', [['Phở bò tái', StationCode::PHO]]);

@@ -386,5 +386,6 @@ Route::middleware('auth')->prefix('payments')->name('payments.')->group(function
         Route::get('/{payment}/qr', [PaymentController::class, 'qr'])->name('qr');
         Route::post('/{payment}/qr/confirm', [PaymentController::class, 'confirmQr'])->name('qr.confirm');
         Route::post('/{payment}/qr/fail', [PaymentController::class, 'failQr'])->name('qr.fail');
+        Route::post('/{payment}/qr/cancel', [PaymentController::class, 'cancelQr'])->name('qr.cancel');
     });
 });

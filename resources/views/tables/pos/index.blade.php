@@ -142,6 +142,7 @@
                                         'table' => $table,
                                         'selected' => $selectedTable?->id === $table->id,
                                         'openSession' => $openSessionsByTableId->get($table->id),
+                                        'orderSummary' => $tableOrderSummariesByTableId->get($table->id),
                                         'transferHistory' => $tableTransferHistoryByTableId->get($table->id, collect()),
                                     ])
                                 @endforeach
@@ -175,41 +176,74 @@
                     </div>
 
                     <div data-table-detail @class(['hidden' => !$selectedTable])>
-                        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                            <div class="flex items-start justify-between gap-3">
+                        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                            <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
                                 <div>
-                                    <p class="text-xs font-medium text-slate-500">Mã bàn</p>
-                                    <h3 data-detail-code class="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{{ $selectedTable?->code ?? '—' }}</h3>
+                                    <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Chi tiết bàn đang chọn</p>
+                                    <h3 data-detail-code class="mt-1 text-xl font-semibold tracking-tight text-slate-950">{{ $selectedTable?->code ?? '—' }}</h3>
                                 </div>
                                 <span data-detail-status class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold">
                                     <span data-detail-status-label>{{ $statusLabels[$selectedTableStatus] ?? 'Chưa chọn' }}</span>
                                 </span>
                             </div>
-                            <div data-detail-session class="{{ $openSessionsByTableId->has($selectedTable?->id ?? 0) ? '' : 'hidden ' }}mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3">
+                            <div class="p-4">
+                            <div data-detail-session class="{{ $openSessionsByTableId->has($selectedTable?->id ?? 0) ? '' : 'hidden ' }}rounded-xl border border-emerald-200 bg-emerald-50 p-3.5">
                                 <p class="text-sm font-semibold text-emerald-950">Phiên #<span data-detail-session-id>{{ $openSessionsByTableId->get($selectedTable?->id ?? 0)?->id }}</span></p>
                                 <p class="mt-1 text-xs text-emerald-900"><span data-detail-guest-count>{{ $openSessionsByTableId->get($selectedTable?->id ?? 0)?->guest_count }}</span> khách · Nhân viên: <span data-detail-employee>{{ $openSessionsByTableId->get($selectedTable?->id ?? 0)?->openedByUser?->full_name ?? '—' }}</span></p>
-                                <button
-    type="button"
-    data-order-session
-    class="mt-3 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
->
-    Gọi món
-</button>
-                                <button type="button" data-transfer-table class="mt-3 w-full rounded-lg border border-emerald-800 px-3 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-100">Chuyển sang bàn khác</button>
-                                <button type="button" data-close-session class="mt-3 w-full rounded-lg bg-emerald-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-950 disabled:cursor-wait disabled:opacity-60">Đóng phiên, trả bàn trống</button>
+                                <button type="button" data-order-session class="mt-3 w-full rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700">Gọi món</button>
+                                <div class="mt-2 grid grid-cols-2 gap-2">
+                                    <button type="button" data-update-session class="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-800">Cập nhật</button>
+                                    <button type="button" data-merge-session class="rounded-lg border border-sky-300 bg-white px-2.5 py-2 text-xs font-semibold text-sky-900">Gộp bàn</button>
+                                    <button type="button" data-transfer-table class="rounded-lg border border-emerald-300 bg-white px-2.5 py-2 text-xs font-semibold text-emerald-950">Chuyển bàn</button>
+                                    <button type="button" data-close-session class="rounded-lg bg-slate-800 px-2.5 py-2 text-xs font-semibold text-white">Đóng phiên</button>
+                                </div>
                                 <p data-session-error class="mt-2 hidden text-xs font-medium text-rose-700" role="alert"></p>
                             </div>
-                            <div data-transfer-history class="mt-4 border-t border-slate-200 pt-3">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-800">Lịch sử chuyển bàn gần đây</p>
-                                <ul data-transfer-history-list class="mt-2 space-y-2">
-                                    @foreach ($tableTransferHistoryByTableId->get($selectedTable?->id, collect()) as $history)
-                                        <li class="rounded-lg bg-slate-50 px-2.5 py-2 text-xs text-slate-700">
-                                            <span class="font-semibold">{{ $history['from'] }} → {{ $history['to'] }}</span>
-                                            <span class="mt-1 block">{{ $history['actor'] }} · {{ $history['at'] }}</span>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                                <p data-transfer-history-empty class="{{ $tableTransferHistoryByTableId->get($selectedTable?->id, collect())->isEmpty() ? '' : 'hidden ' }}mt-2 text-xs text-slate-500">Chưa có lịch sử chuyển bàn.</p>
+                            <div data-empty-session class="{{ $openSessionsByTableId->has($selectedTable?->id ?? 0) ? 'hidden ' : '' }}">
+                                <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3.5">
+                                    <p class="text-sm font-semibold text-slate-900">Bàn <span data-empty-code>{{ $selectedTable?->code ?? '—' }}</span> đang sẵn sàng</p>
+                                    <p class="mt-1 text-xs text-slate-500">Sức chứa tiêu chuẩn: <span data-empty-seats>{{ $selectedTable?->seats ?? '—' }}</span> chỗ</p>
+                                    <button type="button" data-open-table class="{{ $selectedTable && $selectedTable->status === \App\Enums\TableStatus::AVAILABLE ? '' : 'hidden ' }}mt-3 w-full rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white">Mở phiên phục vụ mới</button>
+                                </div>
+                            </div>
+                            <div data-clean-session class="{{ $selectedTable && $selectedTable->status === \App\Enums\TableStatus::CLEANING ? '' : 'hidden ' }}rounded-xl border border-amber-200 bg-amber-50 p-4 text-center">
+                                <p class="text-sm font-semibold text-slate-900">Bàn cần dọn</p>
+                                <p class="mt-1 text-xs text-slate-500">Xác nhận khi nhân viên đã dọn bàn xong.</p>
+                                <button type="button" data-clean-table class="mt-3 w-full rounded-lg bg-amber-600 px-3 py-2.5 text-sm font-semibold text-white">Xác nhận đã dọn xong</button>
+                            </div>
+                            <div data-order-summary class="{{ $openSessionsByTableId->has($selectedTable?->id ?? 0) ? '' : 'hidden ' }}mt-4 border-t border-slate-200 pt-3">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-800">Món đã gọi</p>
+                                <div data-order-summary-content class="mt-2 space-y-2">
+                                    @php
+                                        $selectedOrder = $tableOrderSummariesByTableId->get($selectedTable?->id);
+                                    @endphp
+                                    @if ($selectedOrder)
+                                        @php
+                                            $remaining = max(0, (float) $selectedOrder['total'] - (float) $selectedOrder['paid']);
+                                        @endphp
+                                        <p class="text-xs text-slate-500">{{ $selectedOrder['number'] }}</p>
+                                        <p class="text-xs font-semibold {{ $remaining === 0.0 ? 'text-emerald-700' : 'text-rose-700' }}">
+                                            {{ $remaining === 0.0 ? 'Đã thanh toán đủ' : 'Còn phải trả '.number_format($remaining, 0, ',', '.').'đ' }}
+                                        </p>
+                                        <p class="text-xs text-slate-500">Tổng order: {{ number_format($selectedOrder['total'], 0, ',', '.') }}đ</p>
+                                        @forelse ($selectedOrder['items'] as $item)
+                                            <div class="rounded-lg bg-slate-50 px-2.5 py-2 text-xs text-slate-700">
+                                                <span class="font-semibold">{{ $item['quantity'] }}x {{ $item['name'] }}</span>
+                                                @if ($item['variant'])
+                                                    <span class="text-slate-500"> · {{ $item['variant'] }}</span>
+                                                @endif
+                                                <span class="float-right font-medium">{{ number_format($item['line_total'], 0, ',', '.') }}đ</span>
+                                                @if ($item['note'])
+                                                    <span class="mt-1 block text-slate-500">Ghi chú: {{ $item['note'] }}</span>
+                                                @endif
+                                            </div>
+                                        @empty
+                                            <p class="text-xs text-slate-500">Chưa có món nào trong order.</p>
+                                        @endforelse
+                                    @else
+                                        <p class="text-xs text-slate-500">Phiên chưa có order.</p>
+                                    @endif
+                                </div>
                             </div>
                             <div class="mt-5 divide-y divide-slate-200 border-t border-slate-200">
                                 <div class="flex items-center justify-between gap-3 py-3 text-sm">
@@ -225,11 +259,8 @@
                                     <span data-detail-status-text class="font-medium text-slate-800">{{ $statusLabels[$selectedTableStatus] ?? '—' }}</span>
                                 </div>
                             </div>
-                            <div class="mt-2 grid grid-cols-2 gap-2">
-                                <button type="button" data-open-table class="{{ $selectedTable && $selectedTable->status === \App\Enums\TableStatus::AVAILABLE ? '' : 'hidden ' }}rounded-xl bg-emerald-800 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-900">Mở phiên</button>
                             </div>
                         </div>
-                        <p class="mt-3 text-xs leading-5 text-slate-500">Bàn đang sử dụng hoặc đã đặt không thể mở phiên mới.</p>
                     </div>
 
                     <div data-detail-empty @class(['hidden' => (bool) $selectedTable]) class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
@@ -243,6 +274,9 @@
 
     @include('tables.pos.partials.open-session-modal')
     @include('tables.pos.partials.transfer-session-modal')
+    @include('tables.pos.partials.update-session-modal')
+    @include('tables.pos.partials.merge-session-modal')
+    @include('tables.pos.partials.close-session-modal')
 
     @push('scripts')
         <script>
@@ -259,6 +293,9 @@
                 const detailEmpty = manager.querySelector('[data-detail-empty]');
                 const openModal = document.querySelector('[data-modal="open-session"]');
                 const transferModal = document.querySelector('[data-modal="transfer-session"]');
+                const updateModal = document.querySelector('[data-modal="update-session"]');
+                const mergeModal = document.querySelector('[data-modal="merge-session"]');
+                const closeModal = document.querySelector('[data-modal="close-session"]');
                 const openSessionForm = openModal.querySelector('[data-open-session-form]');
                 const transferForm = transferModal.querySelector('[data-transfer-form]');
                 const transferTarget = transferForm.elements.namedItem('target_table_id');
@@ -294,7 +331,7 @@
                     if (!modal) return;
                     modal.classList.add('hidden');
                     modal.classList.remove('flex');
-                    if ([openModal, transferModal].every((item) => item.classList.contains('hidden'))) {
+                    if ([openModal, transferModal, updateModal, mergeModal, closeModal].every((item) => item.classList.contains('hidden'))) {
                         document.body.classList.remove('overflow-hidden');
                     }
                 };
@@ -369,26 +406,66 @@
                     badge.className = `inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusBadgeClasses(card.dataset.status).join(' ')}`;
                     const hasOpenSession = Boolean(card.dataset.sessionId);
                     detail.querySelector('[data-detail-session]').classList.toggle('hidden', !hasOpenSession);
+                    detail.querySelector('[data-empty-session]').classList.toggle('hidden', card.dataset.status !== 'available');
+                    detail.querySelector('[data-clean-session]').classList.toggle('hidden', card.dataset.status !== 'cleaning');
+                    detail.querySelector('[data-empty-code]').textContent = card.dataset.code;
+                    detail.querySelector('[data-empty-seats]').textContent = card.dataset.seats;
                     detail.querySelector('[data-detail-session-id]').textContent = card.dataset.sessionId;
                     detail.querySelector('[data-detail-guest-count]').textContent = card.dataset.sessionGuestCount;
                     detail.querySelector('[data-detail-employee]').textContent = card.dataset.sessionEmployee || '—';
-                    const transferHistory = JSON.parse(card.dataset.tableTransferHistory || '[]');
-                    const historyList = detail.querySelector('[data-transfer-history-list]');
-                    const historyEmpty = detail.querySelector('[data-transfer-history-empty]');
-                    historyList.replaceChildren();
-                    transferHistory.forEach((entry) => {
-                        const item = document.createElement('li');
-                        item.className = 'rounded-lg bg-white/80 px-2.5 py-2 text-xs text-slate-700';
-                        const tables = document.createElement('span');
-                        tables.className = 'font-semibold';
-                        tables.textContent = `${entry.from} → ${entry.to}`;
-                        const actorAndTime = document.createElement('span');
-                        actorAndTime.className = 'mt-1 block';
-                        actorAndTime.textContent = `${entry.actor} · ${entry.at}`;
-                        item.append(tables, actorAndTime);
-                        historyList.append(item);
-                    });
-                    historyEmpty.classList.toggle('hidden', transferHistory.length > 0);
+                    const orderSummaryContent = detail.querySelector('[data-order-summary-content]');
+                    const orderSummary = JSON.parse(card.dataset.orderSummary || 'null');
+                    const orderSummaryBlock = detail.querySelector('[data-order-summary]');
+                    orderSummaryBlock.classList.toggle('hidden', !hasOpenSession);
+                    if (orderSummaryContent) {
+                        orderSummaryContent.replaceChildren();
+                        if (!orderSummary) {
+                            const empty = document.createElement('p');
+                            empty.className = 'text-xs text-slate-500';
+                            empty.textContent = 'Phiên chưa có order.';
+                            orderSummaryContent.append(empty);
+                        } else {
+                            const orderInfo = document.createElement('p');
+                            orderInfo.className = 'text-xs text-slate-500';
+                            orderInfo.textContent = orderSummary.number;
+                            orderSummaryContent.append(orderInfo);
+                            const remaining = Math.max(0, orderSummary.total - orderSummary.paid);
+                            const paymentStatus = document.createElement('p');
+                            paymentStatus.className = `text-xs font-semibold ${remaining === 0 ? 'text-emerald-700' : 'text-rose-700'}`;
+                            paymentStatus.textContent = remaining === 0
+                                ? 'Đã thanh toán đủ'
+                                : `Còn phải trả ${new Intl.NumberFormat('vi-VN').format(remaining)}đ`;
+                            orderSummaryContent.append(paymentStatus);
+                            const total = document.createElement('p');
+                            total.className = 'text-xs text-slate-500';
+                            total.textContent = `Tổng order: ${new Intl.NumberFormat('vi-VN').format(orderSummary.total)}đ`;
+                            orderSummaryContent.append(total);
+                            if (orderSummary.items.length === 0) {
+                                const empty = document.createElement('p');
+                                empty.className = 'text-xs text-slate-500';
+                                empty.textContent = 'Chưa có món nào trong order.';
+                                orderSummaryContent.append(empty);
+                            }
+                            orderSummary.items.forEach((entry) => {
+                                const item = document.createElement('div');
+                                item.className = 'rounded-lg bg-slate-50 px-2.5 py-2 text-xs text-slate-700';
+                                const name = document.createElement('span');
+                                name.className = 'font-semibold';
+                                name.textContent = `${entry.quantity}x ${entry.name}${entry.variant ? ` · ${entry.variant}` : ''}`;
+                                const lineTotal = document.createElement('span');
+                                lineTotal.className = 'float-right font-medium';
+                                lineTotal.textContent = `${new Intl.NumberFormat('vi-VN').format(entry.line_total)}đ`;
+                                item.append(name, lineTotal);
+                                if (entry.note) {
+                                    const note = document.createElement('span');
+                                    note.className = 'mt-1 block text-slate-500';
+                                    note.textContent = `Ghi chú: ${entry.note}`;
+                                    item.append(note);
+                                }
+                                orderSummaryContent.append(item);
+                            });
+                        }
+                    }
                     detail.querySelector('[data-open-table]').classList.toggle('hidden', card.dataset.status !== 'available');
                 };
 
@@ -425,7 +502,9 @@
 
                     if (!response.ok) {
                         const validationMessage = payload.errors ? Object.values(payload.errors).flat().join(' ') : '';
-                        throw new Error(validationMessage || payload.message || `Yêu cầu không thành công (HTTP ${response.status}).`);
+                        const error = new Error(validationMessage || payload.message || `Yêu cầu không thành công (HTTP ${response.status}).`);
+                        error.status = response.status;
+                        throw error;
                     }
                     return payload;
                 };
@@ -459,13 +538,42 @@
                     transferForm.reset();
                     setError(transferModal.querySelector('[data-transfer-error]'));
                     transferModal.querySelector('[data-transfer-title]').textContent = `Chuyển phiên #${card.dataset.sessionId} từ bàn ${card.dataset.code}`;
-                    transferTarget.replaceChildren(new Option('Chọn bàn đích', ''));
+                    transferTarget.value = '';
+                    transferModal.querySelector('[data-transfer-source-code]').textContent = card.dataset.code;
+                    transferModal.querySelector('[data-transfer-source-info]').textContent = `${card.dataset.seats} chỗ · ${card.dataset.sessionGuestCount || 0} khách`;
+                    transferModal.querySelector('[data-transfer-target-placeholder]').textContent = 'Chưa chọn';
+                    transferModal.querySelector('[data-transfer-target-card]').className = 'rounded-xl border border-dashed border-slate-300 bg-slate-100 p-3';
                     const availableTables = cards.filter((item) => item !== card && item.dataset.status === 'available');
-                    availableTables.forEach((table) => {
-                        transferTarget.append(new Option(
-                            `${table.dataset.code} · ${table.dataset.seats} chỗ · ${table.dataset.areaName}`,
-                            table.dataset.tableId,
-                        ));
+                    const grid = transferModal.querySelector('[data-transfer-target]');
+                    grid.replaceChildren();
+                    const grouped = availableTables.reduce((groups, table) => {
+                        (groups[table.dataset.areaName] ||= []).push(table);
+                        return groups;
+                    }, {});
+                    Object.entries(grouped).forEach(([areaName, tables]) => {
+                        const section = document.createElement('div');
+                        section.className = 'col-span-2 rounded-xl border border-slate-200 bg-white p-2.5 sm:col-span-3 lg:col-span-4';
+                        section.innerHTML = `<p class="mb-2 text-xs font-bold text-slate-700">${areaName} · ${tables.length} bàn trống</p>`;
+                        const tableGrid = document.createElement('div');
+                        tableGrid.className = 'grid grid-cols-2 gap-2 sm:grid-cols-3';
+                        tables.forEach((table) => {
+                            const button = document.createElement('button');
+                            button.type = 'button';
+                            button.dataset.targetTableId = table.dataset.tableId;
+                            button.className = 'rounded-xl border border-slate-200 bg-slate-50 p-3 text-left';
+                            button.innerHTML = `<span class="block text-sm font-bold text-slate-950">${table.dataset.code}</span><span class="mt-1 block text-xs text-slate-500">${table.dataset.seats} chỗ</span>`;
+                            button.addEventListener('click', () => {
+                                transferTarget.value = table.dataset.tableId;
+                                grid.querySelectorAll('[data-target-table-id]').forEach((item) => item.className = 'rounded-xl border border-slate-200 bg-slate-50 p-3 text-left');
+                                button.className = 'rounded-xl border-2 border-orange-400 bg-orange-50 p-3 text-left';
+                                transferModal.querySelector('[data-transfer-target-card]').className = 'rounded-xl border-2 border-orange-400 bg-orange-50 p-3';
+                                transferModal.querySelector('[data-transfer-target-placeholder]').textContent = `${table.dataset.code} · ${table.dataset.seats} chỗ`;
+                                transferModal.querySelector('[data-transfer-submit]').disabled = false;
+                            });
+                            tableGrid.append(button);
+                        });
+                        section.append(tableGrid);
+                        grid.append(section);
                     });
                     transferModal.querySelector('[data-transfer-no-target]').classList.toggle('hidden', availableTables.length > 0);
                     transferModal.querySelector('[data-transfer-submit]').disabled = availableTables.length === 0;
@@ -493,6 +601,20 @@
                 });
 
                 manager.querySelector('[data-open-table]')?.addEventListener('click', () => openSessionForTable(selectedCard));
+                detail.querySelector('[data-clean-table]')?.addEventListener('click', async () => {
+                    if (!selectedCard || selectedCard.dataset.status !== 'cleaning') return;
+                    if (!window.confirm(`Xác nhận bàn ${selectedCard.dataset.code} đã dọn xong?`)) return;
+                    try {
+                        const response = await fetch(`/api/tables/${selectedCard.dataset.tableId}/cleaned`, {
+                            method: 'POST',
+                            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                        });
+                        await readJson(response);
+                        window.location.reload();
+                    } catch (error) {
+                        setError(detail.querySelector('[data-session-error]'), error.message);
+                    }
+                });
                 detail.querySelector('[data-order-session]')?.addEventListener('click', () => {
     if (!selectedCard?.dataset.sessionId) return;
 
@@ -501,21 +623,176 @@
                 detail.querySelector('[data-transfer-table]').addEventListener('click', () => openTransferForTable(selectedCard));
                 detail.querySelector('[data-close-session]').addEventListener('click', async (event) => {
                     if (!selectedCard?.dataset.sessionId) return;
-                    if (!window.confirm(`Đóng phiên #${selectedCard.dataset.sessionId} và trả bàn ${selectedCard.dataset.code} về trạng thái Trống?`)) return;
-                    const button = event.currentTarget;
+                    closeModal.querySelector('[data-close-title]').textContent = `Phiên #${selectedCard.dataset.sessionId} · Bàn ${selectedCard.dataset.code}`;
+                    closeModal.querySelector('[data-close-session-form]').reset();
+                    setError(closeModal.querySelector('[data-close-error]'));
+                    showModal(closeModal);
+                });
+                closeModal.querySelector('[data-close-session-form]').addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    const button = closeModal.querySelector('[data-close-submit]');
                     button.disabled = true;
-                    setError(detail.querySelector('[data-session-error]'));
                     try {
                         const response = await fetch(`/api/tables/${selectedCard.dataset.tableId}/dining-session/close`, {
                             method: 'POST',
-                            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                            headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                            body: JSON.stringify({ reason: 'Khách đã thanh toán và rời bàn' }),
                         });
                         await readJson(response);
                         window.location.reload();
                     } catch (error) {
-                        setError(detail.querySelector('[data-session-error]'), error.message);
+                        setError(closeModal.querySelector('[data-close-error]'), error.message);
                     } finally {
                         button.disabled = false;
+                    }
+                });
+
+                detail.querySelector('[data-update-session]').addEventListener('click', async () => {
+                    if (!selectedCard?.dataset.sessionId) return;
+                    const form = updateModal.querySelector('[data-update-session-form]');
+                    form.reset();
+                    updateModal.querySelector('[data-update-title]').textContent = `Phiên #${selectedCard.dataset.sessionId} · Bàn ${selectedCard.dataset.code}`;
+                    form.elements.namedItem('guest_count').value = selectedCard.dataset.sessionGuestCount || 1;
+                    form.elements.namedItem('note').value = selectedCard.dataset.sessionNote || '';
+                    const employeeSelect = form.elements.namedItem('opened_by');
+                    employeeSelect.replaceChildren();
+                    try {
+                        const response = await fetch('/api/dining-sessions/employees', { headers: { Accept: 'application/json' } });
+                        const payload = await readJson(response);
+                        payload.data.forEach((employee) => employeeSelect.append(new Option(employee.full_name, employee.id)));
+                        if (selectedCard.dataset.sessionOpenedBy) employeeSelect.value = selectedCard.dataset.sessionOpenedBy;
+                    } catch (error) {
+                        setError(updateModal.querySelector('[data-update-error]'), error.message);
+                    }
+                    showModal(updateModal);
+                });
+                updateModal.querySelector('[data-update-session-form]').addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    if (!selectedCard?.dataset.sessionId) return;
+                    const form = event.currentTarget;
+                    const button = updateModal.querySelector('[data-update-submit]');
+                    button.disabled = true;
+                    setError(updateModal.querySelector('[data-update-error]'));
+                    const submit = async (allowOvercapacity = false) => {
+                        const response = await fetch(`/api/dining-sessions/${selectedCard.dataset.sessionId}`, {
+                            method: 'PUT',
+                            headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                            body: JSON.stringify({
+                                guest_count: Number(form.elements.namedItem('guest_count').value),
+                                opened_by: Number(form.elements.namedItem('opened_by').value) || null,
+                                note: form.elements.namedItem('note').value,
+                                allow_overcapacity: allowOvercapacity,
+                            }),
+                        });
+                        return readJson(response);
+                    };
+                    try {
+                        try {
+                            await submit(false);
+                        } catch (error) {
+                            if (error.status === 422 && window.confirm(error.message + ' Bạn có muốn tiếp tục vượt sức chứa?')) {
+                                await submit(true);
+                            } else {
+                                throw error;
+                            }
+                        }
+                        window.location.reload();
+                    } catch (error) {
+                        setError(updateModal.querySelector('[data-update-error]'), error.message);
+                    } finally {
+                        button.disabled = false;
+                    }
+                });
+
+                detail.querySelector('[data-merge-session]').addEventListener('click', () => {
+                    if (!selectedCard?.dataset.sessionId) return;
+                    const target = mergeModal.querySelector('[data-merge-target]');
+                    target.replaceChildren();
+                    const availableTables = cards.filter((item) => item !== selectedCard && item.dataset.status === 'available');
+                    const grouped = availableTables.reduce((groups, table) => {
+                        (groups[table.dataset.areaName] ||= []).push(table);
+                        return groups;
+                    }, {});
+                    Object.entries(grouped).forEach(([areaName, tables]) => {
+                        const section = document.createElement('div');
+                        section.className = 'col-span-2 rounded-xl border border-slate-200 bg-white p-2.5 sm:col-span-3';
+                        section.innerHTML = `<p class="mb-2 text-xs font-bold text-slate-700">${areaName} · ${tables.length} bàn trống</p>`;
+                        const grid = document.createElement('div');
+                        grid.className = 'grid grid-cols-2 gap-2';
+                        tables.forEach((table) => {
+                            const label = document.createElement('label');
+                            label.className = 'cursor-pointer';
+                            const checkbox = document.createElement('input');
+                            checkbox.type = 'checkbox';
+                            checkbox.name = 'target_table_ids[]';
+                            checkbox.value = table.dataset.tableId;
+                            checkbox.dataset.seats = table.dataset.seats;
+                            checkbox.className = 'peer sr-only';
+                            const card = document.createElement('span');
+                            card.className = 'flex min-h-[82px] flex-col justify-between rounded-xl border border-slate-200 bg-slate-50 p-3 transition peer-checked:border-emerald-400 peer-checked:bg-emerald-50 peer-checked:ring-1 peer-checked:ring-emerald-200';
+                            card.innerHTML = `
+                                <span class="flex items-start justify-between gap-2">
+                                    <span class="text-sm font-bold text-slate-950">${table.dataset.code}</span>
+                                    <span data-merge-card-badge class="rounded-md border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">Trống</span>
+                                </span>
+                                <span class="text-xs text-slate-500">${table.dataset.seats} chỗ</span>
+                            `;
+                            checkbox.addEventListener('change', () => {
+                                const selected = [...target.querySelectorAll('input:checked')];
+                                const seats = selected.reduce((sum, item) => sum + Number(item.dataset.seats || 0), 0);
+                                const badge = card.querySelector('[data-merge-card-badge]');
+                                badge.textContent = checkbox.checked ? 'Đã chọn' : 'Trống';
+                                badge.className = checkbox.checked
+                                    ? 'rounded-md border border-emerald-300 bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white'
+                                    : 'rounded-md border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700';
+                                mergeModal.querySelector('[data-merge-source-badge]').textContent = `${selectedCard.dataset.code}: ${selectedCard.dataset.seats} chỗ`;
+                                mergeModal.querySelector('[data-merge-selected-count]').textContent = selected.length ? `${selected.length} bàn · ${seats} chỗ` : 'Chưa chọn bàn';
+                                mergeModal.querySelector('[data-merge-capacity]').textContent = `Khách hiện tại: ${selectedCard.dataset.sessionGuestCount || 0} · Tổng sức chứa: ${Number(selectedCard.dataset.seats || 0) + seats}`;
+                                mergeModal.querySelector('[data-merge-submit]').disabled = selected.length === 0;
+                            });
+                            label.append(checkbox, card);
+                            grid.append(label);
+                        });
+                        section.append(grid);
+                        target.append(section);
+                    });
+                    mergeModal.querySelector('[data-merge-title]').textContent = `Phiên #${selectedCard.dataset.sessionId} · Bàn ${selectedCard.dataset.code}`;
+                    mergeModal.querySelector('[data-merge-source-badge]').textContent = `${selectedCard.dataset.code}: ${selectedCard.dataset.seats} chỗ`;
+                    mergeModal.querySelector('[data-merge-capacity]').textContent = `Khách hiện tại: ${selectedCard.dataset.sessionGuestCount || 0} · Tổng sức chứa: ${selectedCard.dataset.seats || 0}`;
+                    mergeModal.querySelector('[data-merge-submit]').disabled = true;
+                    showModal(mergeModal);
+                });
+                mergeModal.querySelector('[data-merge-session-form]').addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    if (!selectedCard?.dataset.sessionId) return;
+                    const target = mergeModal.querySelector('[data-merge-target]');
+                    const targetIds = [...target.querySelectorAll('input[type="checkbox"]:checked')].map((checkbox) => Number(checkbox.value));
+                    if (targetIds.length === 0) return;
+                    const button = mergeModal.querySelector('[data-merge-submit]');
+                    button.disabled = true;
+                    const submit = async (allowOvercapacity = false) => {
+                        const response = await fetch(`/api/tables/${selectedCard.dataset.tableId}/dining-session/merge`, {
+                            method: 'POST',
+                            headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                            body: JSON.stringify({ target_table_ids: targetIds, allow_overcapacity: allowOvercapacity }),
+                        });
+                        return readJson(response);
+                    };
+                    try {
+                        try {
+                            await submit(false);
+                        } catch (error) {
+                            if (error.status === 422 && window.confirm(error.message + ' Bạn có muốn gộp vượt sức chứa?')) {
+                                await submit(true);
+                            } else {
+                                throw error;
+                            }
+                        }
+                        window.location.reload();
+                    } catch (error) {
+                        setError(mergeModal.querySelector('[data-merge-error]'), error.message);
+                    } finally {
+                        button.disabled = targetIds.length === 0;
                     }
                 });
 
@@ -536,7 +813,7 @@
                     } catch (error) {
                         setError(transferModal.querySelector('[data-transfer-error]'), error.message);
                     } finally {
-                        submitButton.disabled = transferTarget.options.length <= 1;
+                        submitButton.disabled = !transferTarget.value;
                     }
                 });
 
@@ -596,13 +873,16 @@
                 document.querySelectorAll('[data-modal-close]').forEach((button) => button.addEventListener('click', () => {
                     hideModal(button.closest('[data-modal]'));
                 }));
-                [openModal, transferModal].forEach((modal) => modal.addEventListener('click', (event) => {
+                [openModal, transferModal, updateModal, mergeModal, closeModal].forEach((modal) => modal.addEventListener('click', (event) => {
                     if (event.target === modal) hideModal(modal);
                 }));
                 document.addEventListener('keydown', (event) => {
                     if (event.key === 'Escape') {
                         hideModal(openModal);
                         hideModal(transferModal);
+                        hideModal(updateModal);
+                        hideModal(mergeModal);
+                        hideModal(closeModal);
                     }
                 });
 

@@ -3,6 +3,8 @@
 namespace Tests\Feature\Http\Controllers;
 
 use App\Enums\BranchStatus;
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
 use App\Enums\ScopeType;
 use App\Enums\SessionStatus;
 use App\Enums\TableShape;
@@ -15,12 +17,14 @@ use App\Models\Branch;
 use App\Models\DiningSession;
 use App\Models\DiningTable;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\Role;
 use App\Models\SessionTable;
 use App\Models\User;
 use App\Models\UserRole;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class DiningSessionControllerTest extends TestCase
@@ -151,7 +155,203 @@ class DiningSessionControllerTest extends TestCase
         ]);
         $this->assertNotNull($session->fresh()->closed_at);
         $this->assertNotNull(SessionTable::query()->where('session_id', $session->id)->firstOrFail()->left_at);
+        $this->assertSame(TableStatus::CLEANING, $table->fresh()->status);
+        $this->assertDatabaseHas('audit_logs', [
+            'entity_type' => 'dining_session',
+            'entity_id' => $session->id,
+            'action' => 'dining_session_close',
+        ]);
+    }
+
+    public function test_ready_paid_items_do_not_block_closing_the_session(): void
+    {
+        $table = $this->createTable(TableStatus::OCCUPIED);
+        $waiter = $this->createWaiter($table->branch);
+        $session = $this->createOpenSession($table, $waiter);
+        $categoryId = DB::table('categories')->insertGetId([
+            'name' => 'Test Category',
+            'sort_order' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $menuItemId = DB::table('menu_items')->insertGetId([
+            'category_id' => $categoryId,
+            'sku' => 'TEST-READY-CLOSE',
+            'name' => 'Test Ready Dish',
+            'item_type' => 'dish',
+            'station_code' => 'PHO',
+            'base_price' => 50000,
+            'tax_rate' => 8,
+            'prep_time_seconds' => 300,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $order = Order::query()->create([
+            'branch_id' => $table->branch_id,
+            'session_id' => $session->id,
+            'order_no' => 'TEST-READY-CLOSE',
+            'status' => 'sent',
+            'subtotal' => 50000,
+            'discount_amount' => 0,
+            'tax_amount' => 0,
+            'total_amount' => 50000,
+            'created_by' => $waiter->id,
+        ]);
+        DB::table('order_items')->insert([
+            'order_id' => $order->id,
+            'menu_item_id' => $menuItemId,
+            'item_name_snapshot' => 'Test Ready Dish',
+            'unit_price_snapshot' => 50000,
+            'quantity' => 1,
+            'line_total' => 50000,
+            'status' => 'ready',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('payments')->insert([
+            'branch_id' => $table->branch_id,
+            'order_id' => $order->id,
+            'method' => PaymentMethod::CASH->value,
+            'amount' => 50000,
+            'status' => PaymentStatus::SUCCESS->value,
+            'confirmed_by' => $waiter->id,
+            'paid_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($waiter)
+            ->withSession(['branch_id' => $table->branch_id])
+            ->postJson("/api/tables/{$table->id}/dining-session/close", ['reason' => 'Khách rời đi'])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertSame(SessionStatus::CLOSED, $session->fresh()->status);
+        $this->assertSame(TableStatus::CLEANING, $table->fresh()->status);
+    }
+
+    public function test_closing_a_session_is_blocked_when_order_has_items_not_sent_to_kitchen(): void
+    {
+        $table = $this->createTable(TableStatus::OCCUPIED);
+        $waiter = $this->createWaiter($table->branch);
+        $session = $this->createOpenSession($table, $waiter);
+        $categoryId = DB::table('categories')->insertGetId([
+            'name' => 'Test Category',
+            'sort_order' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $menuItemId = DB::table('menu_items')->insertGetId([
+            'category_id' => $categoryId,
+            'sku' => 'TEST-CLOSE-ORDER',
+            'name' => 'Test Dish',
+            'item_type' => 'dish',
+            'station_code' => 'PHO',
+            'base_price' => 50000,
+            'tax_rate' => 8,
+            'prep_time_seconds' => 300,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $order = Order::query()->create([
+            'branch_id' => $table->branch_id,
+            'session_id' => $session->id,
+            'order_no' => 'TEST-CLOSE-1',
+            'status' => 'draft',
+            'subtotal' => 50000,
+            'discount_amount' => 0,
+            'tax_amount' => 0,
+            'total_amount' => 50000,
+            'created_by' => $waiter->id,
+        ]);
+        DB::table('order_items')->insert([
+            'order_id' => $order->id,
+            'menu_item_id' => $menuItemId,
+            'item_name_snapshot' => 'Test Dish',
+            'unit_price_snapshot' => 50000,
+            'quantity' => 1,
+            'line_total' => 50000,
+            'status' => 'pending',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($waiter)
+            ->withSession(['branch_id' => $table->branch_id])
+            ->postJson("/api/tables/{$table->id}/dining-session/close", ['reason' => 'Khách rời đi'])
+            ->assertConflict()
+            ->assertJsonPath('success', false);
+
+        $this->assertSame(SessionStatus::OPEN, $session->fresh()->status);
+        $this->assertSame(TableStatus::OCCUPIED, $table->fresh()->status);
+    }
+
+    public function test_marking_a_cleaning_table_cleaned_returns_it_to_available(): void
+    {
+        $table = $this->createTable(TableStatus::CLEANING);
+        $waiter = $this->createWaiter($table->branch);
+
+        $this->actingAs($waiter)
+            ->withSession(['branch_id' => $table->branch_id])
+            ->postJson("/api/tables/{$table->id}/cleaned")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.table.status', TableStatus::AVAILABLE->value);
+
         $this->assertSame(TableStatus::AVAILABLE, $table->fresh()->status);
+    }
+
+    public function test_marking_one_merged_table_cleaned_cleans_all_tables_in_the_closed_session(): void
+    {
+        $source = $this->createTable(TableStatus::OCCUPIED);
+        $target = $this->createSiblingTable($source, 'A02');
+        $waiter = $this->createWaiter($source->branch);
+        $session = $this->createOpenSession($source, $waiter);
+
+        $this->actingAs($waiter)
+            ->withSession(['branch_id' => $source->branch_id])
+            ->postJson("/api/tables/{$source->id}/dining-session/merge", [
+                'target_table_ids' => [$target->id],
+            ])
+            ->assertOk();
+
+        $closedAt = now();
+        SessionTable::query()
+            ->where('session_id', $session->id)
+            ->update(['left_at' => $closedAt]);
+        $session->update(['status' => SessionStatus::CLOSED, 'closed_at' => $closedAt]);
+        DiningTable::query()
+            ->whereIn('id', [$source->id, $target->id])
+            ->update(['status' => TableStatus::CLEANING]);
+        AuditLog::query()->create([
+            'branch_id' => $source->branch_id,
+            'user_id' => $waiter->id,
+            'action' => 'dining_session_close',
+            'entity_type' => 'dining_session',
+            'entity_id' => $session->id,
+            'old_value' => [
+                'status' => SessionStatus::OPEN->value,
+                'table_ids' => [$source->id, $target->id],
+            ],
+            'new_value' => [
+                'status' => SessionStatus::CLOSED->value,
+                'table_status' => TableStatus::CLEANING->value,
+            ],
+            'created_at' => $closedAt,
+        ]);
+
+        $this->actingAs($waiter)
+            ->withSession(['branch_id' => $source->branch_id])
+            ->postJson("/api/tables/{$source->id}/cleaned")
+            ->assertOk()
+            ->assertJsonCount(2, 'data.table_ids');
+
+        $this->assertSame(TableStatus::AVAILABLE, $source->fresh()->status);
+        $this->assertSame(TableStatus::AVAILABLE, $target->fresh()->status);
     }
 
     public function test_closing_a_session_for_another_branch_returns_not_found(): void
@@ -163,12 +363,80 @@ class DiningSessionControllerTest extends TestCase
 
         $this->actingAs($waiter)
             ->withSession(['branch_id' => $otherBranch->id])
-            ->postJson("/api/tables/{$table->id}/dining-session/close")
+            ->postJson("/api/tables/{$table->id}/dining-session/close", ['reason' => 'Khách rời đi'])
             ->assertNotFound();
 
         $this->assertDatabaseHas('dining_sessions', [
             'id' => $session->id,
             'status' => SessionStatus::OPEN->value,
+        ]);
+    }
+
+    public function test_update_session_changes_guest_count_note_and_responsible_waiter(): void
+    {
+        $table = $this->createTable(TableStatus::OCCUPIED);
+        $waiter = $this->createWaiter($table->branch);
+        $session = $this->createOpenSession($table, $waiter);
+
+        $this->actingAs($waiter)
+            ->withSession(['branch_id' => $table->branch_id])
+            ->putJson("/api/dining-sessions/{$session->id}", [
+                'guest_count' => 6,
+                'note' => 'Sinh nhật · ghế trẻ em',
+                'opened_by' => $waiter->id,
+                'allow_overcapacity' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.guest_count', 6);
+
+        $this->assertDatabaseHas('dining_sessions', [
+            'id' => $session->id,
+            'guest_count' => 6,
+            'note' => 'Sinh nhật · ghế trẻ em',
+            'opened_by' => $waiter->id,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'entity_type' => 'dining_session',
+            'entity_id' => $session->id,
+            'action' => 'dining_session_update',
+        ]);
+    }
+
+    public function test_merge_tables_adds_available_tables_to_the_open_session(): void
+    {
+        $source = $this->createTable(TableStatus::OCCUPIED);
+        $targetOne = $this->createSiblingTable($source, 'A02');
+        $targetTwo = $this->createSiblingTable($source, 'A03');
+        $waiter = $this->createWaiter($source->branch);
+        $session = $this->createOpenSession($source, $waiter);
+
+        $this->actingAs($waiter)
+            ->withSession(['branch_id' => $source->branch_id])
+            ->postJson("/api/tables/{$source->id}/dining-session/merge", [
+                'target_table_ids' => [$targetOne->id, $targetTwo->id],
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.session_id', $session->id)
+            ->assertJsonPath('data.total_capacity', 12);
+
+        $this->assertDatabaseHas('session_tables', [
+            'session_id' => $session->id,
+            'table_id' => $targetOne->id,
+            'left_at' => null,
+        ]);
+        $this->assertDatabaseHas('session_tables', [
+            'session_id' => $session->id,
+            'table_id' => $targetTwo->id,
+            'left_at' => null,
+        ]);
+        $this->assertSame(TableStatus::OCCUPIED, $targetOne->fresh()->status);
+        $this->assertSame(TableStatus::OCCUPIED, $targetTwo->fresh()->status);
+        $this->assertDatabaseHas('audit_logs', [
+            'entity_type' => 'dining_session',
+            'entity_id' => $session->id,
+            'action' => 'dining_session_merge',
         ]);
     }
 
@@ -384,6 +652,19 @@ class DiningSessionControllerTest extends TestCase
             ->getJson("/api/tables/{$table->id}/dining-session")
             ->assertNotFound()
             ->assertJsonPath('success', false);
+    }
+
+    private function createSiblingTable(DiningTable $source, string $code): DiningTable
+    {
+        return DiningTable::query()->create([
+            'branch_id' => $source->branch_id,
+            'area_id' => $source->area_id,
+            'code' => $code,
+            'seats' => 4,
+            'shape' => TableShape::SQUARE,
+            'status' => TableStatus::AVAILABLE,
+            'is_active' => true,
+        ]);
     }
 
     private function createTable(TableStatus $status = TableStatus::AVAILABLE): DiningTable

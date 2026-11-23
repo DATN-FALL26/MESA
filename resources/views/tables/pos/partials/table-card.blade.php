@@ -31,6 +31,11 @@
     data-session-id="{{ $openSession?->id ?? '' }}"
     data-session-guest-count="{{ $openSession?->guest_count ?? '' }}"
     data-session-employee="{{ $openSession?->openedByUser?->full_name ?? '' }}"
+    data-session-opened-by="{{ $openSession?->opened_by ?? '' }}"
+    data-session-note="{{ $openSession?->note ?? '' }}"
+    data-order-summary="{{ json_encode($orderSummary ?? null, JSON_UNESCAPED_UNICODE) }}"
+    data-session-opened-by="{{ $openSession?->opened_by ?? '' }}"
+    data-session-note="{{ $openSession?->note ?? '' }}"
     data-table-transfer-history="{{ json_encode($transferHistory) }}"
     class="group flex min-h-40 flex-col rounded-2xl border p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md {{ $selected ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:border-slate-400' }}"
 >

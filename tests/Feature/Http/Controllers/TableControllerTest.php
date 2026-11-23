@@ -102,8 +102,8 @@ class TableControllerTest extends TestCase
             ->assertOk()
             ->assertSeeText('Phiên #'.$session->id)
             ->assertSeeText('2 khách')
-            ->assertSeeText('Chuyển sang bàn khác')
-            ->assertSeeText('Đóng phiên, trả bàn trống')
+            ->assertSeeText('Chuyển bàn')
+            ->assertSeeText('Đóng phiên')
             ->assertViewHas('tables', function ($areas) use ($table): bool {
                 $renderedTable = $areas->flatten()->firstWhere('id', $table->id);
 
@@ -132,7 +132,7 @@ class TableControllerTest extends TestCase
                 ->assertDontSee('data-modal="transfer-session"', false);
     }
 
-    public function test_table_map_shows_closed_session_transfer_history_and_hides_other_branches(): void
+    public function test_table_map_hides_transfer_history_for_waiter_and_closed_session(): void
     {
         $table = $this->createTable('A02');
         $waiter = $this->createWaiter($table->branch);
@@ -171,10 +171,8 @@ class TableControllerTest extends TestCase
             ->get('/tables')
             ->assertOk()
             ->assertDontSeeText('Phiên #'.$session->id)
-            ->assertSeeText('Lịch sử chuyển bàn')
-            ->assertSeeText('A01 → A02')
-            ->assertSeeText($waiter->full_name)
-            ->assertSeeText('20/05/2026 14:30')
+            ->assertDontSeeText('Lịch sử chuyển bàn gần đây')
+            ->assertDontSeeText('A01 → A02')
             ->assertDontSee('SECRET-FROM')
             ->assertDontSee('SECRET-TO');
     }

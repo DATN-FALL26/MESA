@@ -14,6 +14,7 @@ use App\Models\Payment;
 use App\Services\Payment\OrderPaymentService;
 use App\Services\Payment\VietQrPayload;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -145,6 +146,25 @@ class PaymentController extends Controller
         $this->payments->failQr($payment, 'Nhân viên báo giao dịch thất bại');
 
         return redirect()->route('payments.qr', $payment);
+    }
+
+    public function cancelQr(Request $request, Payment $payment): JsonResponse
+    {
+        $this->authorizeOrder($request, $payment->order, ConstantHelper::PERM_PAYMENT_REQUEST);
+
+        if ($payment->status !== \App\Enums\PaymentStatus::PENDING) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Chỉ có thể hủy giao dịch QR đang chờ.',
+            ], 409);
+        }
+
+        $this->payments->failQr($payment, 'Nhân viên hủy giao dịch QR');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã hủy giao dịch QR đang chờ.',
+        ]);
     }
 
     /**
