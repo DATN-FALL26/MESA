@@ -36,48 +36,46 @@
 {{-- CSS chỉ áp dụng cho trang Order; giữ nguyên layout và nền navy của MESA. --}}
 <style>
     .mesa-pos {
-        --mesa-surface: #111d35;
-        --mesa-surface-2: #15233f;
-        --mesa-border: rgba(150, 174, 215, .20);
-        --mesa-muted: #9fb1d1;
-        color: #f4f7ff;
+        --mesa-border: #e2e8f0;
+        --mesa-muted: #64748b;
+        color: #0f172a;
     }
     .mesa-pos .mesa-surface {
-        background: linear-gradient(135deg, rgba(24, 39, 67, .95), rgba(10, 21, 42, .96));
+        background: #ffffff;
         border: 1px solid var(--mesa-border);
-        box-shadow: 0 14px 36px rgba(0, 0, 0, .12);
+        box-shadow: 0 1px 3px rgba(15, 23, 42, .06), 0 8px 24px rgba(15, 23, 42, .05);
     }
     .mesa-pos .mesa-item {
-        background: linear-gradient(135deg, rgba(26, 43, 72, .78), rgba(16, 29, 52, .9));
-        border: 1px solid rgba(157, 180, 215, .15);
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
         transition: border-color .18s ease, background-color .18s ease;
     }
-    .mesa-pos .mesa-item:hover { border-color: rgba(103, 161, 255, .42); }
+    .mesa-pos .mesa-item:hover { border-color: #93c5fd; background: #f8fbff; }
     .mesa-pos [data-menu-item][hidden] { display: none !important; }
     .mesa-pos .mesa-field {
-        background: rgba(23, 37, 64, .9);
-        border: 1px solid rgba(150, 174, 215, .22);
-        color: #f4f7ff;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        color: #0f172a;
         outline: none;
     }
-    .mesa-pos .mesa-field::placeholder { color: #8fa3c4; }
-    .mesa-pos .mesa-field:focus { border-color: #5298ff; box-shadow: 0 0 0 3px rgba(40, 118, 255, .15); }
+    .mesa-pos .mesa-field::placeholder { color: #94a3b8; }
+    .mesa-pos .mesa-field:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .15); }
     .mesa-pos .mesa-filter,
     .mesa-pos .mesa-mobile-tab {
-        border: 1px solid rgba(150, 174, 215, .22);
-        background: rgba(21, 35, 61, .75);
-        color: #c8d5ed;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        color: #334155;
     }
     .mesa-pos .mesa-filter[aria-pressed="true"],
     .mesa-pos .mesa-mobile-tab[aria-selected="true"] {
-        color: #eaf3ff;
-        background: linear-gradient(135deg, #1464e8, #257dff);
-        border-color: #5c9df9;
-        box-shadow: 0 2px 12px rgba(36, 119, 245, .20);
+        color: #ffffff;
+        background: #2563eb;
+        border-color: #2563eb;
+        box-shadow: 0 2px 10px rgba(37, 99, 235, .20);
     }
-    .mesa-pos .mesa-scroll { scrollbar-color: #526581 transparent; scrollbar-width: thin; }
+    .mesa-pos .mesa-scroll { scrollbar-color: #cbd5e1 transparent; scrollbar-width: thin; }
     .mesa-pos .mesa-scroll::-webkit-scrollbar { width: 6px; }
-    .mesa-pos .mesa-scroll::-webkit-scrollbar-thumb { background: #526581; border-radius: 99px; }
+    .mesa-pos .mesa-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
     @media (max-width: 1279px) {
         .mesa-pos[data-active-tab="menu"] #order-panel { display: none; }
         .mesa-pos[data-active-tab="order"] #menu-panel { display: none; }
@@ -94,30 +92,30 @@
         <div class="min-w-0">
             <div class="mb-4 flex flex-wrap items-center gap-3">
                 <a href="{{ route('tables.index') }}"
-                   class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-blue-400/40 bg-blue-600/15 px-4 py-2 text-sm font-semibold text-blue-200 transition hover:border-blue-400/80 hover:bg-blue-600/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
+                   class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
                    aria-label="Quay lại danh sách bàn">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7M5 12h14"/></svg>
                     <span>Danh sách bàn</span>
                 </a>
-                <span class="inline-flex items-center gap-2 rounded-full bg-emerald-400/15 px-3 py-1.5 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-400/25">
+                <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
                     <span class="h-2 w-2 rounded-full bg-emerald-400"></span>Điểm bán hàng
                 </span>
             </div>
 
             <div class="flex items-start gap-3 sm:gap-4">
-                <div class="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-700/50 ring-1 ring-white/10 sm:flex">
-                    <svg class="h-6 w-6 text-blue-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="14" rx="2"/><path d="M4 9h16M7 17v4m10-4v4M9 13h6"/></svg>
+                <div class="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 ring-1 ring-slate-200 sm:flex">
+                    <svg class="h-6 w-6 text-blue-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="14" rx="2"/><path d="M4 9h16M7 17v4m10-4v4M9 13h6"/></svg>
                 </div>
                 <div class="min-w-0">
-                    <h1 class="text-2xl font-bold tracking-tight text-white sm:text-[30px]">Gọi món - Bàn {{ $session->table_code }}</h1>
-                    <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-400">Chọn món, cập nhật số lượng và theo dõi trạng thái bếp theo thời gian thực.</p>
+                    <h1 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-[30px]">Gọi món - Bàn {{ $session->table_code }}</h1>
+                    <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Chọn món, cập nhật số lượng và theo dõi trạng thái bếp theo thời gian thực.</p>
                     <div class="mt-3 flex flex-wrap gap-2">
-                        <span class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.055] px-3 py-1.5 text-xs font-medium text-slate-200 sm:text-sm">
-                            <svg class="h-4 w-4 text-blue-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 sm:text-sm">
+                            <svg class="h-4 w-4 text-blue-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                             {{ $session->guest_count }} khách
                         </span>
-                        <span class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.055] px-3 py-1.5 text-xs font-medium text-slate-200 sm:text-sm">
-                            <svg class="h-4 w-4 text-blue-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Zm-9 10 9 5 9-5M3 17l9 5 9-5"/></svg>
+                        <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 sm:text-sm">
+                            <svg class="h-4 w-4 text-blue-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Zm-9 10 9 5 9-5M3 17l9 5 9-5"/></svg>
                             Dining Session #{{ $session->session_id }}
                         </span>
                     </div>
@@ -136,7 +134,7 @@
         <button type="button" data-mobile-tab="order" aria-selected="false" aria-controls="order-panel" role="tab"
                 class="mesa-mobile-tab inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold transition">
             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 3v15l-3-2-4 2-4-2-3 2V6l3-3Z"/><path d="M9 10h6M9 14h6"/></svg>
-            Order <span id="mesa-tab-count" class="rounded-full bg-white/10 px-2 py-0.5 text-xs">{{ $initialItemCount }}</span>
+            Order <span id="mesa-tab-count" class="rounded-full bg-slate-900/10 px-2 py-0.5 text-xs">{{ $initialItemCount }}</span>
         </button>
     </div>
 
@@ -146,20 +144,20 @@
         <section id="menu-panel" aria-label="Thực đơn" class="mesa-surface min-w-0 rounded-[22px] p-3 sm:p-5">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
-                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-400/10 text-blue-200">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
                         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3v7a3 3 0 0 0 6 0V3M7 3v18M20 3v8h-5l5-8Zm0 8v10"/></svg>
                     </div>
                     <div>
-                        <h2 class="text-xl font-bold text-white">Thực đơn</h2>
-                        <p class="text-xs text-slate-400 sm:text-sm">Chọn món cho bàn {{ $session->table_code }}</p>
+                        <h2 class="text-xl font-bold text-slate-900">Thực đơn</h2>
+                        <p class="text-xs text-slate-500 sm:text-sm">Chọn món cho bàn {{ $session->table_code }}</p>
                     </div>
                 </div>
-                <span class="rounded-full bg-white/[.075] px-3 py-1 text-xs font-semibold text-slate-300">{{ $menuItems->count() }} món</span>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ $menuItems->count() }} món</span>
             </div>
 
             <label class="relative mb-3 block">
                 <span class="sr-only">Tìm món theo tên hoặc mô tả</span>
-                <svg class="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <svg class="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                 <input data-menu-search type="search" autocomplete="off" placeholder="Tìm món ăn, đồ uống..."
                        class="mesa-field h-11 w-full rounded-xl pl-10 pr-4 text-sm" />
             </label>
@@ -196,21 +194,21 @@
                     <article class="mesa-item flex min-w-0 gap-3 rounded-2xl p-3" data-menu-item
                              data-menu-group="{{ $menuGroup }}"
                              data-menu-search-text="{{ $item->name }} {{ $item->description }}">
-                        <div class="h-[104px] w-[104px] shrink-0 overflow-hidden rounded-xl bg-slate-800 sm:h-[114px] sm:w-[114px]">
+                        <div class="h-[104px] w-[104px] shrink-0 overflow-hidden rounded-xl bg-slate-100 sm:h-[114px] sm:w-[114px]">
                             @if ($item->image_path && file_exists(public_path($item->image_path)))
                                 <img src="{{ asset($item->image_path) }}" alt="{{ $item->name }}" class="h-full w-full object-cover" loading="lazy" />
                             @else
-                                <div class="flex h-full w-full items-center justify-center text-center text-xs text-slate-400">Chưa có ảnh</div>
+                                <div class="flex h-full w-full items-center justify-center text-center text-xs text-slate-500">Chưa có ảnh</div>
                             @endif
                         </div>
                         <div class="flex min-w-0 flex-1 flex-col">
                             <div class="mb-1 flex min-w-0 items-start justify-between gap-1">
-                                <h3 class="line-clamp-2 text-sm font-bold leading-5 text-white sm:text-[15px]">{{ $item->name }}</h3>
+                                <h3 class="line-clamp-2 text-sm font-bold leading-5 text-slate-900 sm:text-[15px]">{{ $item->name }}</h3>
                             </div>
-                            <div class="mb-1 w-fit rounded-md bg-blue-400/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-200">{{ $label }}</div>
-                            <p class="line-clamp-2 text-xs leading-[1.4] text-slate-400">{{ $item->description }}</p>
+                            <div class="mb-1 w-fit rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">{{ $label }}</div>
+                            <p class="line-clamp-2 text-xs leading-[1.4] text-slate-500">{{ $item->description }}</p>
                             <div class="mt-auto flex flex-wrap items-end justify-between gap-2 pt-2">
-                                <span class="text-base font-bold text-rose-400">{{ number_format($item->base_price, 0, ',', '.') }}đ</span>
+                                <span class="text-base font-bold text-red-700">{{ number_format($item->base_price, 0, ',', '.') }}đ</span>
                                 @if ($order)
                                     <form action="{{ route('orders.items.add', [$order->id, $item->id]) }}" method="POST" data-order-ajax>
                                         @csrf
@@ -224,7 +222,7 @@
                     </article>
                 @endforeach
             </div>
-            <div id="mesa-no-menu-results" class="hidden rounded-xl border border-dashed border-white/15 px-4 py-8 text-center text-sm text-slate-400">Không tìm thấy món phù hợp.</div>
+            <div id="mesa-no-menu-results" class="hidden rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">Không tìm thấy món phù hợp.</div>
         </section>
 
         {{-- ORDER: giữ ID này để AJAX + Reverb cập nhật --}}
@@ -235,23 +233,23 @@
                class="mesa-surface min-w-0 overflow-hidden rounded-[22px] xl:sticky xl:top-20">
             @if ($order)
                 <div class="flex flex-col xl:h-[min(790px,calc(100vh-7rem))] xl:min-h-[560px]">
-                    <div class="shrink-0 border-b border-white/10 px-4 py-4 sm:px-5">
+                    <div class="shrink-0 border-b border-slate-200 px-4 py-4 sm:px-5">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
-                                <div class="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                                    <svg class="h-4 w-4 text-blue-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 3v15l-3-2-4 2-4-2-3 2V6l3-3Z"/><path d="M9 10h6M9 14h6"/></svg>
+                                <div class="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    <svg class="h-4 w-4 text-blue-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 3v15l-3-2-4 2-4-2-3 2V6l3-3Z"/><path d="M9 10h6M9 14h6"/></svg>
                                     Order hiện tại
                                 </div>
-                                <h2 class="break-all text-base font-bold text-white sm:text-lg">{{ $order->order_no }}</h2>
+                                <h2 class="break-all text-base font-bold text-slate-900 sm:text-lg">{{ $order->order_no }}</h2>
                             </div>
                             @php
                                 $orderBadge = match ($order->status) {
-                                    'draft' => ['Đang chọn món', 'bg-blue-400/15 text-blue-200'],
-                                    'sent' => ['Đã gửi bếp', 'bg-blue-400/15 text-blue-200'],
-                                    'served' => ['Đã phục vụ', 'bg-emerald-400/15 text-emerald-300'],
-                                    'completed' => ['Hoàn thành', 'bg-emerald-400/15 text-emerald-300'],
-                                    'cancelled' => ['Đã hủy', 'bg-rose-400/15 text-rose-300'],
-                                    default => [$order->status, 'bg-white/10 text-slate-300'],
+                                    'draft' => ['Đang chọn món', 'bg-blue-50 text-blue-700'],
+                                    'sent' => ['Đã gửi bếp', 'bg-blue-50 text-blue-700'],
+                                    'served' => ['Đã phục vụ', 'bg-emerald-50 text-emerald-700'],
+                                    'completed' => ['Hoàn thành', 'bg-emerald-50 text-emerald-700'],
+                                    'cancelled' => ['Đã hủy', 'bg-rose-50 text-rose-700'],
+                                    default => [$order->status, 'bg-slate-100 text-slate-600'],
                                 };
                             @endphp
                             <span class="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $orderBadge[1] }}">{{ $orderBadge[0] }}</span>
@@ -265,18 +263,18 @@
                                 $canEditQuantity = $orderItem->status === 'pending' || $isReadyMade || ($orderItem->status === 'sent' && $orderItem->kitchen_status === 'new');
                                 $iconKind = $orderItem->item_type === \App\Enums\ItemType::DRINK->value ? 'drink' : ($orderItem->item_type === \App\Enums\ItemType::SIDE->value ? 'side' : 'main');
                                 $statusMeta = match ($orderItem->status) {
-                                    'pending' => ['Chưa gửi bếp', 'text-amber-300 bg-amber-400/10'],
-                                    'sent' => ['Đã gửi bếp', 'text-blue-200 bg-blue-400/10'],
-                                    'preparing' => ['Đang làm', 'text-orange-300 bg-orange-400/10'],
-                                    'ready' => ['Sẵn sàng', 'text-emerald-300 bg-emerald-400/10'],
-                                    'served' => ['Đã phục vụ', 'text-emerald-300 bg-emerald-400/10'],
-                                    'cancelled' => ['Đã hủy', 'text-rose-300 bg-rose-400/10'],
-                                    default => [$orderItem->status, 'text-slate-300 bg-white/10'],
+                                    'pending' => ['Chưa gửi bếp', 'text-amber-700 bg-amber-50'],
+                                    'sent' => ['Đã gửi bếp', 'text-blue-700 bg-blue-50'],
+                                    'preparing' => ['Đang làm', 'text-orange-700 bg-orange-50'],
+                                    'ready' => ['Sẵn sàng', 'text-emerald-700 bg-emerald-50'],
+                                    'served' => ['Đã phục vụ', 'text-emerald-700 bg-emerald-50'],
+                                    'cancelled' => ['Đã hủy', 'text-rose-700 bg-rose-50'],
+                                    default => [$orderItem->status, 'text-slate-600 bg-slate-100'],
                                 };
                             @endphp
-                            <div class="border-b border-white/10 py-4 last:border-b-0">
+                            <div class="border-b border-slate-200 py-4 last:border-b-0">
                                 <div class="flex items-start gap-3">
-                                    <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-400/10 text-blue-200" aria-hidden="true">
+                                    <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700" aria-hidden="true">
                                         @if ($iconKind === 'drink')
                                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h15l-2 13H6L4 8ZM2 8h19M8 3l2 5M14 3l-2 5"/><path d="M8 13h7"/></svg>
                                         @elseif ($iconKind === 'side')
@@ -287,25 +285,25 @@
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <div class="flex items-start justify-between gap-2">
-                                            <h3 class="break-words text-sm font-semibold leading-5 text-white">{{ $orderItem->item_name_snapshot }}</h3>
-                                            <span class="shrink-0 text-sm font-bold text-white">{{ number_format($orderItem->line_total, 0, ',', '.') }}đ</span>
+                                            <h3 class="break-words text-sm font-semibold leading-5 text-slate-900">{{ $orderItem->item_name_snapshot }}</h3>
+                                            <span class="shrink-0 text-sm font-bold text-slate-900">{{ number_format($orderItem->line_total, 0, ',', '.') }}đ</span>
                                         </div>
                                         <span class="mt-1.5 inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium {{ $statusMeta[1] }}">{{ $statusMeta[0] }}</span>
                                         @if ($canEditQuantity)
                                             <div class="mt-3 flex flex-wrap items-center gap-2">
                                                 <form action="{{ route('orders.items.decrease', [$order->id, $orderItem->id]) }}" method="POST" data-order-ajax>
                                                     @csrf
-                                                    <button type="submit" aria-label="Giảm {{ $orderItem->item_name_snapshot }}" class="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-lg text-slate-200 transition hover:bg-white/10">−</button>
+                                                    <button type="submit" aria-label="Giảm {{ $orderItem->item_name_snapshot }}" class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-lg text-slate-700 transition hover:bg-slate-100">−</button>
                                                 </form>
                                                 <span class="min-w-6 text-center text-sm font-bold">{{ $orderItem->quantity }}</span>
                                                 <form action="{{ route('orders.items.add', [$order->id, $orderItem->menu_item_id]) }}" method="POST" data-order-ajax>
                                                     @csrf
                                                     <button type="submit" aria-label="Tăng {{ $orderItem->item_name_snapshot }}" class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg font-bold text-white transition hover:bg-blue-500">+</button>
                                                 </form>
-                                                <span class="text-xs text-slate-400">{{ number_format($orderItem->unit_price_snapshot, 0, ',', '.') }}đ / món</span>
+                                                <span class="text-xs text-slate-500">{{ number_format($orderItem->unit_price_snapshot, 0, ',', '.') }}đ / món</span>
                                             </div>
                                         @else
-                                            <p class="mt-2 text-xs text-slate-400">Số lượng: <strong class="text-slate-200">{{ $orderItem->quantity }}</strong> · {{ number_format($orderItem->unit_price_snapshot, 0, ',', '.') }}đ / món</p>
+                                            <p class="mt-2 text-xs text-slate-500">Số lượng: <strong class="text-slate-700">{{ $orderItem->quantity }}</strong> · {{ number_format($orderItem->unit_price_snapshot, 0, ',', '.') }}đ / món</p>
                                         @endif
 
                                         @if ($canEditQuantity)
@@ -314,24 +312,24 @@
                                                 <label class="sr-only" for="note-{{ $orderItem->id }}">Ghi chú {{ $orderItem->item_name_snapshot }}</label>
                                                 <input id="note-{{ $orderItem->id }}" name="note" type="text" value="{{ $orderItem->note }}" placeholder="Ghi chú món..."
                                                        class="mesa-field min-h-10 w-full rounded-lg px-3 text-sm" />
-                                                <button type="submit" class="min-h-9 rounded-lg border border-white/15 bg-white/10 px-3 text-xs font-semibold text-slate-100 transition hover:bg-white/15">Lưu ghi chú</button>
+                                                <button type="submit" class="min-h-9 rounded-lg border border-slate-200 bg-slate-100 px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">Lưu ghi chú</button>
                                             </form>
                                         @elseif ($orderItem->note)
-                                            <p class="mt-2 rounded-lg bg-white/5 px-3 py-2 text-xs leading-5 text-slate-300">Ghi chú: {{ $orderItem->note }}</p>
+                                            <p class="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">Ghi chú: {{ $orderItem->note }}</p>
                                         @endif
                                     </div>
                                 </div>
                             </div>
                         @empty
-                            <div class="py-12 text-center text-sm text-slate-400">Chưa có món nào trong order.</div>
+                            <div class="py-12 text-center text-sm text-slate-500">Chưa có món nào trong order.</div>
                         @endforelse
                     </div>
 
                     {{-- BẢNG TỔNG VÀ HÀNH ĐỘNG: giữ nguyên điều kiện nghiệp vụ --}}
-                    <div class="shrink-0 border-t border-white/10 bg-slate-950/30 p-4 sm:p-5">
-                        <div class="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[.055] px-4 py-3">
-                            <span class="text-sm font-semibold text-slate-300">Tổng cộng</span>
-                            <strong class="text-xl font-bold text-rose-400 sm:text-2xl">{{ number_format($order->total_amount, 0, ',', '.') }}đ</strong>
+                    <div class="shrink-0 border-t border-slate-200 bg-slate-50 p-4 sm:p-5">
+                        <div class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <span class="text-sm font-semibold text-slate-600">Tổng cộng</span>
+                            <strong class="text-xl font-bold text-red-700 sm:text-2xl">{{ number_format($order->total_amount, 0, ',', '.') }}đ</strong>
                         </div>
                         @php
                             $hasPending = $orderItems->where('status', 'pending')->count() > 0;
@@ -361,7 +359,7 @@
                                 </button>
                             </form>
                         @else
-                            <button type="button" disabled data-kitchen-disabled class="mt-3 min-h-12 w-full cursor-not-allowed rounded-xl border border-white/10 bg-white/10 px-4 text-sm font-semibold text-slate-400">Đã gửi bếp</button>
+                            <button type="button" disabled data-kitchen-disabled class="mt-3 min-h-12 w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100 px-4 text-sm font-semibold text-slate-500">Đã gửi bếp</button>
                         @endif
 
                         {{-- MOD04: giữ nguyên permission, dịch vụ tính tiền và route thanh toán từ bản gốc. --}}
@@ -386,11 +384,11 @@
                 </div>
             @else
                 <div class="px-5 py-7 text-center">
-                    <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-400/10 text-blue-200">
+                    <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
                         <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 3v15l-3-2-4 2-4-2-3 2V6l3-3Z"/><path d="M9 10h6M9 14h6"/></svg>
                     </div>
-                    <h2 class="text-lg font-bold text-white">Bàn này chưa có order</h2>
-                    <p class="mt-1 text-sm leading-6 text-slate-400">Bắt đầu gọi món để tạo order cho bàn {{ $session->table_code }}.</p>
+                    <h2 class="text-lg font-bold text-slate-900">Bàn này chưa có order</h2>
+                    <p class="mt-1 text-sm leading-6 text-slate-500">Bắt đầu gọi món để tạo order cho bàn {{ $session->table_code }}.</p>
                     <form action="{{ route('orders.start', $session->session_id) }}" method="POST" data-order-ajax class="mt-5">
                         @csrf
                         <button type="submit" class="min-h-12 w-full rounded-xl bg-blue-600 px-4 font-semibold text-white transition hover:bg-blue-500">Bắt đầu gọi món</button>
@@ -401,11 +399,11 @@
     </div>
 
     {{-- Thanh truy cập Order trên điện thoại; không tạo bản sao nút gửi bếp/thanh toán. --}}
-    <div id="mesa-mobile-bar" class="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#071126]/95 px-3 py-3 shadow-[0_-12px_28px_rgba(0,0,0,.26)] backdrop-blur-xl xl:hidden">
+    <div id="mesa-mobile-bar" class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 py-3 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur-xl xl:hidden">
         <div class="mx-auto flex max-w-[700px] items-center gap-3">
             <div class="min-w-0 flex-1">
-                <p class="text-[11px] text-slate-400">Tổng cộng</p>
-                <strong id="mesa-mobile-total" class="block truncate text-lg font-bold text-rose-400">{{ number_format($order?->total_amount ?? 0, 0, ',', '.') }}đ</strong>
+                <p class="text-[11px] text-slate-500">Tổng cộng</p>
+                <strong id="mesa-mobile-total" class="block truncate text-lg font-bold text-red-700">{{ number_format($order?->total_amount ?? 0, 0, ',', '.') }}đ</strong>
             </div>
             <button type="button" id="mesa-mobile-switch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-500">
                 <span id="mesa-mobile-switch-text">Xem Order ({{ $initialItemCount }})</span>
