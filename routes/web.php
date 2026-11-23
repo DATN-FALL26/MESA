@@ -18,6 +18,7 @@ use App\Http\Controllers\Menu\ModifierController;
 use App\Http\Controllers\Menu\ModifierGroupController;
 use App\Http\Controllers\PublicDashboardController;
 use App\Http\Controllers\table\TableController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\OrderController;
@@ -355,12 +356,21 @@ Route::middleware('auth')->prefix('menu')->name('menu.')->group(function () {
         Route::view('/ingredients', 'inventory.ingredients')->name('ingredients');
         Route::view('/suppliers', 'inventory.suppliers')->name('suppliers');
         Route::view('/recipes', 'inventory.recipes')->name('recipes');
-        Route::get('/stock-movements', function () {
+        Route::get('/stock-movements', function (Request $request) {
             $branches = \App\Models\Branch::where('status', \App\Enums\BranchStatus::ACTIVE)->orderBy('id')->get();
-            $warehouses = \App\Models\Warehouse::where('is_active', true)->with('branch')->orderBy('branch_id')->get();
+            $allowedBranchIds = $request->attributes->get('authorized_branch_ids');
+            $selectedBranchId = $request->attributes->get('selected_branch_id');
+            $warehouses = \App\Models\Warehouse::query()
+                ->where('is_active', true)
+                ->with('branch')
+                ->when($selectedBranchId !== null, fn ($query) => $query->where('branch_id', $selectedBranchId))
+                ->when(is_array($allowedBranchIds), fn ($query) => $query->whereIn('branch_id', $allowedBranchIds))
+                ->orderBy('branch_id')
+                ->get();
             $ingredients = \App\Models\Ingredient::where('is_active', true)->orderBy('name')->get();
+
             return view('inventory.stock-movements', compact('branches', 'warehouses', 'ingredients'));
-        })->name('stock-movements');
+        })->middleware(['auth', 'permission:inventory.view', 'branch.access:inventory.view'])->name('stock-movements');
         Route::get('/purchase-orders', function () {
             $branches = \App\Models\Branch::where('status', \App\Enums\BranchStatus::ACTIVE)->orderBy('id')->get();
             $warehouses = \App\Models\Warehouse::where('is_active', true)->with('branch')->orderBy('id')->get();
