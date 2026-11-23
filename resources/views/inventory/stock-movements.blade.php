@@ -223,7 +223,16 @@
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                 });
 
-                if (!res.ok) throw new Error('Không thể tải dữ liệu thẻ kho');
+                if (!res.ok) {
+                    const message = res.status === 401
+                        ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+                        : res.status === 403
+                            ? 'Bạn không có quyền xem thẻ kho.'
+                            : res.status === 404
+                                ? 'Kho không thuộc chi nhánh đang chọn hoặc không tồn tại.'
+                                : 'Không thể tải dữ liệu thẻ kho.';
+                    throw new Error(message);
+                }
 
                 const json = await res.json();
                 const items = json.data || [];
@@ -270,7 +279,7 @@
                     `;
                 }).join('');
             } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-rose-500 font-medium">${err.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-rose-500 font-medium">${escapeHtml(err.message)}</td></tr>`;
             }
         }
 
