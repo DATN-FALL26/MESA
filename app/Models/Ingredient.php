@@ -98,4 +98,9 @@ class Ingredient extends Model
     {
         return $this->hasMany(AiAlert::class, 'ingredient_id');
     }
+
+    public function stockBatches(): HasMany
+    {
+        return $this->hasMany(StockBatch::class, 'ingredient_id');
+    }
 }

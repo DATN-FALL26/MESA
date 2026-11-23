@@ -18,6 +18,7 @@ use App\Models\RecipeItem;
 use App\Models\StockLevel;
 use App\Models\Supplier;
 use App\Repositories\Contracts\PurchaseOrderRepositoryInterface;
+use App\Services\Inventory\StockBatchService;
 use App\Services\Inventory\StockLedgerService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,7 @@ class KitchenDailyCheckinService
     public function __construct(
         protected StockLedgerService $stockLedgerService,
         protected PurchaseOrderRepositoryInterface $poRepository,
+        protected StockBatchService $batchService,
     ) {}
 
     /**
@@ -201,6 +203,21 @@ class KitchenDailyCheckinService
                     );
 
                     $this->stockLedgerService->recordMovement($dto);
+
+                    // Khởi tạo lô hàng tươi hàng ngày tại Bếp (mặc định HSD 2 ngày)
+                    $this->batchService->createBatch([
+                        'batch_code' => 'LOT-' . date('Ymd') . '-KITCHEN-' . $ingredientId,
+                        'warehouse_id' => $warehouseId,
+                        'ingredient_id' => $ingredientId,
+                        'purchase_order_id' => $purchaseOrder->id,
+                        'supplier_id' => $purchaseOrder->supplier_id,
+                        'initial_quantity' => $quantity,
+                        'current_quantity' => $quantity,
+                        'unit_cost' => $unitPrice,
+                        'import_date' => now()->toDateString(),
+                        'expiry_date' => now()->addDays(2)->toDateString(),
+                        'created_by' => $userId,
+                    ]);
 
                     // Mở lại trạng thái sẵn sàng cho món ăn tương ứng tại chi nhánh
                     $this->syncMenuItemAvailability($branchId, $ingredientId, true);

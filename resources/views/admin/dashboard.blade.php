@@ -3,6 +3,8 @@
 @section('heading', $title ?? 'Tổng quan Dashboard Kinh doanh')
 
 @section('content')
+@include('admin.partials.system-overview')
+
 <div class="space-y-6">
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -221,7 +223,7 @@
             const transferData = @json((float) data_get($paymentStats ?? [], 'transfer', 0));
             const hasPaymentData = (cashData + transferData) > 0;
 
-            new Chart(paymentCtx, {
+            const paymentChart = new Chart(paymentCtx, {
                 type: 'doughnut',
                 data: {
                     labels: hasPaymentData ? ['Tiền mặt', 'Chuyển khoản / QR'] : ['Chưa có dữ liệu'],
@@ -246,6 +248,35 @@
                     }
                 }
             });
+
+            fetch(@json(route('admin.dashboard.payment_stats', ['filter' => $filter ?? 'week']), JSON_UNESCAPED_SLASHES), {
+                headers: { 'Accept': 'application/json' }
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Không thể tải thống kê thanh toán (${response.status}).`);
+                    }
+
+                    return response.json();
+                })
+                .then(response => {
+                    if (response.status !== 'success') {
+                        throw new Error('Dữ liệu thống kê thanh toán không hợp lệ.');
+                    }
+
+                    const cash = Number(response.data.cash);
+                    const transfer = Number(response.data.transfer);
+                    if (!Number.isFinite(cash) || !Number.isFinite(transfer)) {
+                        throw new Error('Dữ liệu thống kê thanh toán không hợp lệ.');
+                    }
+
+                    const hasData = (cash + transfer) > 0;
+                    paymentChart.data.labels = hasData ? ['Tiền mặt', 'Chuyển khoản / QR'] : ['Chưa có dữ liệu'];
+                    paymentChart.data.datasets[0].data = hasData ? [cash, transfer] : [1];
+                    paymentChart.data.datasets[0].backgroundColor = hasData ? ['#10b981', '#6366f1'] : ['#cbd5e1'];
+                    paymentChart.update();
+                })
+                .catch(error => console.error('Lỗi tải thống kê thanh toán:', error));
         }
     });
 </script>
