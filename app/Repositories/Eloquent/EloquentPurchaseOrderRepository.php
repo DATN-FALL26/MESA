@@ -24,6 +24,8 @@ class EloquentPurchaseOrderRepository implements PurchaseOrderRepositoryInterfac
 
         if (!empty($filters['branch_id'])) {
             $query->where('branch_id', (int) $filters['branch_id']);
+        } elseif (isset($filters['branch_ids']) && is_array($filters['branch_ids'])) {
+            $query->whereIn('branch_id', $filters['branch_ids']);
         }
 
         if (!empty($filters['warehouse_id'])) {

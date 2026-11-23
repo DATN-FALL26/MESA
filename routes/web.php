@@ -18,6 +18,7 @@ use App\Http\Controllers\Menu\ModifierController;
 use App\Http\Controllers\Menu\ModifierGroupController;
 use App\Http\Controllers\PublicDashboardController;
 use App\Http\Controllers\table\TableController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\OrderController;
@@ -27,6 +28,10 @@ use App\Http\Controllers\OrderController;
 Route::middleware(['auth', 'permission:dashboard.view'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/reports', [DashboardController::class, 'reports'])->name('reports');
+
+    // Bổ sung route xuất Excel cho báo cáo kinh doanh
+    Route::get('/reports/export-excel', [DashboardController::class, 'exportExcel'])->name('reports.export');
+
     Route::get('/api/revenue', [DashboardController::class, 'getRevenueApi'])->name('api.revenue');
 
     // Route API cho biểu đồ Dashboard (Thanh toán & Khung giờ)
@@ -210,37 +215,40 @@ Route::middleware('auth')->prefix('orders')->name('orders.')->group(function () 
 
     // Xem màn gọi món của Dining Session
     Route::get('/session/{sessionId}', [OrderController::class, 'showSession'])
-        ->middleware('permission:order.view')
+        ->middleware(['permission:order.view', 'branch.access:order.view'])
         ->name('session');
 
     // Tạo Order cho Dining Session
     Route::post('/session/{sessionId}/start', [OrderController::class, 'startOrder'])
-        ->middleware('permission:order.create')
+        ->middleware(['permission:order.create', 'branch.access:order.create'])
         ->name('start');
 
     // Thêm / tăng món
     Route::post('/{orderId}/items/{menuItemId}', [OrderController::class, 'addItem'])
-        ->middleware('permission:order.update')
+        ->middleware(['permission:order.update', 'branch.access:order.update'])
         ->name('items.add');
 
     // Giảm món
     Route::post('/{orderId}/items/{orderItemId}/decrease', [OrderController::class, 'decreaseItem'])
-        ->middleware('permission:order.update')
+        ->middleware(['permission:order.update', 'branch.access:order.update'])
         ->name('items.decrease');
 
     // Ghi chú món
     Route::post('/{orderId}/items/{orderItemId}/note', [OrderController::class, 'updateItemNote'])
-        ->middleware('permission:order.update')
+        ->middleware(['permission:order.update', 'branch.access:order.update'])
         ->name('items.note');
 
     // Gửi Batch xuống bếp
     Route::post('/{orderId}/send-kitchen', [OrderController::class, 'sendToKitchen'])
-        ->middleware('permission:order.batch.release,order.update,order.create')
+        ->middleware([
+            'permission:order.batch.release,order.update,order.create',
+            'branch.access:order.batch.release,order.update,order.create',
+        ])
         ->name('send-kitchen');
 
     // Cập nhật món đã gửi nhưng bếp chưa bắt đầu
     Route::post('/{orderId}/update-kitchen', [OrderController::class, 'updateKitchen'])
-        ->middleware('permission:order.update')
+        ->middleware(['permission:order.update', 'branch.access:order.update'])
         ->name('update-kitchen');
 });
 
@@ -348,12 +356,21 @@ Route::middleware('auth')->prefix('menu')->name('menu.')->group(function () {
         Route::view('/ingredients', 'inventory.ingredients')->name('ingredients');
         Route::view('/suppliers', 'inventory.suppliers')->name('suppliers');
         Route::view('/recipes', 'inventory.recipes')->name('recipes');
-        Route::get('/stock-movements', function () {
+        Route::get('/stock-movements', function (Request $request) {
             $branches = \App\Models\Branch::where('status', \App\Enums\BranchStatus::ACTIVE)->orderBy('id')->get();
-            $warehouses = \App\Models\Warehouse::where('is_active', true)->with('branch')->orderBy('branch_id')->get();
+            $allowedBranchIds = $request->attributes->get('authorized_branch_ids');
+            $selectedBranchId = $request->attributes->get('selected_branch_id');
+            $warehouses = \App\Models\Warehouse::query()
+                ->where('is_active', true)
+                ->with('branch')
+                ->when($selectedBranchId !== null, fn ($query) => $query->where('branch_id', $selectedBranchId))
+                ->when(is_array($allowedBranchIds), fn ($query) => $query->whereIn('branch_id', $allowedBranchIds))
+                ->orderBy('branch_id')
+                ->get();
             $ingredients = \App\Models\Ingredient::where('is_active', true)->orderBy('name')->get();
+
             return view('inventory.stock-movements', compact('branches', 'warehouses', 'ingredients'));
-        })->name('stock-movements');
+        })->middleware(['auth', 'permission:inventory.view', 'branch.access:inventory.view'])->name('stock-movements');
         Route::get('/purchase-orders', function () {
             $branches = \App\Models\Branch::where('status', \App\Enums\BranchStatus::ACTIVE)->orderBy('id')->get();
             $warehouses = \App\Models\Warehouse::where('is_active', true)->with('branch')->orderBy('id')->get();

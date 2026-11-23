@@ -12,6 +12,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRole;
+use App\Services\Auth\BranchAccessService;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -24,11 +25,19 @@ class AuthFeatureTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Branch $defaultBranch;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(ReferenceSeeder::class);
+        $this->defaultBranch = Branch::query()->create([
+            'code' => 'TEST_DEFAULT',
+            'name' => 'Test Default Branch',
+            'timezone' => 'Asia/Ho_Chi_Minh',
+            'status' => BranchStatus::ACTIVE,
+        ]);
     }
 
     public function test_guest_can_open_the_public_dashboard_without_signing_in(): void
@@ -169,6 +178,120 @@ class AuthFeatureTest extends TestCase
         ])->assertSessionHasErrors('login');
 
         $this->assertGuest();
+    }
+
+    public function test_non_admin_role_scope_only_grants_access_to_assigned_active_branches(): void
+    {
+        $otherBranch = Branch::query()->create([
+            'code' => 'TEST_OTHER',
+            'name' => 'Test Other Branch',
+            'timezone' => 'Asia/Ho_Chi_Minh',
+            'status' => BranchStatus::ACTIVE,
+        ]);
+        $user = $this->createUser([
+            'username' => 'branchscoped',
+            'full_name' => 'Branch Scoped User',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $access = app(BranchAccessService::class);
+
+        $this->assertSame(
+            [$this->defaultBranch->id],
+            $access->accessibleBranchIds($user, [ConstantHelper::PERM_DASHBOARD_VIEW])
+        );
+        $this->assertTrue($access->canAccessBranch($user, $this->defaultBranch->id, [ConstantHelper::PERM_DASHBOARD_VIEW]));
+        $this->assertFalse($access->canAccessBranch($user, $otherBranch->id, [ConstantHelper::PERM_DASHBOARD_VIEW]));
+
+        $user->userRoles()->update(['scope_type' => 'ALL', 'scope_id' => null]);
+
+        $this->assertSame([], $access->accessibleBranchIds($user, [ConstantHelper::PERM_DASHBOARD_VIEW]));
+    }
+
+    public function test_dashboard_branch_selection_only_accepts_authorized_branches_and_updates_session(): void
+    {
+        $otherBranch = Branch::query()->create([
+            'code' => 'TEST_SWITCH',
+            'name' => 'Test Switch Branch',
+            'timezone' => 'Asia/Ho_Chi_Minh',
+            'status' => BranchStatus::ACTIVE,
+        ]);
+        $unauthorizedBranch = Branch::query()->create([
+            'code' => 'TEST_DENIED',
+            'name' => 'Test Denied Branch',
+            'timezone' => 'Asia/Ho_Chi_Minh',
+            'status' => BranchStatus::ACTIVE,
+        ]);
+        $user = $this->createUser([
+            'username' => 'branchswitcher',
+            'full_name' => 'Branch Switcher',
+            'password' => Hash::make('Password123!'),
+            'status' => UserStatus::ACTIVE,
+        ]);
+        $dashboardPermission = Permission::query()
+            ->where('code', ConstantHelper::PERM_DASHBOARD_VIEW)
+            ->firstOrFail();
+
+        $permissionRole = Role::query()->create([
+            'code' => 'TEST_DASHBOARD_VIEW',
+            'name' => 'Dashboard Viewer',
+            'is_system' => false,
+        ]);
+        DB::table(ConstantHelper::TABLE_ROLE_PERMISSIONS)->insert([
+            'role_id' => $permissionRole->id,
+            'permission_id' => $dashboardPermission->id,
+        ]);
+        foreach ([$this->defaultBranch, $otherBranch] as $branch) {
+            UserRole::query()->create([
+                'user_id' => $user->id,
+                'role_id' => $permissionRole->id,
+                'scope_type' => 'BRANCH',
+                'scope_id' => $branch->id,
+                'valid_from' => now()->subMinute(),
+                'granted_by' => null,
+            ]);
+        }
+
+        $this->withoutVite();
+        $this->actingAs($user)
+            ->get(route('admin.dashboard'))
+            ->assertOk()
+            ->assertViewIs('branches.select')
+            ->assertSee($this->defaultBranch->name)
+            ->assertSee($otherBranch->name)
+            ->assertDontSee($unauthorizedBranch->name);
+
+        $this->get(route('admin.dashboard', ['branch_id' => $otherBranch->id]))
+            ->assertOk()
+            ->assertViewHas('branchId', $otherBranch->id)
+            ->assertSessionHas('branch_id', $otherBranch->id);
+
+        $this->get(route('admin.dashboard', ['branch_id' => $unauthorizedBranch->id]))
+            ->assertNotFound()
+            ->assertSessionHas('branch_id', $otherBranch->id);
+
+        $inventoryPermission = Permission::query()
+            ->where('code', ConstantHelper::PERM_INVENTORY_VIEW)
+            ->firstOrFail();
+        $inventoryRole = Role::query()->create([
+            'code' => 'TEST_INVENTORY_VIEW',
+            'name' => 'Inventory Viewer',
+            'is_system' => false,
+        ]);
+        DB::table(ConstantHelper::TABLE_ROLE_PERMISSIONS)->insert([
+            'role_id' => $inventoryRole->id,
+            'permission_id' => $inventoryPermission->id,
+        ]);
+        UserRole::query()->create([
+            'user_id' => $user->id,
+            'role_id' => $inventoryRole->id,
+            'scope_type' => 'BRANCH',
+            'scope_id' => $this->defaultBranch->id,
+            'valid_from' => now()->subMinute(),
+            'granted_by' => null,
+        ]);
+        $this->getJson(route('api.inventory.stock.overview', ['branch_id' => $unauthorizedBranch->id]))
+            ->assertNotFound();
     }
 
     public function test_user_can_logout(): void
@@ -516,6 +639,7 @@ class AuthFeatureTest extends TestCase
             'password_confirmation' => 'Password123!',
             'assign_roles' => '1',
             'role_ids' => [$role->id],
+            'role_branch_ids' => [$role->id => [$this->defaultBranch->id]],
         ])->assertRedirect('/users');
 
         $createdUser = User::query()->where('username', 'newstaff')->firstOrFail();
@@ -524,8 +648,8 @@ class AuthFeatureTest extends TestCase
         $this->assertDatabaseHas('user_roles', [
             'user_id' => $createdUser->id,
             'role_id' => $role->id,
-            'scope_type' => 'ALL',
-            'scope_id' => null,
+            'scope_type' => 'BRANCH',
+            'scope_id' => $this->defaultBranch->id,
         ]);
 
         $this->delete('/users/'.$createdUser->id)->assertMethodNotAllowed();
@@ -534,6 +658,12 @@ class AuthFeatureTest extends TestCase
 
     public function test_admin_can_create_an_account_and_assign_a_role(): void
     {
+        $branch = Branch::query()->create([
+            'code' => 'ROLE_SCOPE_TEST',
+            'name' => 'Role Scope Test',
+            'timezone' => 'Asia/Ho_Chi_Minh',
+            'status' => BranchStatus::ACTIVE,
+        ]);
         $adminRole = Role::query()->where('code', ConstantHelper::ROLE_ADMIN)->firstOrFail();
         $admin = $this->createUser([
             'username' => 'accountadmin',
@@ -571,6 +701,7 @@ class AuthFeatureTest extends TestCase
             'password_confirmation' => 'Password123!',
             'assign_roles' => '1',
             'role_ids' => [$role->id],
+            'role_branch_ids' => [$role->id => [$branch->id]],
         ])->assertRedirect('/users');
 
         $createdUser = User::query()->where('username', 'admincreated')->firstOrFail();
@@ -578,8 +709,8 @@ class AuthFeatureTest extends TestCase
         $this->assertDatabaseHas('user_roles', [
             'user_id' => $createdUser->id,
             'role_id' => $role->id,
-            'scope_type' => 'ALL',
-            'scope_id' => null,
+            'scope_type' => 'BRANCH',
+            'scope_id' => $branch->id,
         ]);
     }
 
@@ -831,8 +962,8 @@ class AuthFeatureTest extends TestCase
         UserRole::query()->create([
             'user_id' => $user->getKey(),
             'role_id' => $staffRole->getKey(),
-            'scope_type' => 'ALL',
-            'scope_id' => null,
+            'scope_type' => 'BRANCH',
+            'scope_id' => $this->defaultBranch->id,
             'valid_from' => now()->subMinute(),
             'granted_by' => null,
         ]);
@@ -862,8 +993,8 @@ class AuthFeatureTest extends TestCase
         UserRole::query()->create([
             'user_id' => $user->id,
             'role_id' => $role->id,
-            'scope_type' => 'ALL',
-            'scope_id' => null,
+            'scope_type' => 'BRANCH',
+            'scope_id' => $this->defaultBranch->id,
             'valid_from' => now()->subMinute(),
             'granted_by' => null,
         ]);

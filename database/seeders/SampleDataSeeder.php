@@ -1245,16 +1245,17 @@ class SampleDataSeeder extends Seeder
      */
     private function seedStockLevels(array $warehouseIds, array $ingredientIds): void
     {
+        // Costs use the ingredient base unit and keep the demo food cost near 33%.
         $initialStocks = [
-            'NL_BANH_PHO' => ['quantity' => 0.000, 'avg_cost' => 18000.00],
-            'NL_THIT_BO_TAI' => ['quantity' => 0.000, 'avg_cost' => 220000.00],
-            'NL_THIT_BO_CHIN' => ['quantity' => 0.000, 'avg_cost' => 200000.00],
-            'NL_XUONG_BO' => ['quantity' => 40000.000, 'avg_cost' => 60000.00],
-            'NL_HANH_LA' => ['quantity' => 0.000, 'avg_cost' => 25000.00],
-            'NL_QUAY' => ['quantity' => 0.000,   'avg_cost' => 2000.00],
-            'NL_NUOC_DUNG' => ['quantity' => 100000.000, 'avg_cost' => 15000.00],
-            'NL_TRA' => ['quantity' => 5000.000,  'avg_cost' => 150000.00],
-            'NL_NUOC_NGOT' => ['quantity' => 200.000,   'avg_cost' => 8000.00],
+            'NL_BANH_PHO' => ['quantity' => 0.000, 'avg_cost' => 13.86],
+            'NL_THIT_BO_TAI' => ['quantity' => 0.000, 'avg_cost' => 169.40],
+            'NL_THIT_BO_CHIN' => ['quantity' => 0.000, 'avg_cost' => 154.00],
+            'NL_XUONG_BO' => ['quantity' => 40000.000, 'avg_cost' => 46.20],
+            'NL_HANH_LA' => ['quantity' => 0.000, 'avg_cost' => 19.25],
+            'NL_QUAY' => ['quantity' => 0.000,   'avg_cost' => 1540.00],
+            'NL_NUOC_DUNG' => ['quantity' => 100000.000, 'avg_cost' => 11.55],
+            'NL_TRA' => ['quantity' => 5000.000,  'avg_cost' => 115.50],
+            'NL_NUOC_NGOT' => ['quantity' => 200.000,   'avg_cost' => 6160.00],
         ];
 
         foreach ($warehouseIds as $branchCode => $warehouseId) {

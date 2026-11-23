@@ -18,6 +18,7 @@ use App\Models\SessionTable;
 use App\Models\User;
 use App\Models\Order;
 use App\Services\Payment\OrderPaymentService;
+use App\Services\Auth\BranchAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
@@ -32,7 +33,13 @@ class DiningSessionController extends BaseController
 {
     use ResolvesTableBranch;
 
-    public function __construct(private OrderPaymentService $payments) {}
+    public function __construct(
+        private OrderPaymentService $payments,
+        BranchAccessService $branchAccess,
+    )
+    {
+        $this->branchAccess = $branchAccess;
+    }
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -45,7 +52,7 @@ class DiningSessionController extends BaseController
             ],
         ]);
 
-        $branchId = $this->resolveBranchId($request);
+        $branchId = $this->requireBranchId($request);
         $table = DiningTable::query()
             ->where('branch_id', $branchId)
             ->where('is_active', true)
@@ -121,7 +128,7 @@ class DiningSessionController extends BaseController
 
     public function employees(Request $request): JsonResponse
     {
-        $branchId = $this->resolveBranchId($request);
+        $branchId = $this->requireBranchId($request);
         $employees = $this->activeBranchWaiters($branchId)
             ->orderBy('full_name')
             ->get(['id', 'full_name']);
@@ -230,7 +237,7 @@ class DiningSessionController extends BaseController
         $validated = $request->validate([
             'reason' => ['nullable', 'string', 'max:255'],
         ]);
-        $branchId = $this->resolveBranchId($request);
+        $branchId = $this->requireBranchId($request);
 
         $session = DB::transaction(function () use ($branchId, $tableId, $validated, $request): DiningSession|JsonResponse {
             $table = DiningTable::query()
@@ -528,7 +535,7 @@ class DiningSessionController extends BaseController
         $validated = $request->validate([
             'target_table_id' => ['required', 'integer', 'not_in:'.$tableId],
         ]);
-        $branchId = $this->resolveBranchId($request);
+        $branchId = $this->requireBranchId($request);
         $userId = Auth::id();
 
         $result = DB::transaction(function () use ($request, $branchId, $tableId, $userId, $validated): array|JsonResponse {
@@ -638,7 +645,7 @@ class DiningSessionController extends BaseController
 
     public function showByTable(Request $request, int $tableId): JsonResponse
     {
-        $branchId = $this->resolveBranchId($request);
+        $branchId = $this->requireBranchId($request);
         $table = DiningTable::query()
             ->where('branch_id', $branchId)
             ->where('is_active', true)

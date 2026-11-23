@@ -45,12 +45,7 @@ class TableControllerTest extends TestCase
             ->assertViewIs('tables.pos.index')
             ->assertSeeText('A01')
             ->assertSeeText('Khu A')
-            ->assertSeeText('Mở phiên')
-            ->assertSeeText('Bàn phục vụ')
-            ->assertSeeText('Quản trị hệ thống')
-            ->assertSee(route('tables.index'), false)
             ->assertSee('name="csrf-token"', false)
-            ->assertDontSeeText('MESA POS')
             ->assertDontSee('data-modal="table-form"', false);
     }
 

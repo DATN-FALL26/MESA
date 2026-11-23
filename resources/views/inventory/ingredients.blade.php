@@ -14,6 +14,18 @@
             <div class="flex items-center gap-3">
                 <button 
                     type="button" 
+                    onclick="triggerScanAlerts()" 
+                    id="btn-scan-alerts"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors border border-slate-300 shadow-2xs"
+                    title="Quét cảnh báo tồn kho và hạn sử dụng"
+                >
+                    <svg class="w-4 h-4 text-emerald-600" id="scan-icon" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                    <span>Quét cảnh báo</span>
+                </button>
+                <button 
+                    type="button" 
                     onclick="openCreateModal()" 
                     class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-2xs"
                 >
@@ -82,13 +94,14 @@
                             <th class="py-3 px-4">Phân loại</th>
                             <th class="py-3 px-4">Đơn vị cơ sở (UOM)</th>
                             <th class="py-3 px-4 text-right">Tồn tối thiểu</th>
+                            <th class="py-3 px-4 text-right">Tồn thực tế</th>
                             <th class="py-3 px-4 text-center">Trạng thái</th>
                             <th class="py-3 px-4 text-right">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody id="ingredients-table-body" class="divide-y divide-slate-100 text-slate-700">
                         <tr>
-                            <td colspan="7" class="py-12 text-center text-slate-400">
+                            <td colspan="8" class="py-12 text-center text-slate-400">
                                 <div class="inline-flex items-center gap-2">
                                     <svg class="w-4 h-4 animate-spin text-emerald-600" fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -282,7 +295,7 @@
             const tbody = document.getElementById('ingredients-table-body');
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="py-8 text-center text-slate-400">
+                    <td colspan="8" class="py-8 text-center text-slate-400">
                         <span class="inline-flex items-center gap-2">
                             <span class="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></span>
                             Đang tải dữ liệu...
@@ -307,7 +320,7 @@
             } catch (err) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="py-8 text-center text-rose-500 font-medium">
+                        <td colspan="8" class="py-8 text-center text-rose-500 font-medium">
                             Lỗi khi tải dữ liệu: ${err.message}
                         </td>
                     </tr>
@@ -320,7 +333,7 @@
             if (items.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="py-8 text-center text-slate-400">
+                        <td colspan="8" class="py-8 text-center text-slate-400">
                             Không tìm thấy nguyên vật liệu nào phù hợp với bộ lọc.
                         </td>
                     </tr>
@@ -339,6 +352,16 @@
                     : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200">Ngừng</span>`;
 
                 const itemDataEscaped = encodeURIComponent(JSON.stringify(item));
+                const totalStock = Number(item.total_stock || 0);
+                const minStock = Number(item.min_stock || 0);
+                const isOutOfStock = totalStock <= 0;
+                const isLow = totalStock <= minStock;
+
+                const stockBadge = isOutOfStock
+                    ? `<span class="inline-flex items-center gap-1 font-mono font-bold text-rose-600">${totalStock.toLocaleString('vi-VN')} <span class="text-[9px] px-1 py-0.2 rounded bg-rose-100 text-rose-700">Hết</span></span>`
+                    : (isLow 
+                        ? `<span class="inline-flex items-center gap-1 font-mono font-bold text-amber-600">${totalStock.toLocaleString('vi-VN')} <span class="text-[9px] px-1 py-0.2 rounded bg-amber-100 text-amber-800">Sắp hết</span></span>`
+                        : `<span class="font-mono font-bold text-emerald-700">${totalStock.toLocaleString('vi-VN')}</span>`);
 
                 return `
                     <tr class="hover:bg-slate-50/70 transition-colors">
@@ -346,7 +369,8 @@
                         <td class="py-3 px-4 font-medium text-slate-900">${escapeHtml(item.name)}</td>
                         <td class="py-3 px-4">${typeBadge}</td>
                         <td class="py-3 px-4 font-medium text-slate-600">${escapeHtml(item.base_uom)}</td>
-                        <td class="py-3 px-4 text-right font-mono text-slate-700">${Number(item.min_stock || 0).toLocaleString('vi-VN')}</td>
+                        <td class="py-3 px-4 text-right font-mono text-slate-500">${Number(item.min_stock || 0).toLocaleString('vi-VN')}</td>
+                        <td class="py-3 px-4 text-right">${stockBadge}</td>
                         <td class="py-3 px-4 text-center">${statusBadge}</td>
                         <td class="py-3 px-4 text-right whitespace-nowrap">
                             <button 
@@ -538,6 +562,45 @@
             } finally {
                 btn.disabled = false;
                 btn.innerText = 'Xác nhận xóa';
+            }
+        }
+
+        async function triggerScanAlerts() {
+            const btn = document.getElementById('btn-scan-alerts');
+            const icon = document.getElementById('scan-icon');
+            if (!btn || !icon) return;
+
+            btn.disabled = true;
+            icon.classList.add('animate-spin');
+
+            try {
+                const res = await fetch('/api/v1/inventory/alerts/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const data = await res.json();
+                const lowCount = (data.data?.low_stock?.created || 0) + (data.data?.low_stock?.updated || 0);
+                const expCount = (data.data?.expiry?.created || 0) + (data.data?.expiry?.updated || 0);
+
+                if (window.showToast) {
+                    window.showToast(`Quét hoàn tất: ${lowCount} cảnh báo tồn kho, ${expCount} cảnh báo HSD.`, 'success');
+                } else {
+                    alert(`Đã quét cảnh báo: ${lowCount} cảnh báo tồn kho, ${expCount} cảnh báo HSD.`);
+                }
+                loadIngredients(currentPage);
+            } catch (err) {
+                console.error(err);
+                if (window.showToast) {
+                    window.showToast('Lỗi khi quét cảnh báo: ' + err.message, 'error');
+                }
+            } finally {
+                btn.disabled = false;
+                icon.classList.remove('animate-spin');
             }
         }
 

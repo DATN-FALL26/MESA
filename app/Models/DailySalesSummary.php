@@ -18,6 +18,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $gross_revenue
  * @property string $discount_amount
  * @property string $net_revenue
+ * @property string $total_cogs
+ * @property string $gross_profit
  * @property array<string, mixed>|null $payment_breakdown
  * @property CarbonInterface|null $created_at
  * @property CarbonInterface|null $updated_at
@@ -41,6 +43,8 @@ class DailySalesSummary extends Model
             'gross_revenue' => 'decimal:0',
             'discount_amount' => 'decimal:0',
             'net_revenue' => 'decimal:0',
+            'total_cogs' => 'decimal:2',
+            'gross_profit' => 'decimal:2',
             'payment_breakdown' => 'array',
         ];
     }

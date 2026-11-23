@@ -14,6 +14,7 @@
     <div class="min-h-screen lg:flex">
 
         {{-- ================= SIDEBAR TRÁI (HIỆN ĐẠI & CHUYÊN NGHIỆP) ================= --}}
+        @unless (auth()->user()?->hasRole(\App\Helpers\ConstantHelper::ROLE_WAITER))
         <aside
             class="flex flex-col gap-5 border-b border-slate-200 bg-white px-4 py-4 text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-300 lg:min-h-screen lg:w-64 lg:shrink-0 lg:justify-between lg:gap-0 lg:border-b-0 lg:border-r lg:border-slate-800 lg:bg-slate-950 lg:px-5 lg:py-6 lg:shadow-none">
 
@@ -326,6 +327,7 @@
             @endif
 
         </aside>
+        @endunless
 
         {{-- ================= KHUNG NỘI DUNG CHÍNH BÊN PHẢI ================= --}}
         <div class="min-w-0 flex-1 flex flex-col min-h-screen">
@@ -350,8 +352,20 @@
                     {{-- Avatar nhanh trên Header mobile/desktop --}}
                     @if (auth()->check())
                     <div class="flex items-center gap-2 border-l border-slate-200 pl-2 dark:border-slate-700">
+                        <div class="flex flex-col items-center gap-1">
                         <span
                             class="hidden text-xs font-semibold text-slate-700 dark:text-slate-200 md:inline">{{ auth()->user()->full_name }}</span>
+                        {{-- Tài khoản order không có menu trái: nút Đăng xuất nằm dưới tên --}}
+                        @if (auth()->user()->hasRole(\App\Helpers\ConstantHelper::ROLE_WAITER))
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit" class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-100 hover:text-red-800">
+                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" /></svg>
+                                    Đăng xuất
+                                </button>
+                            </form>
+                        @endif
+                        </div>
                     </div>
                     @endif
                 </div>
