@@ -52,6 +52,16 @@ class AuthController extends Controller
         $request->session()->regenerate();
         Auth::user()?->forceFill(['last_login_at' => now()])->save();
 
+        // Tài khoản order (phục vụ): vào thẳng POS & Sơ đồ bàn.
+        if (Auth::user()?->hasRole(\App\Helpers\ConstantHelper::ROLE_WAITER)) {
+            return redirect()->route('tables.index');
+        }
+
+        // Tài khoản bếp: vào thẳng Màn hình bếp (KDS).
+        if (Auth::user()?->hasRole(\App\Helpers\ConstantHelper::ROLE_KITCHEN)) {
+            return redirect()->route('kitchen.index');
+        }
+
         return redirect()->route('admin.dashboard');
     }
 
