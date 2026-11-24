@@ -80,9 +80,9 @@
         </div>
 
         <div class="rounded-2xl border border-indigo-200/80 bg-indigo-50/70 p-6 shadow-sm dark:border-indigo-800/60 dark:bg-indigo-950/30">
-            <span class="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Tổng số đơn hàng</span>
-            <h3 class="mt-3 text-2xl font-extrabold text-indigo-950 dark:text-white">{{ $tongDon ?? 0 }} đơn</h3>
-            <p class="mt-1 text-xs font-medium text-indigo-700/80 dark:text-indigo-300/70">Đơn hoàn tất trong ngày</p>
+            <span class="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Bát phở đã bán</span>
+            <h3 class="mt-3 text-2xl font-extrabold text-indigo-950 dark:text-white">{{ number_format((int) ($soBatPhoDaBan ?? 0), 0, ',', '.') }} bát phở</h3>
+            <p class="mt-1 text-xs font-medium text-indigo-700/80 dark:text-indigo-300/70">Các món phở bán ra trong ngày</p>
         </div>
 
         <div class="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-6 shadow-sm dark:border-amber-800/60 dark:bg-amber-950/30">
