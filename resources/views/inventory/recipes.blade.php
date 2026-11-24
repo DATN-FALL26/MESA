@@ -78,6 +78,49 @@
             </div>
         </div>
 
+        <!-- DISH COST & PROFIT METRICS CARDS (Tự động cập nhật khi chọn món / biến thể) -->
+        <div id="dish-cost-cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 hidden">
+            <!-- Card 1: Giá bán -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Giá bán niêm yết</span>
+                    <span class="text-xs">🏷️</span>
+                </div>
+                <div class="mt-2 text-xl font-extrabold text-slate-900" id="card-selling-price">0 đ</div>
+                <p class="text-[11px] text-slate-400 mt-0.5" id="card-variant-label">Giá bán tiêu chuẩn</p>
+            </div>
+
+            <!-- Card 2: Chi phí nguyên liệu định mức -->
+            <div class="bg-white p-4 rounded-xl border border-amber-200 bg-amber-50/30 shadow-2xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Chi phí NVL (Cost)</span>
+                    <span class="text-xs">🥩</span>
+                </div>
+                <div class="mt-2 text-xl font-extrabold text-amber-900" id="card-recipe-cost">0 đ</div>
+                <p class="text-[11px] text-amber-600 mt-0.5">Theo định lượng BOM & giá kho</p>
+            </div>
+
+            <!-- Card 3: Lợi nhuận gộp dự kiến -->
+            <div class="bg-white p-4 rounded-xl border border-emerald-200 bg-emerald-50/30 shadow-2xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Lãi gộp dự tính</span>
+                    <span class="text-xs">💰</span>
+                </div>
+                <div class="mt-2 text-xl font-extrabold text-emerald-900" id="card-gross-profit">0 đ</div>
+                <p class="text-[11px] text-emerald-600 mt-0.5">Giá bán trừ chi phí nguyên liệu</p>
+            </div>
+
+            <!-- Card 4: Tỷ lệ Food Cost % -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Tỷ lệ Food Cost</span>
+                    <span id="card-food-cost-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">--</span>
+                </div>
+                <div class="mt-2 text-xl font-extrabold text-slate-900" id="card-food-cost-pct">0%</div>
+                <p class="text-[11px] text-slate-400 mt-0.5" id="card-margin-pct">Biên lãi: 0%</p>
+            </div>
+        </div>
+
         <!-- MAIN CONTENT AREA: 2 COLUMNS (RECIPE DETAILS & EXPLOSION SIMULATOR) -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- LEFT 2 COLUMNS: VERSION LIST & INGREDIENT ITEMS -->
@@ -129,15 +172,23 @@
                                     <th class="py-2.5 px-4">Phân loại</th>
                                     <th class="py-2.5 px-4 text-right">Định lượng / Suất</th>
                                     <th class="py-2.5 px-4">Đơn vị (UOM)</th>
+                                    <th class="py-2.5 px-4 text-right">Đơn giá vốn</th>
+                                    <th class="py-2.5 px-4 text-right">Thành tiền (Cost)</th>
                                 </tr>
                             </thead>
                             <tbody id="recipe-items-tbody" class="divide-y divide-slate-100 text-slate-700">
                                 <tr>
-                                    <td colspan="5" class="py-10 text-center text-slate-400">
+                                    <td colspan="7" class="py-10 text-center text-slate-400">
                                         Chưa có công thức nào được chọn để hiển thị.
                                     </td>
                                 </tr>
                             </tbody>
+                            <tfoot id="recipe-items-tfoot" class="bg-slate-50 border-t border-slate-200 hidden font-bold text-xs text-slate-900">
+                                <tr>
+                                    <td colspan="6" class="py-3 px-4 text-right uppercase tracking-wider text-[11px] text-slate-600">Tổng chi phí nguyên liệu định mức (Cost / Suất):</td>
+                                    <td class="py-3 px-4 text-right text-amber-700 font-extrabold text-sm" id="recipe-total-cost-footer">0 đ</td>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                 </div>
@@ -277,6 +328,7 @@
         let currentLoadedRecipes = [];
         let selectedRecipeId = null;
         let activeIngredientsList = [];
+        let currentCostAnalysis = null;
 
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
@@ -341,10 +393,15 @@
             if (!menuItemId) {
                 vContainer.innerHTML = '<p class="text-xs text-slate-400 py-1">Vui lòng chọn món ăn phía trên để tải công thức.</p>';
                 vCount.innerText = '0 phiên bản';
-                tbody.innerHTML = '<tr><td colspan="5" class="py-10 text-center text-slate-400">Chưa có món ăn nào được chọn.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="py-10 text-center text-slate-400">Chưa có món ăn nào được chọn.</td></tr>';
                 document.getElementById('recipe-action-buttons').classList.add('hidden');
+                document.getElementById('dish-cost-cards-container')?.classList.add('hidden');
+                document.getElementById('recipe-items-tfoot')?.classList.add('hidden');
                 return;
             }
+
+            // Đồng thời tải phân tích chi phí nguyên liệu & lợi nhuận
+            loadCostAnalysisForSelected(menuItemId, variantId);
 
             const params = new URLSearchParams({ menu_item_id: menuItemId });
             if (variantId) params.append('variant_id', variantId);
@@ -444,8 +501,73 @@
             });
         }
 
+        async function loadCostAnalysisForSelected(menuItemId, variantId) {
+            const container = document.getElementById('dish-cost-cards-container');
+            if (!menuItemId) {
+                if (container) container.classList.add('hidden');
+                return;
+            }
+
+            try {
+                const url = `/api/v1/inventory/cost-analysis/dishes/${menuItemId}${variantId ? '?variant_id=' + variantId : ''}`;
+                const res = await fetch(url, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (res.ok) {
+                    const json = await res.json();
+                    currentCostAnalysis = json.data;
+                    renderDishCostCards(currentCostAnalysis);
+                    // Cập nhật lại cột giá vốn trên bảng nếu đã render items
+                    const currentRecipe = currentLoadedRecipes.find(r => r.id === selectedRecipeId);
+                    if (currentRecipe) {
+                        renderRecipeDetails(currentRecipe);
+                    }
+                }
+            } catch (e) {
+                console.error('Lỗi tải phân tích chi phí món:', e);
+            }
+        }
+
+        function renderDishCostCards(analysis) {
+            const container = document.getElementById('dish-cost-cards-container');
+            if (!container || !analysis) return;
+
+            container.classList.remove('hidden');
+
+            document.getElementById('card-selling-price').innerText = Number(analysis.selling_price || 0).toLocaleString('vi-VN') + ' đ';
+            document.getElementById('card-variant-label').innerText = analysis.variant_name ? `Biến thể: ${analysis.variant_name}` : 'Món chuẩn (Size gốc)';
+
+            document.getElementById('card-recipe-cost').innerText = Number(analysis.recipe_cost || 0).toLocaleString('vi-VN') + ' đ';
+            document.getElementById('card-gross-profit').innerText = Number(analysis.gross_profit || 0).toLocaleString('vi-VN') + ' đ';
+
+            const fc = Number(analysis.cost_percentage || 0);
+            const margin = Number(analysis.margin_percentage || 0);
+
+            const badge = document.getElementById('card-food-cost-badge');
+            if (badge) {
+                if (!analysis.has_recipe) {
+                    badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500';
+                    badge.innerText = 'Chưa có BOM';
+                } else if (fc <= 35) {
+                    badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800';
+                    badge.innerText = 'Lý tưởng (<35%)';
+                } else if (fc <= 45) {
+                    badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800';
+                    badge.innerText = 'Chấp nhận (35-45%)';
+                } else {
+                    badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800';
+                    badge.innerText = 'Cảnh báo (>45%)';
+                }
+            }
+
+            document.getElementById('card-food-cost-pct').innerText = fc.toFixed(1) + '%';
+            document.getElementById('card-margin-pct').innerText = `Biên lãi: ${margin.toFixed(1)}%`;
+        }
+
         function renderRecipeDetails(recipe) {
             const tbody = document.getElementById('recipe-items-tbody');
+            const tfoot = document.getElementById('recipe-items-tfoot');
+            const footerTotal = document.getElementById('recipe-total-cost-footer');
             const title = document.getElementById('active-recipe-title');
             const subtitle = document.getElementById('active-recipe-subtitle');
             const actionButtons = document.getElementById('recipe-action-buttons');
@@ -455,7 +577,8 @@
                 title.innerText = 'Chi tiết Định lượng';
                 subtitle.innerText = 'Chưa có công thức';
                 actionButtons.classList.add('hidden');
-                tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-400">Không có dữ liệu nguyên liệu.</td></tr>';
+                if (tfoot) tfoot.classList.add('hidden');
+                tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-400">Không có dữ liệu nguyên liệu.</td></tr>';
                 return;
             }
 
@@ -471,9 +594,19 @@
 
             const items = recipe.items || [];
             if (items.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-400">Phiên bản này chưa có dòng nguyên liệu nào.</td></tr>';
+                if (tfoot) tfoot.classList.add('hidden');
+                tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-400">Phiên bản này chưa có dòng nguyên liệu nào.</td></tr>';
                 return;
             }
+
+            const costMap = {};
+            if (currentCostAnalysis && currentCostAnalysis.ingredients) {
+                currentCostAnalysis.ingredients.forEach(ci => {
+                    costMap[ci.ingredient_id] = ci;
+                });
+            }
+
+            let totalRecipeCost = 0;
 
             tbody.innerHTML = items.map(it => {
                 const sku = it.ingredient_sku || it.ingredient?.sku || '—';
@@ -482,16 +615,31 @@
                 const rawType = it.ingredient_type || it.ingredient?.ingredient_type || 'raw';
                 const typeLabel = rawType === 'semi_finished' ? 'Bán thành phẩm' : 'Nguyên liệu thô';
 
+                const ingId = it.ingredient_id;
+                const costInfo = costMap[ingId];
+                const unitCost = costInfo ? Number(costInfo.unit_cost || 0) : 0;
+                const qty = Number(it.quantity || 0);
+                const subtotalCost = costInfo ? Number(costInfo.subtotal_cost || 0) : (unitCost * qty);
+
+                totalRecipeCost += subtotalCost;
+
                 return `
                     <tr class="hover:bg-slate-50/60">
                         <td class="py-2.5 px-4 font-mono font-semibold text-slate-800">${escapeHtml(sku)}</td>
                         <td class="py-2.5 px-4 font-medium text-slate-900">${escapeHtml(name)}</td>
                         <td class="py-2.5 px-4 text-slate-500">${escapeHtml(typeLabel)}</td>
-                        <td class="py-2.5 px-4 text-right font-mono font-bold text-slate-900">${Number(it.quantity || 0).toLocaleString('vi-VN', { maximumFractionDigits: 3 })}</td>
+                        <td class="py-2.5 px-4 text-right font-mono font-bold text-slate-900">${qty.toLocaleString('vi-VN', { maximumFractionDigits: 3 })}</td>
                         <td class="py-2.5 px-4 font-medium text-slate-600">${escapeHtml(uom)}</td>
+                        <td class="py-2.5 px-4 text-right font-mono text-slate-600">${unitCost > 0 ? unitCost.toLocaleString('vi-VN') + ' đ' : '—'}</td>
+                        <td class="py-2.5 px-4 text-right font-mono font-bold text-amber-700">${subtotalCost > 0 ? subtotalCost.toLocaleString('vi-VN') + ' đ' : '—'}</td>
                     </tr>
                 `;
             }).join('');
+
+            if (tfoot && footerTotal) {
+                tfoot.classList.remove('hidden');
+                footerTotal.innerText = totalRecipeCost.toLocaleString('vi-VN') + ' đ';
+            }
         }
 
         async function activateCurrentRecipe() {

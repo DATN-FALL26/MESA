@@ -83,12 +83,15 @@
                     @if (auth()->user()->hasPermission('order.serve'))
                         <x-button :href="route('kitchen.serve.index')" variant="ghost" size="sm">Trang ra món</x-button>
                     @endif
-                    @if (auth()->user()->hasPermission('dashboard.view'))
+                    @if (auth()->user()->hasPermission('dashboard.view') && ! auth()->user()->hasRole(\App\Helpers\ConstantHelper::ROLE_KITCHEN))
                         <x-button :href="route('admin.dashboard')" variant="ghost" size="sm">Quản trị</x-button>
                     @endif
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <x-button type="submit" variant="outline" size="sm">Đăng xuất</x-button>
+                        <button type="submit" class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 active:scale-95">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" /></svg>
+                            Đăng xuất
+                        </button>
                     </form>
                 </div>
             </div>

@@ -90,18 +90,28 @@ class ReturnStockForOrderItemJob implements ShouldQueue
         // 3. Bóc tách lại nguyên liệu tiêu hao đã trừ
         $consumedIngredients = $explosion->explodeOrderItem($orderItem);
 
-        DB::transaction(function () use ($consumedIngredients, $warehouse, $orderItem, $ledger): void {
+        $ingredientIds = array_map(fn ($ing) => (int) $ing->ingredientId, $consumedIngredients);
+        $avgCosts = DB::table('stock_levels')
+            ->where('warehouse_id', $warehouse->id)
+            ->whereIn('ingredient_id', $ingredientIds)
+            ->pluck('avg_cost', 'ingredient_id')
+            ->map(fn ($cost) => (float) $cost)
+            ->toArray();
+
+        DB::transaction(function () use ($consumedIngredients, $warehouse, $orderItem, $ledger, $avgCosts): void {
             foreach ($consumedIngredients as $ingredient) {
                 if ($ingredient->quantity <= 0) {
                     continue;
                 }
+
+                $unitCost = (float) ($avgCosts[$ingredient->ingredientId] ?? 0.0);
 
                 $dto = new StockMovementDTO(
                     warehouseId: $warehouse->id,
                     ingredientId: $ingredient->ingredientId,
                     movementType: MovementType::SALE_RETURN,
                     quantity: abs($ingredient->quantity), // Số lượng dương biểu thị nhập hoàn kho
-                    unitCost: null,
+                    unitCost: $unitCost > 0 ? $unitCost : null,
                     refType: 'order_item',
                     refId: $orderItem->id,
                     idempotencyKey: "return_order_item_{$orderItem->id}_ing_{$ingredient->ingredientId}",
@@ -112,9 +122,12 @@ class ReturnStockForOrderItemJob implements ShouldQueue
                 $ledger->recordMovement($dto);
             }
 
-            // Đặt lại stock_deducted_at về null để chống hoàn kho lần 2
+            // Đặt lại stock_deducted_at và các trường giá vốn về null để chống hoàn kho lần 2
             $orderItem->update([
                 'stock_deducted_at' => null,
+                'cost_price_snapshot' => null,
+                'cogs_total' => null,
+                'gross_profit' => null,
             ]);
         });
 

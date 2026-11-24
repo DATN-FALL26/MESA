@@ -5,104 +5,73 @@ declare(strict_types=1);
 namespace App\Http\Controllers\table\Concerns;
 
 use App\Enums\BranchStatus;
-use App\Enums\ScopeType;
+use App\Helpers\ConstantHelper;
 use App\Models\Branch;
+use App\Models\User;
+use App\Services\Auth\BranchAccessService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 
 trait ResolvesTableBranch
 {
-    /**
-     * Resolve the current branch ID from request parameter, session, authenticated user's role scope,
-     * or fallback to the first active branch in the system.
-     */
-    protected function resolveBranchId(Request $request): int
+    protected BranchAccessService $branchAccess;
+
+    protected function resolveBranchId(Request $request, bool $required = true): ?int
     {
-        // 1. Explicit request input/query
-        if ($request->filled('branch_id')) {
-            $branchId = (int) $request->input('branch_id');
-            if ($branchId > 0 && Branch::query()->whereKey($branchId)->exists()) {
-                $request->session()->put('branch_id', $branchId);
-
-                return $branchId;
-            }
-        }
-
-        // 2. From session if already set and valid
-        $sessionBranchId = (int) $request->session()->get('branch_id');
-        if ($sessionBranchId > 0 && Branch::query()->whereKey($sessionBranchId)->exists()) {
-            return $sessionBranchId;
-        }
-
-        // 3. From user's assigned branch in role scope
         $user = $request->user();
-        if ($user !== null) {
-            $userBranchId = $user->userRoles()
-                ->where('scope_type', ScopeType::BRANCH)
-                ->where('valid_from', '<=', now())
-                ->where(fn ($query) => $query->whereNull('valid_to')->orWhere('valid_to', '>=', now()))
-                ->value('scope_id');
+        abort_unless($user instanceof User, 401);
 
-            if ($userBranchId !== null && Branch::query()->whereKey((int) $userBranchId)->exists()) {
-                $branchId = (int) $userBranchId;
-                $request->session()->put('branch_id', $branchId);
-
-                return $branchId;
-            }
-        }
-
-        // 4. Fallback to the first active branch
-        $defaultBranchId = Branch::query()
-            ->where('status', BranchStatus::ACTIVE)
-            ->orderBy('id')
-            ->value('id');
-
-        if ($defaultBranchId !== null) {
-            $branchId = (int) $defaultBranchId;
+        if ($request->filled('branch_id')) {
+            $branchId = $request->integer('branch_id');
+            $this->branchAccess->authorizeBranch($user, $branchId, [ConstantHelper::PERM_TABLE_VIEW]);
             $request->session()->put('branch_id', $branchId);
 
             return $branchId;
         }
 
-        // 5. Ultimate fallback
-        return 1;
+        $sessionBranchId = $request->session()->get('branch_id');
+        if (is_numeric($sessionBranchId)) {
+            $sessionBranchId = (int) $sessionBranchId;
+            if ($this->branchAccess->canAccessBranch($user, $sessionBranchId, [ConstantHelper::PERM_TABLE_VIEW])) {
+                return $sessionBranchId;
+            }
+
+            $request->session()->forget('branch_id');
+        }
+
+        $branches = $this->accessibleBranches($request);
+        if ($branches->count() === 1) {
+            $branchId = (int) $branches->first()->getKey();
+            $request->session()->put('branch_id', $branchId);
+
+            return $branchId;
+        }
+
+        if ($required) {
+            abort(422, 'Vui lòng chọn chi nhánh trước khi thao tác.');
+        }
+
+        return null;
+    }
+
+    protected function requireBranchId(Request $request): int
+    {
+        return $this->resolveBranchId($request) ?? abort(422, 'Vui lòng chọn chi nhánh trước khi thao tác.');
     }
 
     /**
-     * Get active branches accessible by the current user.
-     *
      * @return Collection<int, Branch>
      */
     protected function accessibleBranches(Request $request): Collection
     {
-        $user = $request->user();
-
-        if ($user !== null && $user->userRoles()->where('scope_type', ScopeType::ALL)->exists()) {
-            return Branch::query()
-                ->where('status', BranchStatus::ACTIVE)
-                ->orderBy('name')
-                ->get();
-        }
-
-        if ($user !== null) {
-            $branchIds = $user->userRoles()
-                ->where('scope_type', ScopeType::BRANCH)
-                ->pluck('scope_id')
-                ->filter()
-                ->unique()
-                ->all();
-
-            if (! empty($branchIds)) {
-                return Branch::query()
-                    ->where('status', BranchStatus::ACTIVE)
-                    ->whereIn('id', $branchIds)
-                    ->orderBy('name')
-                    ->get();
-            }
-        }
+        $branchIds = $this->branchAccess->accessibleBranchIds(
+            $request->user(),
+            [ConstantHelper::PERM_TABLE_VIEW]
+        );
 
         return Branch::query()
             ->where('status', BranchStatus::ACTIVE)
+            ->when(is_array($branchIds), fn ($query) => $query->whereIn('id', $branchIds))
             ->orderBy('name')
             ->get();
     }

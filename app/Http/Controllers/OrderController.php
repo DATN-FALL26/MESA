@@ -7,13 +7,19 @@ use Illuminate\Support\Facades\DB;
 use App\Models\OrderBatch;
 use App\Services\Kitchen\KitchenTicketDispatcher;
 use App\Enums\ItemType;
+use App\Helpers\ConstantHelper;
+use App\Models\User;
+use App\Services\Auth\BranchAccessService;
+use Illuminate\Http\Request;
 
 class OrderController extends Controller
 {
-    public function index()
+    public function __construct(private BranchAccessService $branchAccess) {}
+
+    public function index(Request $request)
     {
-        // Lấy danh sách bàn của chi nhánh 1
-        $tables = DiningTable::where('branch_id', 1)
+        $branchId = $this->currentBranchId($request, ConstantHelper::PERM_ORDER_VIEW);
+        $tables = DiningTable::where('branch_id', $branchId)
             ->where('is_active', 1)
             ->orderBy('sort_order')
             ->get();
@@ -26,7 +32,7 @@ class OrderController extends Controller
                 '=',
                 'dining_sessions.id'
             )
-            ->where('dining_sessions.branch_id', 1)
+            ->where('dining_sessions.branch_id', $branchId)
             ->where('dining_sessions.status', 'open')
             ->whereNull('session_tables.left_at')
             ->select(
@@ -44,17 +50,18 @@ class OrderController extends Controller
         ));
     }
 
-    public function openTable($tableId)
+    public function openTable(Request $request, $tableId)
 {
+    $branchId = $this->currentBranchId($request, ConstantHelper::PERM_ORDER_CREATE);
     $table = DB::table('dining_tables')
         ->where('id', $tableId)
-        ->where('branch_id', 1)
+        ->where('branch_id', $branchId)
         ->where('is_active', 1)
         ->first();
 
     abort_if(!$table, 404);
 
-    $sessionId = DB::transaction(function () use ($table) {
+    $sessionId = DB::transaction(function () use ($table, $request) {
 
         // Khóa bàn để tránh 2 người cùng mở một bàn
         DB::table('dining_tables')
@@ -87,7 +94,7 @@ class OrderController extends Controller
         // Tạo Dining Session mới
         $sessionId = DB::table('dining_sessions')->insertGetId([
             'branch_id'   => $table->branch_id,
-            'opened_by'   => 1,
+            'opened_by'   => $request->user()->getKey(),
             'opened_at'   => now(),
             'closed_at'   => null,
             'guest_count' => 1,
@@ -119,6 +126,31 @@ class OrderController extends Controller
         $sessionId
     );
 }
+
+    private function currentBranchId(Request $request, string $permission): int
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        $branchId = $request->filled('branch_id')
+            ? $request->integer('branch_id')
+            : $request->session()->get('branch_id');
+
+        if (! is_numeric($branchId)) {
+            $accessibleBranchIds = $this->branchAccess->accessibleBranchIds($user, [$permission]);
+            if (is_array($accessibleBranchIds) && count($accessibleBranchIds) === 1) {
+                $branchId = $accessibleBranchIds[0];
+            } else {
+                abort(422, 'Vui lòng chọn chi nhánh trước khi thao tác.');
+            }
+        }
+
+        $branchId = (int) $branchId;
+        $this->branchAccess->authorizeBranch($user, $branchId, [$permission]);
+        $request->session()->put('branch_id', $branchId);
+
+        return $branchId;
+    }
 
     public function showSession($sessionId)
 {

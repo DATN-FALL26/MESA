@@ -12,6 +12,8 @@ use App\Http\Resources\Inventory\ExplodedIngredientResource;
 use App\Http\Resources\Inventory\StockLevelResource;
 use App\Http\Resources\Inventory\StockMovementResource;
 use App\Services\Inventory\RecipeExplosionService;
+use App\Services\Inventory\StockAlertService;
+use App\Services\Inventory\StockBatchService;
 use App\Services\Inventory\StockLedgerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -87,5 +89,125 @@ class StockLedgerController extends Controller
         );
 
         return ExplodedIngredientResource::collection(collect($exploded));
+    }
+
+    /**
+     * Bảng tổng hợp tồn kho và trạng thái chất lượng theo chi nhánh.
+     */
+    public function stockOverview(Request $request, StockAlertService $alertService): JsonResponse
+    {
+        $branchId = $this->requireSelectedBranchId($request);
+        $perPage = (int) ($request->query('per_page') ?? 20);
+
+        $overview = $alertService->getBranchStockOverview($branchId, [
+            'search' => $request->query('search'),
+            'type' => $request->query('type'),
+            'status_filter' => $request->query('status_filter'),
+        ], $perPage);
+
+        return response()->json($overview);
+    }
+
+    /**
+     * Lấy thống kê cảnh báo tồn kho và HSD của chi nhánh.
+     */
+    public function alertSummary(Request $request, StockAlertService $alertService): JsonResponse
+    {
+        $branchId = $this->requireSelectedBranchId($request);
+        $summary = $alertService->getAlertSummary($branchId);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $summary,
+        ]);
+    }
+
+    /**
+     * Kích hoạt quét cảnh báo tồn kho & HSD thủ công từ giao diện.
+     */
+    public function scanAlerts(Request $request, StockAlertService $alertService): JsonResponse
+    {
+        $branchId = $this->requireSelectedBranchId($request);
+        $days = (int) ($request->input('days') ?? 3);
+
+        $lowStock = $alertService->scanLowStockAlerts($branchId);
+        $expiry = $alertService->scanExpiryAlerts($days, $branchId);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Đã quét và cập nhật cảnh báo kho thành công.',
+            'data' => [
+                'low_stock' => $lowStock,
+                'expiry' => $expiry,
+            ],
+        ]);
+    }
+
+    /**
+     * Danh sách các lô hàng (Batches) có phân trang & lọc.
+     */
+    public function batches(Request $request, StockBatchService $batchService): JsonResponse
+    {
+        $branchId = $request->attributes->get('selected_branch_id');
+        $warehouseId = $request->query('warehouse_id');
+
+        if ($branchId === null && ! is_numeric($warehouseId)) {
+            $branchId = $this->requireSelectedBranchId($request);
+        }
+
+        $filters = [
+            'warehouse_id' => $warehouseId,
+            'branch_id' => $branchId,
+            'ingredient_id' => $request->query('ingredient_id'),
+            'status' => $request->query('status'),
+            'search' => $request->query('search'),
+            'expiry_filter' => $request->query('expiry_filter'),
+            'days_threshold' => $request->query('days_threshold', 3),
+        ];
+
+        $batches = $batchService->paginate(array_filter($filters), (int) ($request->query('per_page') ?? 15));
+
+        return response()->json($batches);
+    }
+
+    private function requireSelectedBranchId(Request $request): int
+    {
+        $branchId = $request->attributes->get('selected_branch_id');
+        if (is_numeric($branchId)) {
+            return (int) $branchId;
+        }
+
+        $allowedBranchIds = $request->attributes->get('authorized_branch_ids');
+        if (is_array($allowedBranchIds) && count($allowedBranchIds) === 1) {
+            return (int) $allowedBranchIds[0];
+        }
+
+        abort(422, 'Vui lòng chọn chi nhánh trước khi xem dữ liệu kho.');
+    }
+
+    /**
+     * Tạo mới một lô hàng thủ công (nếu cần quản lý riêng).
+     */
+    public function storeBatch(Request $request, StockBatchService $batchService): JsonResponse
+    {
+        $validated = $request->validate([
+            'batch_code' => ['nullable', 'string', 'max:50'],
+            'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
+            'ingredient_id' => ['required', 'integer', 'exists:ingredients,id'],
+            'quantity' => ['required', 'numeric', 'min:0.001'],
+            'unit_cost' => ['nullable', 'numeric', 'min:0'],
+            'import_date' => ['nullable', 'date'],
+            'expiry_date' => ['required', 'date'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $validated['created_by'] = $request->user()?->id;
+        $batch = $batchService->createBatch($validated);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Đã tạo lô nguyên liệu thành công.',
+            'data' => $batch,
+        ], 201);
     }
 }

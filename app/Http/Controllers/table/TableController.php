@@ -11,6 +11,7 @@ use App\Models\AuditLog;
 use App\Models\DiningTable;
 use App\Models\SessionTable;
 use App\Models\User;
+use App\Services\Auth\BranchAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
@@ -24,10 +25,21 @@ class TableController extends BaseController
 {
     use ResolvesTableBranch;
 
+    public function __construct(BranchAccessService $branchAccess)
+    {
+        $this->branchAccess = $branchAccess;
+    }
+
     public function index(Request $request): View
     {
-        $currentBranchId = $this->resolveBranchId($request);
         $branches = $this->accessibleBranches($request);
+        abort_if($branches->isEmpty(), 403, 'Bạn chưa được cấp quyền xem chi nhánh nào.');
+
+        $currentBranchId = $this->resolveBranchId($request, required: false);
+        if ($currentBranchId === null) {
+            return view('branches.select', ['branches' => $branches]);
+        }
+
         $areas = Area::query()
             ->where('branch_id', $currentBranchId)
             ->where('is_active', true)

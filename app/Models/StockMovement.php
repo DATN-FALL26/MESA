@@ -57,6 +57,11 @@ class StockMovement extends Model
         return $this->belongsTo(Ingredient::class, 'ingredient_id');
     }
 
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(StockBatch::class, 'batch_id');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
