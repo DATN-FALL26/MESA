@@ -382,19 +382,25 @@
                         @endif
                     </div>
                 </div>
-            @else
-                <div class="px-5 py-7 text-center">
-                    <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-                        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 3v15l-3-2-4 2-4-2-3 2V6l3-3Z"/><path d="M9 10h6M9 14h6"/></svg>
-                    </div>
-                    <h2 class="text-lg font-bold text-slate-900">Bàn này chưa có order</h2>
-                    <p class="mt-1 text-sm leading-6 text-slate-500">Bắt đầu gọi món để tạo order cho bàn {{ $session->table_code }}.</p>
-                    <form action="{{ route('orders.start', $session->session_id) }}" method="POST" data-order-ajax class="mt-5">
-                        @csrf
-                        <button type="submit" class="min-h-12 w-full rounded-xl bg-blue-600 px-4 font-semibold text-white transition hover:bg-blue-500">Bắt đầu gọi món</button>
-                    </form>
-                </div>
-            @endif
+@else
+    <div class="px-5 py-7 text-center">
+        <p class="text-sm text-slate-400">
+            Đang chuẩn bị Order cho bàn
+            {{ $session->table_code }}...
+        </p>
+
+        <form
+            id="auto-start-order"
+            action="{{ route('orders.start', $session->session_id) }}"
+            method="POST"
+            data-order-ajax
+            class="hidden"
+        >
+            @csrf
+            <button type="submit">Tạo Order</button>
+        </form>
+    </div>
+@endif
         </aside>
     </div>
 
@@ -602,6 +608,14 @@
     syncMobileBar();
     // Echo được import qua Vite; đợi full load như flow đã test hoạt động trước đây.
     window.addEventListener('load', subscribeOrderRealtime);
+    // Tự động tạo Order khi bàn chưa có Order
+const autoStartForm = document.getElementById('auto-start-order');
+
+if (autoStartForm) {
+    autoStartForm.requestSubmit();
+}
+
 })();
+
 </script>
 @endsection
