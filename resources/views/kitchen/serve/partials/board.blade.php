@@ -32,7 +32,7 @@
                         <ul class="mt-1.5 space-y-0.5 text-sm text-slate-700">
                             @foreach ($group['items'] as $orderItem)
                                 <li>
-                                    <span class="font-bold text-slate-900">{{ $orderItem->quantity }}x</span>
+                                    <span class="font-bold text-slate-900">{{ $orderItem->kitchenTicketItems->last()?->sent_quantity ?? $orderItem->quantity }}x</span>
                                     {{ $orderItem->item_name_snapshot }}
                                     @if ($orderItem->variant_name_snapshot)
                                         <span class="text-slate-500">({{ $orderItem->variant_name_snapshot }})</span>

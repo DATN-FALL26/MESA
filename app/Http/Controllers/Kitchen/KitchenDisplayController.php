@@ -214,7 +214,7 @@ class KitchenDisplayController extends Controller
                 return $this->respond($request, 'Phiếu này không còn món cần chế biến.', false);
             }
 
-            $changedItems->each(fn (KitchenTicketItem $item) => $item->update(['notified_quantity' => $item->orderItem->quantity]));
+            $changedItems->each(fn (KitchenTicketItem $item) => $item->update(['notified_quantity' => $item->sentQuantity()]));
             $this->printer->reprint($kitchenTicket);
 
             return $this->respond($request, 'Đã xác nhận số lượng mới và in lại phiếu.');
@@ -353,7 +353,7 @@ class KitchenDisplayController extends Controller
     public static function isQuantityChanged(KitchenTicketItem $ticketItem): bool
     {
         return $ticketItem->notified_quantity !== null
-            && (int) $ticketItem->notified_quantity !== (int) $ticketItem->orderItem->quantity;
+            && (int) $ticketItem->notified_quantity !== $ticketItem->sentQuantity();
     }
 
     private function hasQuantityChange(KitchenTicket $ticket): bool
@@ -442,11 +442,11 @@ class KitchenDisplayController extends Controller
                 ->whereIn(ConstantHelper::TABLE_KITCHEN_TICKET_ITEMS.'.status', [
                     TicketItemStatus::NEW, TicketItemStatus::SCHEDULED, TicketItemStatus::PREPARING,
                 ])
-                ->sum(ConstantHelper::TABLE_ORDER_ITEMS.'.quantity'),
+                ->sum(DB::raw('COALESCE('.ConstantHelper::TABLE_KITCHEN_TICKET_ITEMS.'.sent_quantity, '.ConstantHelper::TABLE_ORDER_ITEMS.'.quantity)')),
             'done' => (int) $phoItems()
                 ->where(ConstantHelper::TABLE_KITCHEN_TICKET_ITEMS.'.status', TicketItemStatus::READY)
                 ->where(ConstantHelper::TABLE_KITCHEN_TICKET_ITEMS.'.ready_at', '>=', today())
-                ->sum(ConstantHelper::TABLE_ORDER_ITEMS.'.quantity'),
+                ->sum(DB::raw('COALESCE('.ConstantHelper::TABLE_KITCHEN_TICKET_ITEMS.'.sent_quantity, '.ConstantHelper::TABLE_ORDER_ITEMS.'.quantity)')),
         ];
     }
 
@@ -477,7 +477,7 @@ class KitchenDisplayController extends Controller
         $now = now();
 
         // Bếp bấm chuyển trạng thái nghĩa là đã xem số lượng hiện tại (M04-T06).
-        $item->fill(['status' => $status, 'notified_quantity' => $item->orderItem->quantity]);
+        $item->fill(['status' => $status, 'notified_quantity' => $item->sentQuantity()]);
 
         if ($status === TicketItemStatus::PREPARING) {
             $item->started_at = $now;

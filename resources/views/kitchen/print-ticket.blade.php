@@ -100,7 +100,7 @@
                                     <div class="sub">Ghi chú: {{ $orderItem->note }}</div>
                                 @endif
                             </td>
-                            <td class="qty">{{ $orderItem->quantity }}</td>
+                            <td class="qty">{{ $ticketItem->sentQuantity() }}</td>
                         </tr>
                     @endforeach
                 </tbody>

@@ -32,23 +32,35 @@ class OrderPaymentService
 
     /**
      * Món tính tiền (đã gửi bếp, chưa hủy), tổng tiền, đã trả và còn phải trả của order.
+     * Chỉ tính theo số lượng đã gửi bếp: phục vụ bấm +/− mà chưa "Cập nhật bếp" thì chưa tính tiền phần thay đổi.
+     * Mỗi món có thêm payable_quantity / payable_total (số lượng và thành tiền được tính).
      *
-     * @return array{items: Collection<int, OrderItem>, unservedItems: Collection<int, OrderItem>, total: int, paid: int, remaining: int}
+     * @return array{items: Collection<int, OrderItem>, unservedItems: Collection<int, OrderItem>, unconfirmedItems: Collection<int, OrderItem>, total: int, paid: int, remaining: int}
      */
     public function summary(Order $order): array
     {
         $items = $order->items()
             ->whereNotIn('status', [OrderItemStatus::PENDING, OrderItemStatus::CANCELLED])
-            ->with('modifiers')
+            ->with(['modifiers', 'kitchenTicketItems'])
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->each(function (OrderItem $orderItem): void {
+                $quantity = (int) $orderItem->quantity;
+                $sentQuantity = (int) ($orderItem->kitchenTicketItems->sortBy('id')->last()?->sent_quantity ?? $quantity);
 
-        $total = max(0, (int) $items->sum('line_total') - (int) $order->discount_amount);
+                $orderItem->setAttribute('payable_quantity', $sentQuantity);
+                $orderItem->setAttribute('payable_total', $quantity > 0
+                    ? (int) round((int) $orderItem->line_total / $quantity * $sentQuantity)
+                    : 0);
+            });
+
+        $total = max(0, (int) $items->sum('payable_total') - (int) $order->discount_amount);
         $paid = $this->paidAmount($order);
 
         return [
             'items' => $items,
             'unservedItems' => $items->reject(fn (OrderItem $orderItem): bool => $orderItem->status === OrderItemStatus::SERVED),
+            'unconfirmedItems' => $items->filter(fn (OrderItem $orderItem): bool => (int) $orderItem->payable_quantity !== (int) $orderItem->quantity),
             'total' => $total,
             'paid' => $paid,
             'remaining' => max(0, $total - $paid),

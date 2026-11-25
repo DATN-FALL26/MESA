@@ -97,6 +97,8 @@ class KitchenDisplayTest extends TestCase
 
         // Phục vụ tăng số lượng món đã gửi bếp (giống màn gọi món của MOD03).
         $ticket->items()->first()->orderItem->update(['quantity' => 3]);
+        // ... rồi bấm "Cập nhật bếp" thì bếp mới nhận số mới.
+        $ticket->items()->first()->update(['sent_quantity' => 3]);
 
         $this->actingAs($kitchenUser)
             ->get(route('kitchen.board'))
@@ -146,6 +148,7 @@ class KitchenDisplayTest extends TestCase
 
         // Khách gọi thêm trà đá vào cùng món đã xong.
         $ticket->items()->first()->orderItem->update(['quantity' => 2]);
+        $ticket->items()->first()->update(['sent_quantity' => 2]); // bấm "Cập nhật bếp"
 
         $this->actingAs($kitchenUser)
             ->get(route('kitchen.board'))

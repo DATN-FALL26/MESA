@@ -762,7 +762,8 @@ public function updateKitchen($orderId)
             });
     })
     ->select(
-        'kitchen_ticket_items.id as kitchen_item_id'
+        'kitchen_ticket_items.id as kitchen_item_id',
+        'order_items.quantity as order_quantity' // MOD04: số lượng mới để báo bếp
     )
     ->get();
 
@@ -772,6 +773,8 @@ public function updateKitchen($orderId)
             ->where('id', $item->kitchen_item_id)
             ->update([
                 'updated_at' => now(),
+                // MOD04: chỉ khi bấm "Cập nhật bếp" thì bếp và thanh toán mới nhận số lượng mới.
+                'sent_quantity' => $item->order_quantity,
             ]);
     }
 

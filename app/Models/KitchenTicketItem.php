@@ -20,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonInterface|null $ready_at
  * @property CarbonInterface|null $created_at
  * @property CarbonInterface|null $updated_at
+ * @property int|null $notified_quantity
+ * @property int|null $sent_quantity
  * @property-read KitchenTicket $ticket
  * @property-read OrderItem $orderItem
  */
@@ -50,5 +52,13 @@ class KitchenTicketItem extends Model
     public function orderItem(): BelongsTo
     {
         return $this->belongsTo(OrderItem::class, 'order_item_id');
+    }
+
+    /**
+     * MOD04: số lượng đã gửi bếp (Gửi bếp / Cập nhật bếp). Phục vụ bấm +/− mà chưa "Cập nhật bếp" thì bếp vẫn thấy số này.
+     */
+    public function sentQuantity(): int
+    {
+        return (int) ($this->sent_quantity ?? $this->orderItem->quantity);
     }
 }

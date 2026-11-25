@@ -107,6 +107,7 @@ class PaymentTest extends TestCase
         // Khách gọi thêm 1 trà đá vào món đã trả (số lượng 1 → 2).
         $tea = $order->items()->where('item_name_snapshot', 'Trà đá')->firstOrFail();
         $tea->update(['quantity' => 2, 'line_total' => 100_000]);
+        $tea->kitchenTicketItems()->update(['sent_quantity' => 2]); // đã bấm "Cập nhật bếp"
 
         $this->actingAs($this->waiter)
             ->get(route('payments.show', $order))
@@ -141,6 +142,7 @@ class PaymentTest extends TestCase
 
         // Khách gọi thêm và đã gửi bếp → nút "Thanh toán" hiện lại.
         $order->items()->first()->update(['quantity' => 2, 'line_total' => 100_000]);
+        $order->items()->first()->kitchenTicketItems()->update(['sent_quantity' => 2]); // đã bấm "Cập nhật bếp"
 
         $this->actingAs($this->waiter)
             ->get(route('orders.session', $order->session_id))

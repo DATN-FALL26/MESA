@@ -12,6 +12,14 @@
     <div class="space-y-4">
         @include('payments.partials.steps', ['current' => 1])
 
+        @if ($summary['unconfirmedItems']->isNotEmpty())
+            <x-alert type="warning">
+                Có món vừa sửa số lượng nhưng chưa bấm "Cập nhật bếp":
+                {{ $summary['unconfirmedItems']->map(fn ($orderItem) => $orderItem->item_name_snapshot.' ('.$orderItem->payable_quantity.' → '.$orderItem->quantity.')')->join(', ') }}.
+                Hóa đơn đang tính theo số lượng đã gửi bếp; quay lại order bấm "Cập nhật bếp" để tính phần thay đổi.
+            </x-alert>
+        @endif
+
         <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
             {{-- Hóa đơn tạm tính --}}
             <x-card :padding="false">
@@ -20,7 +28,7 @@
                         @if ($summary['unservedItems']->isEmpty())
                             <x-badge color="success" size="sm">Tất cả món đã phục vụ</x-badge>
                         @else
-                            <x-badge color="warning" size="sm">Còn {{ $summary['unservedItems']->sum('quantity') }} món chưa phục vụ</x-badge>
+                            <x-badge color="warning" size="sm">Còn {{ $summary['unservedItems']->sum('payable_quantity') }} món chưa phục vụ</x-badge>
                         @endif
                     </x-slot:actions>
                 </x-card.header>
@@ -43,9 +51,9 @@
                                         <span class="text-slate-500">({{ $orderItem->variant_name_snapshot }})</span>
                                     @endif
                                 </td>
-                                <td class="px-3 py-2.5 text-right tabular-nums">{{ $orderItem->quantity }}</td>
+                                <td class="px-3 py-2.5 text-right tabular-nums">{{ $orderItem->payable_quantity }}</td>
                                 <td class="px-3 py-2.5 text-right tabular-nums text-slate-600">{{ $money((int) $orderItem->unit_price_snapshot) }}</td>
-                                <td class="px-6 py-2.5 text-right tabular-nums text-slate-900">{{ $money((int) $orderItem->line_total) }}</td>
+                                <td class="px-6 py-2.5 text-right tabular-nums text-slate-900">{{ $money((int) $orderItem->payable_total) }}</td>
                             </tr>
                             @foreach ($orderItem->modifiers as $modifier)
                                 <tr class="text-xs text-slate-500">

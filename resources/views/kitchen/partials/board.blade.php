@@ -67,8 +67,8 @@
                                 </p>
                                 <p class="text-xs text-slate-700">
                                     @foreach ($ticket->items as $ticketItem)
-                                        <span class="whitespace-nowrap">{{ $ticketItem->orderItem->quantity }}x {{ $ticketItem->orderItem->item_name_snapshot }}@if (\App\Http\Controllers\Kitchen\KitchenDisplayController::isQuantityChanged($ticketItem))
-                                                <span class="rounded bg-amber-100 px-1 font-semibold text-amber-800">Đã sửa {{ $ticketItem->notified_quantity }}→{{ $ticketItem->orderItem->quantity }}</span>@endif{{ $loop->last ? '' : ',' }}</span>
+                                        <span class="whitespace-nowrap">{{ $ticketItem->sentQuantity() }}x {{ $ticketItem->orderItem->item_name_snapshot }}@if (\App\Http\Controllers\Kitchen\KitchenDisplayController::isQuantityChanged($ticketItem))
+                                                <span class="rounded bg-amber-100 px-1 font-semibold text-amber-800">Đã sửa {{ $ticketItem->notified_quantity }}→{{ $ticketItem->sentQuantity() }}</span>@endif{{ $loop->last ? '' : ',' }}</span>
                                     @endforeach
                                     @foreach ($ticketCancelledItems as $cancelledItem)
                                         <span class="whitespace-nowrap text-red-700"><span class="line-through">{{ $cancelledItem->orderItem->item_name_snapshot }}</span> Đã hủy</span>
@@ -137,7 +137,7 @@
                                 @endphp
                                 <li>
                                     <p class="{{ $columnKey !== 'done' && $ticketItem->status === \App\Enums\TicketItemStatus::READY ? 'text-slate-400 line-through' : 'text-slate-900' }}">
-                                        <span class="font-bold">{{ $orderItem->quantity }}x</span>
+                                        <span class="font-bold">{{ $ticketItem->sentQuantity() }}x</span>
                                         <span class="font-medium">{{ $orderItem->item_name_snapshot }}</span>
                                         @if ($orderItem->variant_name_snapshot)
                                             <span class="text-slate-500">({{ $orderItem->variant_name_snapshot }})</span>
@@ -146,7 +146,7 @@
                                             <span class="font-medium text-red-700">· {{ $orderItem->note }}</span>
                                         @endif
                                         @if ($columnKey !== 'done' && \App\Http\Controllers\Kitchen\KitchenDisplayController::isQuantityChanged($ticketItem))
-                                            <span class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800 no-underline">Đã sửa: {{ $ticketItem->notified_quantity }} → {{ $orderItem->quantity }}</span>
+                                            <span class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800 no-underline">Đã sửa: {{ $ticketItem->notified_quantity }} → {{ $ticketItem->sentQuantity() }}</span>
                                         @endif
                                     </p>
                                     @foreach ($orderItem->modifiers as $modifier)
