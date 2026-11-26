@@ -69,13 +69,20 @@ class OrderPaymentService
 
     /**
      * INV-20: thu tiền mặt cho phần còn phải trả.
+     * $allowPartial (thanh toán kết hợp): khách đưa ít hơn thì chỉ ghi nhận số tiền mặt đó, phần còn lại trả QR.
      */
-    public function payCash(Order $order, int $tenderedAmount, User $cashier): Payment
+    public function payCash(Order $order, int $tenderedAmount, User $cashier, bool $allowPartial = false): Payment
     {
-        return DB::transaction(function () use ($order, $tenderedAmount, $cashier): Payment {
+        return DB::transaction(function () use ($order, $tenderedAmount, $cashier, $allowPartial): Payment {
             $remaining = $this->lockAndGetRemaining($order);
 
-            if ($tenderedAmount < $remaining) {
+            if ($allowPartial && $tenderedAmount <= 0) {
+                throw ValidationException::withMessages([
+                    'tendered_amount' => 'Nhập số tiền mặt khách đưa.',
+                ]);
+            }
+
+            if (! $allowPartial && $tenderedAmount < $remaining) {
                 throw ValidationException::withMessages([
                     'tendered_amount' => 'Tiền khách đưa chưa đủ. Còn thiếu '.number_format($remaining - $tenderedAmount, 0, ',', '.').'đ.',
                 ]);
@@ -83,13 +90,15 @@ class OrderPaymentService
 
             $this->cancelPendingQr($order, 'Đổi sang thanh toán tiền mặt');
 
+            $amount = min($tenderedAmount, $remaining);
+
             return Payment::query()->create([
                 'branch_id' => $order->branch_id,
                 'order_id' => $order->getKey(),
                 'method' => PaymentMethod::CASH,
-                'amount' => $remaining,
+                'amount' => $amount,
                 'tendered_amount' => $tenderedAmount,
-                'change_amount' => $tenderedAmount - $remaining,
+                'change_amount' => $tenderedAmount - $amount,
                 'status' => PaymentStatus::SUCCESS,
                 'confirmed_by' => $cashier->getKey(),
                 'paid_at' => now(),

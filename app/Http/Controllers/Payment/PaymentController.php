@@ -27,6 +27,11 @@ class PaymentController extends Controller
 {
     use ResolvesBranchScope;
 
+    /**
+     * Thanh toán kết hợp: một phần tiền mặt, phần còn lại QR / chuyển khoản.
+     */
+    private const METHOD_MIXED = 'mixed';
+
     public function __construct(private OrderPaymentService $payments) {}
 
     /**
@@ -51,11 +56,16 @@ class PaymentController extends Controller
         $this->authorizeOrder($request, $order, ConstantHelper::PERM_PAYMENT_REQUEST);
 
         $validated = $request->validate([
-            'method' => ['required', Rule::in([PaymentMethod::CASH->value, PaymentMethod::QR->value])],
+            'method' => ['required', Rule::in([PaymentMethod::CASH->value, PaymentMethod::QR->value, self::METHOD_MIXED])],
         ]);
 
         if ($validated['method'] === PaymentMethod::CASH->value) {
             return redirect()->route('payments.cash', $order);
+        }
+
+        // Kết hợp: thu tiền mặt trước, phần còn lại tạo QR.
+        if ($validated['method'] === self::METHOD_MIXED) {
+            return redirect()->route('payments.cash', [$order, 'mixed' => 1]);
         }
 
         $payment = $this->payments->startQr($order, $this->transferNote($order));
@@ -76,7 +86,7 @@ class PaymentController extends Controller
             return redirect()->route('payments.show', $order)->with('success', 'Order này đã được thanh toán đủ.');
         }
 
-        return view('payments.cash', $data);
+        return view('payments.cash', [...$data, 'mixed' => $request->boolean('mixed')]);
     }
 
     public function payCash(Request $request, Order $order): RedirectResponse
@@ -85,9 +95,23 @@ class PaymentController extends Controller
 
         $validated = $request->validate([
             'tendered_amount' => ['required', 'integer', 'min:0', 'max:999999999'],
+            'mixed' => ['nullable', 'boolean'],
         ]);
 
-        $payment = $this->payments->payCash($order, (int) $validated['tendered_amount'], $request->user());
+        $mixed = (bool) ($validated['mixed'] ?? false);
+        $payment = $this->payments->payCash($order, (int) $validated['tendered_amount'], $request->user(), $mixed);
+        $remaining = $this->payments->summary($order)['remaining'];
+
+        // Kết hợp: tiền mặt chưa đủ thì tạo luôn mã QR cho phần còn lại.
+        if ($mixed && $remaining > 0) {
+            $qrPayment = $this->payments->startQr($order, $this->transferNote($order));
+
+            return redirect()->route('payments.qr', $qrPayment)->with('success', sprintf(
+                'Đã thu %sđ tiền mặt. Còn %sđ khách chuyển khoản qua QR.',
+                number_format((int) $payment->amount, 0, ',', '.'),
+                number_format($remaining, 0, ',', '.'),
+            ));
+        }
 
         return redirect()->route('payments.show', $order)->with('success', sprintf(
             'Đã thanh toán %sđ bằng tiền mặt. Tiền thừa trả khách: %sđ.',
