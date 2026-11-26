@@ -270,6 +270,15 @@ class AuthFeatureTest extends TestCase
             ->assertNotFound()
             ->assertSessionHas('branch_id', $otherBranch->id);
 
+        $this->get(route('admin.reports', ['branch_id' => $unauthorizedBranch->id]))
+            ->assertNotFound();
+        $this->get(route('admin.reports.export', ['branch_id' => $unauthorizedBranch->id]))
+            ->assertNotFound();
+        $this->getJson(route('admin.dashboard.payment_stats', ['branch_id' => $unauthorizedBranch->id]))
+            ->assertNotFound();
+        $this->getJson(route('admin.reports.storage', ['branch_id' => $unauthorizedBranch->id]))
+            ->assertNotFound();
+
         $inventoryPermission = Permission::query()
             ->where('code', ConstantHelper::PERM_INVENTORY_VIEW)
             ->firstOrFail();

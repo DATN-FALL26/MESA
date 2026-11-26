@@ -109,4 +109,31 @@ class KitchenQuantityConfirmTest extends TestCase
 
         $this->assertSame(50_000, app(OrderPaymentService::class)->summary($order->fresh())['remaining']);
     }
+
+    public function test_branch_manager_cannot_access_orders_from_another_branch(): void
+    {
+        $otherBranch = $this->createBranch('QTY02');
+        $otherBranchManager = $this->createUserWithRole(ConstantHelper::ROLE_BRANCH_MANAGER, $otherBranch);
+        $order = $this->createSentOrder($this->branch, 'A05', [['Phở Bò Tái', StationCode::PHO]], $this->waiter);
+        $orderItem = $order->items()->sole();
+
+        $this->actingAs($otherBranchManager)
+            ->withSession(['branch_id' => $otherBranch->id]);
+
+        $requests = [
+            fn () => $this->get(route('orders.session', $order->session_id)),
+            fn () => $this->post(route('orders.start', $order->session_id)),
+            fn () => $this->post(route('orders.items.add', [$order->id, $orderItem->menu_item_id])),
+            fn () => $this->post(route('orders.items.decrease', [$order->id, $orderItem->id])),
+            fn () => $this->post(route('orders.items.note', [$order->id, $orderItem->id])),
+            fn () => $this->post(route('orders.send-kitchen', $order->id)),
+            fn () => $this->post(route('orders.update-kitchen', $order->id)),
+        ];
+
+        foreach ($requests as $request) {
+            $request()->assertNotFound();
+        }
+
+        $this->assertSame(1, (int) $orderItem->fresh()->quantity);
+    }
 }

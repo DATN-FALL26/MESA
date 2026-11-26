@@ -2,7 +2,12 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\BranchStatus;
+use App\Helpers\ConstantHelper;
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
+use App\Models\User;
+use App\Services\Auth\BranchAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +15,8 @@ use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
+    public function __construct(private BranchAccessService $branchAccess) {}
+
     private function applyValidOrderScope($query, string $column = 'orders.status')
     {
         $table = str_contains($column, '.') ? explode('.', $column)[0] : 'orders';
@@ -163,13 +170,21 @@ class DashboardController extends Controller
 
     public function index(Request $request)
     {
-        $branchId = $request->input('branch_id');
+        $user = $this->currentUser($request);
+        $branchId = $this->resolveBranchId($request, $user);
+        if ($branchId === false) {
+            return view('branches.select', [
+                'branches' => $this->selectableBranches($user),
+                'action' => route('admin.dashboard'),
+            ]);
+        }
+
         $filter = $request->input('filter', 'week');
         if (!in_array($filter, ['week', 'month', 'year'], true)) {
             $filter = 'week';
         }
 
-        $branches = collect();
+        $branches = $this->selectableBranches($user);
         $doanhThu = 0;
         $tongDon = 0;
         $soBatPhoDaBan = 0;
@@ -179,15 +194,6 @@ class DashboardController extends Controller
         $chartData = [];
         $donHangs = collect();
         $paymentStats = ['cash' => 0, 'transfer' => 0];
-
-        if (Schema::hasTable('branches')) {
-            $branches = DB::table('branches')->orderBy('id')->get();
-            if (!$branchId && $branches->isNotEmpty()) {
-                $firstBranch = $branches->first();
-                $branchId = is_object($firstBranch) ? ($firstBranch->id ?? 1) : ($firstBranch['id'] ?? 1);
-            }
-        }
-        $branchId = (int) ($branchId ?: 1);
 
         $hasBranchOnOrders = Schema::hasTable('orders') && Schema::hasColumn('orders', 'branch_id');
         $amountCol = $this->resolveOrderAmountColumn();
@@ -398,8 +404,12 @@ class DashboardController extends Controller
         ));
     }
 
-    public function orderDetail($id)
+    public function orderDetail(Request $request, $id)
     {
+        $user = $this->currentUser($request);
+        $branchId = $this->resolveBranchId($request, $user);
+        abort_if($branchId === false, 422, 'Vui lòng chọn chi nhánh trước khi xem đơn hàng.');
+
         if (!Schema::hasTable('orders')) {
             return response()->json(['message' => 'Không tìm thấy bảng orders'], 404);
         }
@@ -408,6 +418,14 @@ class DashboardController extends Controller
         if (!$order) {
             return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
         }
+
+        abort_unless(isset($order->branch_id), 404);
+        $this->branchAccess->authorizeBranch(
+            $user,
+            (int) $order->branch_id,
+            [ConstantHelper::PERM_DASHBOARD_VIEW]
+        );
+        abort_unless((int) $order->branch_id === $branchId, 404);
 
         $branchName = null;
         if (Schema::hasTable('branches') && isset($order->branch_id)) {
@@ -489,18 +507,19 @@ class DashboardController extends Controller
 
     public function reports(Request $request)
     {
-        $branchId = (int) $request->input('branch_id', 1);
+        $user = $this->currentUser($request);
+        $branchId = $this->resolveBranchId($request, $user);
+        if ($branchId === false) {
+            return view('branches.select', [
+                'branches' => $this->selectableBranches($user),
+                'action' => route('admin.reports'),
+            ]);
+        }
+
         $fromDate = $request->input('from_date', Carbon::today()->subDays(7)->format('Y-m-d'));
         $toDate = $request->input('to_date', Carbon::today()->format('Y-m-d'));
 
-        $branches = collect();
-        if (Schema::hasTable('branches')) {
-            $branches = DB::table('branches')->orderBy('id')->get();
-            if (!$request->has('branch_id') && $branches->isNotEmpty()) {
-                $firstBranch = $branches->first();
-                $branchId = (int) (is_object($firstBranch) ? ($firstBranch->id ?? 1) : ($firstBranch['id'] ?? 1));
-            }
-        }
+        $branches = $this->selectableBranches($user);
 
         $tongDoanhThuKy = 0.0;
         $tongSoTo = 0;
@@ -642,7 +661,9 @@ class DashboardController extends Controller
 
     public function exportExcel(Request $request)
     {
-        $branchId = $request->input('branch_id');
+        $branchId = $this->resolveBranchId($request, $this->currentUser($request));
+        abort_if($branchId === false, 422, 'Vui lòng chọn chi nhánh trước khi xuất báo cáo.');
+
         $fromDate = $request->input('from_date');
         $toDate = $request->input('to_date');
         $fileName = 'bao-cao-kinh-doanh-' . date('Y-m-d') . '.csv';
@@ -699,7 +720,9 @@ class DashboardController extends Controller
 
     public function getPaymentMethodStats(Request $request)
     {
-        $branchId = session('current_branch_id', $request->input('branch_id', 1));
+        $branchId = $this->resolveBranchId($request, $this->currentUser($request));
+        abort_if($branchId === false, 422, 'Vui lòng chọn chi nhánh trước khi xem thống kê.');
+
         $cashTotal = 0;
         $transferTotal = 0;
 
@@ -732,7 +755,9 @@ class DashboardController extends Controller
 
     public function getFoodStorageReport(Request $request)
     {
-        $branchId = session('current_branch_id', $request->input('branch_id', 1));
+        $branchId = $this->resolveBranchId($request, $this->currentUser($request));
+        abort_if($branchId === false, 422, 'Vui lòng chọn chi nhánh trước khi xem báo cáo.');
+
         $ingredients = collect();
 
         if (Schema::hasTable('ingredients')) {
@@ -747,5 +772,70 @@ class DashboardController extends Controller
             'status' => 'success',
             'data' => $ingredients,
         ]);
+    }
+
+    private function currentUser(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        return $user;
+    }
+
+    private function resolveBranchId(Request $request, User $user): int|false
+    {
+        $permissions = [ConstantHelper::PERM_DASHBOARD_VIEW];
+        $branchIds = $this->branchAccess->accessibleBranchIds($user, $permissions);
+
+        if (is_array($branchIds) && $branchIds === []) {
+            abort(403, 'Bạn chưa được cấp quyền xem chi nhánh nào.');
+        }
+
+        if ($request->filled('branch_id')) {
+            $branchId = $request->integer('branch_id');
+            $this->branchAccess->authorizeBranch($user, $branchId, $permissions);
+            $request->session()->put('branch_id', $branchId);
+
+            return $branchId;
+        }
+
+        $sessionBranchId = $request->session()->get('branch_id');
+        if (is_numeric($sessionBranchId)) {
+            $sessionBranchId = (int) $sessionBranchId;
+            if ($this->branchAccess->canAccessBranch($user, $sessionBranchId, $permissions)) {
+                return $sessionBranchId;
+            }
+
+            $request->session()->forget('branch_id');
+        }
+
+        if (is_array($branchIds) && count($branchIds) > 1) {
+            return false;
+        }
+
+        $branch = $this->selectableBranches($user)->first();
+        abort_if($branch === null, 403, 'Hiện không có chi nhánh đang hoạt động để truy cập.');
+
+        $branchId = (int) $branch->getKey();
+        $request->session()->put('branch_id', $branchId);
+
+        return $branchId;
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, Branch>
+     */
+    private function selectableBranches(User $user): \Illuminate\Database\Eloquent\Collection
+    {
+        $branchIds = $this->branchAccess->accessibleBranchIds(
+            $user,
+            [ConstantHelper::PERM_DASHBOARD_VIEW]
+        );
+
+        return Branch::query()
+            ->where('status', BranchStatus::ACTIVE)
+            ->when(is_array($branchIds), fn ($query) => $query->whereIn('id', $branchIds))
+            ->orderBy('name')
+            ->get();
     }
 }

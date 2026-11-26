@@ -82,6 +82,16 @@ class PaymentHistoryTest extends TestCase
             ->assertSee('Chưa có giao dịch');
     }
 
+    public function test_manager_cannot_view_order_details_from_another_branch(): void
+    {
+        $otherBranch = $this->createBranch('HIS03');
+        $order = $this->createSentOrder($otherBranch, 'C02', [['Phở bò tái', StationCode::PHO]]);
+
+        $this->actingAs($this->manager)
+            ->getJson(route('admin.dashboard.order-detail', ['id' => $order->id]))
+            ->assertNotFound();
+    }
+
     public function test_dashboard_page_loads_payment_chart_from_api_without_merge_markers(): void
     {
         $this->actingAs($this->manager)

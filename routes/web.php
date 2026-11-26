@@ -140,31 +140,34 @@ Route::middleware('auth')->group(function () {
 
 Route::middleware('auth')->prefix('orders')->name('orders.')->group(function () {
     Route::get('/session/{sessionId}', [OrderController::class, 'showSession'])
-        ->middleware('permission:order.view')
+        ->middleware(['permission:order.view', 'branch.access:order.view'])
         ->name('session');
 
     Route::post('/session/{sessionId}/start', [OrderController::class, 'startOrder'])
-        ->middleware('permission:order.create')
+        ->middleware(['permission:order.create', 'branch.access:order.create'])
         ->name('start');
 
     Route::post('/{orderId}/items/{menuItemId}', [OrderController::class, 'addItem'])
-        ->middleware('permission:order.update')
+        ->middleware(['permission:order.update', 'branch.access:order.update'])
         ->name('items.add');
 
     Route::post('/{orderId}/items/{orderItemId}/decrease', [OrderController::class, 'decreaseItem'])
-        ->middleware('permission:order.update')
+        ->middleware(['permission:order.update', 'branch.access:order.update'])
         ->name('items.decrease');
 
     Route::post('/{orderId}/items/{orderItemId}/note', [OrderController::class, 'updateItemNote'])
-        ->middleware('permission:order.update')
+        ->middleware(['permission:order.update', 'branch.access:order.update'])
         ->name('items.note');
 
     Route::post('/{orderId}/send-kitchen', [OrderController::class, 'sendToKitchen'])
-        ->middleware('permission:order.batch.release,order.update,order.create')
+        ->middleware([
+            'permission:order.batch.release,order.update,order.create',
+            'branch.access:order.batch.release,order.update,order.create',
+        ])
         ->name('send-kitchen');
 
     Route::post('/{orderId}/update-kitchen', [OrderController::class, 'updateKitchen'])
-        ->middleware('permission:order.update')
+        ->middleware(['permission:order.update', 'branch.access:order.update'])
         ->name('update-kitchen');
 });
 
