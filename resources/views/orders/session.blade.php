@@ -5,28 +5,34 @@
 
 @section('content')
 @php
-    // Nhóm hiển thị phục vụ tìm kiếm/lọc trong giao diện; không thay đổi item_type nghiệp vụ.
-    $detectMenuGroup = static function ($item): string {
-        $rawType = data_get($item, 'item_type');
-        $type = $rawType instanceof \BackedEnum ? (string) $rawType->value : (string) ($rawType ?? '');
-        $name = mb_strtolower((string) data_get($item, 'name', ''), 'UTF-8');
+    // Tab lọc món lấy theo trang "Danh mục thực đơn" (tên + thứ tự); món chưa có danh mục vào tab "Khác".
+    $menuCategories = \Illuminate\Support\Facades\DB::table('categories')
+        ->where('is_active', 1)
+        ->orderBy('sort_order')
+        ->orderBy('id')
+        ->pluck('name', 'id');
 
-        if ($type === \App\Enums\ItemType::DRINK->value) return 'drink';
-        if ($type === \App\Enums\ItemType::SIDE->value) return 'side';
-        if (str_contains($name, 'phở')) return 'pho';
-        // Fallback chỉ dành cho chip phân loại UI nếu truy vấn menu chưa trả item_type.
-        if ($type === '' && preg_match('/(nước|trà |cà phê|cafe|soda|coca|pepsi|sinh tố)/u', $name)) return 'drink';
-        if ($type === '' && preg_match('/(quẩy|ăn kèm)/u', $name)) return 'side';
-        return 'main';
-    };
+    $detectMenuGroup = static fn ($item): string => isset($menuCategories[data_get($item, 'category_id')])
+        ? 'cat-'.data_get($item, 'category_id')
+        : 'other';
 
-    $groupLabels = [
-        'pho' => 'Phở',
-        'side' => 'Món ăn kèm',
-        'drink' => 'Đồ uống',
-        'main' => 'Món chính',
-    ];
-    $groupCounts = ['pho' => 0, 'side' => 0, 'drink' => 0, 'main' => 0];
+    $groupLabels = [];
+    $groupIcons = [];
+    foreach ($menuCategories as $categoryId => $categoryName) {
+        $groupLabels['cat-'.$categoryId] = $categoryName;
+        $lowerName = mb_strtolower($categoryName, 'UTF-8');
+        // Biểu tượng tab chọn theo tên danh mục.
+        $groupIcons['cat-'.$categoryId] = match (true) {
+            str_contains($lowerName, 'uống') => 'drink',
+            str_contains($lowerName, 'thêm'), str_contains($lowerName, 'kèm') => 'side',
+            str_contains($lowerName, 'phở') => 'pho',
+            default => 'main',
+        };
+    }
+    $groupLabels['other'] = 'Khác';
+    $groupIcons['other'] = 'main';
+
+    $groupCounts = array_fill_keys(array_keys($groupLabels), 0);
     foreach ($menuItems as $menuEntry) {
         $groupCounts[$detectMenuGroup($menuEntry)]++;
     }
@@ -170,11 +176,11 @@
                 @foreach ($groupLabels as $group => $label)
                     @if ($groupCounts[$group] > 0)
                         <button type="button" data-menu-category="{{ $group }}" aria-pressed="false" class="mesa-filter inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition sm:text-sm">
-                            @if ($group === 'drink')
+                            @if ($groupIcons[$group] === 'drink')
                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h15l-2 13H6L4 8ZM2 8h19M8 3l2 5M14 3l-2 5"/></svg>
-                            @elseif ($group === 'side')
+                            @elseif ($groupIcons[$group] === 'side')
                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13h16a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7ZM3 13h18M7 9l1-4M12 9l1-4M17 9l1-4"/></svg>
-                            @elseif ($group === 'pho')
+                            @elseif ($groupIcons[$group] === 'pho')
                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13h18a8 8 0 0 1-8 8h-2a8 8 0 0 1-8-8ZM2 13h20M8 9V3M13 9V3"/></svg>
                             @else
                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13h18M5 13a7 7 0 0 1 14 0M12 6V4M4 19h16"/></svg>

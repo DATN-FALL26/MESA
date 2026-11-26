@@ -5,8 +5,6 @@
 
 @php
     $remaining = $summary['remaining'];
-    // Kết hợp: thu một phần tiền mặt, phần còn lại tạo mã QR.
-    $mixed = $mixed ?? false;
     $money = fn (int $amount): string => number_format($amount, 0, ',', '.').'đ';
     // Gợi ý tiền khách đưa: làm tròn lên các mệnh giá hay dùng
     $quickAmounts = collect([50_000, 100_000, 500_000])
@@ -21,22 +19,12 @@
 
 @section('content')
     <div class="space-y-4">
-        @include('payments.partials.steps', ['current' => 2, 'secondLabel' => $mixed ? 'Tiền mặt + QR' : 'Thanh toán tiền mặt'])
-
-        @if ($mixed)
-            <x-alert type="info">
-                Thanh toán kết hợp: nhập số tiền mặt khách đưa, phần còn lại hệ thống tạo mã QR để khách chuyển khoản.
-            </x-alert>
-        @endif
+        @include('payments.partials.steps', ['current' => 2, 'secondLabel' => 'Thanh toán tiền mặt'])
 
         <form method="POST" action="{{ route('payments.cash.pay', $order) }}" id="cash-form"
               data-remaining="{{ $remaining }}"
-              data-mixed="{{ $mixed ? 1 : 0 }}"
               class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
             @csrf
-            @if ($mixed)
-                <input type="hidden" name="mixed" value="1">
-            @endif
 
             <div class="flex flex-col gap-4">
                 <x-card>
@@ -45,7 +33,7 @@
                 </x-card>
 
                 <x-card class="flex flex-1 flex-col justify-center">
-                    <label for="tendered-display" class="text-xs text-slate-500">{{ $mixed ? 'Tiền mặt khách đưa' : 'Khách đưa' }}</label>
+                    <label for="tendered-display" class="text-xs text-slate-500">Khách đưa</label>
                     <input type="hidden" name="tendered_amount" id="tendered-amount" value="{{ old('tendered_amount', 0) }}">
                     <div id="tendered-display"
                          class="mt-1 rounded-lg border-2 border-red-700 px-4 py-2.5 text-right text-2xl font-bold tabular-nums text-slate-900">
@@ -57,6 +45,7 @@
                             <button type="button" data-quick="{{ $amount }}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium tabular-nums text-slate-700 hover:bg-slate-50">{{ number_format($amount, 0, ',', '.') }}</button>
                         @endforeach
                     </div>
+                    <p class="mt-3 text-xs text-slate-500">Khách đưa thiếu thì phần còn lại sẽ tạo mã QR.</p>
                 </x-card>
 
                 <div id="change-box" class="flex items-center justify-between rounded-xl bg-emerald-50 px-6 py-4 ring-1 ring-emerald-200">
@@ -91,7 +80,6 @@
             const changeLabel = document.getElementById('change-label');
             const changeAmount = document.getElementById('change-amount');
             const confirmButton = document.getElementById('confirm-cash');
-            const isMixed = form.dataset.mixed === '1';
             const format = (value) => value.toLocaleString('vi-VN') + 'đ';
             let tendered = Number(hidden.value) || 0;
             // Mặc định 0đ: nhân viên tự bấm số tiền khách đưa.
@@ -102,21 +90,19 @@
                 display.textContent = format(tendered);
                 const change = tendered - remaining;
                 const isEnough = change >= 0;
-                // Kết hợp: tiền mặt chưa đủ thì phần thiếu chuyển sang QR (không phải lỗi).
-                const isSplit = isMixed && ! isEnough;
+                // Khách đưa thiếu: phần còn lại chuyển sang QR (không phải lỗi).
+                const isSplit = tendered > 0 && ! isEnough;
 
-                changeLabel.textContent = isEnough ? 'Tiền thừa trả khách' : (isSplit ? 'Còn lại chuyển khoản QR' : 'Khách đưa còn thiếu');
+                changeLabel.textContent = isEnough ? 'Tiền thừa trả khách' : 'Còn lại chuyển khoản QR';
                 changeAmount.textContent = format(Math.abs(change));
                 changeBox.className = isEnough
                     ? 'flex items-center justify-between rounded-xl bg-emerald-50 px-6 py-4 ring-1 ring-emerald-200'
-                    : (isSplit
-                        ? 'flex items-center justify-between rounded-xl bg-sky-50 px-6 py-4 ring-1 ring-sky-200'
-                        : 'flex items-center justify-between rounded-xl bg-red-50 px-6 py-4 ring-1 ring-red-200');
-                const tone = isEnough ? 'text-emerald-800' : (isSplit ? 'text-sky-800' : 'text-red-800');
+                    : 'flex items-center justify-between rounded-xl bg-sky-50 px-6 py-4 ring-1 ring-sky-200';
+                const tone = isEnough ? 'text-emerald-800' : 'text-sky-800';
                 changeLabel.className = 'text-sm font-medium ' + tone;
                 changeAmount.className = 'text-2xl font-bold tabular-nums ' + tone;
                 confirmButton.textContent = isSplit ? 'Thu tiền mặt & tạo QR phần còn lại' : 'Xác nhận đã nhận tiền';
-                confirmButton.disabled = isMixed ? tendered <= 0 : ! isEnough;
+                confirmButton.disabled = tendered <= 0;
             }
 
             form.querySelectorAll('[data-quick]').forEach((button) => button.addEventListener('click', () => {

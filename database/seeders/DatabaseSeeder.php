@@ -17,6 +17,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             ReferenceSeeder::class,
             SampleDataSeeder::class,
+            // Thực đơn mới của quán (thay các món mẫu cũ).
+            ThucDonMoiSeeder::class,
         ]);
     }
 }

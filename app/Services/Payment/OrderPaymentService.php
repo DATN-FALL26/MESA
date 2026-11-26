@@ -69,22 +69,16 @@ class OrderPaymentService
 
     /**
      * INV-20: thu tiền mặt cho phần còn phải trả.
-     * $allowPartial (thanh toán kết hợp): khách đưa ít hơn thì chỉ ghi nhận số tiền mặt đó, phần còn lại trả QR.
+     * Khách đưa đủ / thừa: ghi nhận đủ và tính tiền thừa. Khách đưa thiếu: chỉ ghi nhận số tiền mặt đó, phần còn lại trả QR.
      */
-    public function payCash(Order $order, int $tenderedAmount, User $cashier, bool $allowPartial = false): Payment
+    public function payCash(Order $order, int $tenderedAmount, User $cashier): Payment
     {
-        return DB::transaction(function () use ($order, $tenderedAmount, $cashier, $allowPartial): Payment {
+        return DB::transaction(function () use ($order, $tenderedAmount, $cashier): Payment {
             $remaining = $this->lockAndGetRemaining($order);
 
-            if ($allowPartial && $tenderedAmount <= 0) {
+            if ($tenderedAmount <= 0) {
                 throw ValidationException::withMessages([
                     'tendered_amount' => 'Nhập số tiền mặt khách đưa.',
-                ]);
-            }
-
-            if (! $allowPartial && $tenderedAmount < $remaining) {
-                throw ValidationException::withMessages([
-                    'tendered_amount' => 'Tiền khách đưa chưa đủ. Còn thiếu '.number_format($remaining - $tenderedAmount, 0, ',', '.').'đ.',
                 ]);
             }
 

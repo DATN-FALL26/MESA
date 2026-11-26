@@ -18,7 +18,7 @@ use Tests\Feature\Concerns\BuildsKitchenOrders;
 use Tests\TestCase;
 
 /**
- * Thanh toán kết hợp: một phần tiền mặt, phần còn lại QR / chuyển khoản.
+ * Thanh toán tiền mặt: khách đưa thiếu thì phần còn lại trả QR / chuyển khoản.
  */
 class PaymentMixedTest extends TestCase
 {
@@ -42,26 +42,28 @@ class PaymentMixedTest extends TestCase
         $this->waiter = $this->createUserWithRole(ConstantHelper::ROLE_WAITER, $this->branch);
     }
 
-    public function test_mixed_payment_takes_part_cash_then_qr_for_the_rest(): void
+    public function test_payment_page_only_offers_cash_and_qr(): void
     {
-        $order = $this->createSentOrder($this->branch, 'A05', [['Phở Bò Tái', StationCode::PHO]], $this->waiter);
+        $order = $this->createSentOrder($this->branch, 'A04', [['Phở Bò Tái', StationCode::PHO]], $this->waiter);
 
         $this->actingAs($this->waiter)
             ->get(route('payments.show', $order))
-            ->assertSee('Kết hợp (tiền mặt + QR)');
+            ->assertSee('Tiền mặt')
+            ->assertSee('QR / chuyển khoản')
+            ->assertDontSee('Kết hợp');
 
         $this->actingAs($this->waiter)
-            ->post(route('payments.start', $order), ['method' => 'mixed'])
-            ->assertRedirect(route('payments.cash', [$order, 'mixed' => 1]));
+            ->get(route('payments.cash', $order))
+            ->assertSee('Khách đưa thiếu thì phần còn lại sẽ tạo mã QR.');
+    }
 
-        $this->actingAs($this->waiter)
-            ->get(route('payments.cash', [$order, 'mixed' => 1]))
-            ->assertSee('Thanh toán kết hợp')
-            ->assertSee('name="mixed"', false);
+    public function test_short_cash_is_recorded_then_qr_for_the_rest(): void
+    {
+        $order = $this->createSentOrder($this->branch, 'A05', [['Phở Bò Tái', StationCode::PHO]], $this->waiter);
 
         // Khách đưa 30.000đ tiền mặt: ghi nhận 30.000đ, tự tạo mã QR 20.000đ cho phần còn lại.
         $response = $this->actingAs($this->waiter)
-            ->post(route('payments.cash.pay', $order), ['tendered_amount' => 30_000, 'mixed' => 1]);
+            ->post(route('payments.cash.pay', $order), ['tendered_amount' => 30_000]);
 
         $cash = Payment::query()->where('order_id', $order->id)->where('method', PaymentMethod::CASH)->sole();
         $this->assertSame(30_000, (int) $cash->amount);
@@ -82,12 +84,12 @@ class PaymentMixedTest extends TestCase
         $this->assertSame(0, $summary['remaining']);
     }
 
-    public function test_mixed_payment_with_enough_cash_works_like_normal_cash(): void
+    public function test_enough_cash_gives_change(): void
     {
         $order = $this->createSentOrder($this->branch, 'A06', [['Phở Bò Tái', StationCode::PHO]], $this->waiter);
 
         $this->actingAs($this->waiter)
-            ->post(route('payments.cash.pay', $order), ['tendered_amount' => 100_000, 'mixed' => 1])
+            ->post(route('payments.cash.pay', $order), ['tendered_amount' => 100_000])
             ->assertRedirect(route('payments.show', $order));
 
         $cash = Payment::query()->where('order_id', $order->id)->sole();
@@ -95,23 +97,12 @@ class PaymentMixedTest extends TestCase
         $this->assertSame(50_000, (int) $cash->change_amount);
     }
 
-    public function test_mixed_payment_requires_some_cash(): void
+    public function test_cash_requires_some_amount(): void
     {
         $order = $this->createSentOrder($this->branch, 'A07', [['Phở Bò Tái', StationCode::PHO]], $this->waiter);
 
         $this->actingAs($this->waiter)
-            ->post(route('payments.cash.pay', $order), ['tendered_amount' => 0, 'mixed' => 1])
-            ->assertSessionHasErrors('tendered_amount');
-
-        $this->assertSame(0, Payment::query()->where('order_id', $order->id)->count());
-    }
-
-    public function test_normal_cash_still_rejects_short_amount(): void
-    {
-        $order = $this->createSentOrder($this->branch, 'A08', [['Phở Bò Tái', StationCode::PHO]], $this->waiter);
-
-        $this->actingAs($this->waiter)
-            ->post(route('payments.cash.pay', $order), ['tendered_amount' => 30_000])
+            ->post(route('payments.cash.pay', $order), ['tendered_amount' => 0])
             ->assertSessionHasErrors('tendered_amount');
 
         $this->assertSame(0, Payment::query()->where('order_id', $order->id)->count());

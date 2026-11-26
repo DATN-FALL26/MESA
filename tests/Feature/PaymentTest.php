@@ -87,7 +87,7 @@ class PaymentTest extends TestCase
         $order = $this->createSentOrder($this->branch, 'B05', [['Phở bò tái', StationCode::PHO]]);
 
         $this->actingAs($this->waiter)
-            ->post(route('payments.cash.pay', $order), ['tendered_amount' => 20_000])
+            ->post(route('payments.cash.pay', $order), ['tendered_amount' => 0])
             ->assertSessionHasErrors('tendered_amount');
         $this->assertDatabaseCount('payments', 0);
 
