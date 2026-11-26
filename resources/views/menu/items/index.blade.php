@@ -92,7 +92,7 @@
                                 <td class="py-3 px-4">
                                     <div class="flex items-center gap-3">
                                         @if ($item->image_path)
-                                            <img src="{{ asset('storage/'.$item->image_path) }}" alt="" class="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0">
+                                            <img src="{{ $item->image_url }}" alt="" class="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0">
                                         @else
                                             <div class="w-10 h-10 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
                                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">

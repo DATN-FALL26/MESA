@@ -201,8 +201,8 @@
                              data-menu-group="{{ $menuGroup }}"
                              data-menu-search-text="{{ $item->name }} {{ $item->description }}">
                         <div class="h-[104px] w-[104px] shrink-0 overflow-hidden rounded-xl bg-slate-100 sm:h-[114px] sm:w-[114px]">
-                            @if ($item->image_path && file_exists(public_path($item->image_path)))
-                                <img src="{{ asset($item->image_path) }}" alt="{{ $item->name }}" class="h-full w-full object-cover" loading="lazy" />
+                            @if ($item->image_path)
+                                <img src="{{ \App\Models\MenuItem::imageUrlFor($item->image_path) }}" alt="{{ $item->name }}" class="h-full w-full object-cover" loading="lazy" />
                             @else
                                 <div class="flex h-full w-full items-center justify-center text-center text-xs text-slate-500">Chưa có ảnh</div>
                             @endif

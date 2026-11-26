@@ -64,6 +64,31 @@ class MenuItem extends Model
         ];
     }
 
+    /**
+     * Link ảnh món dùng chung cho mọi màn hình.
+     * Ảnh mẫu nằm sẵn trong public/images, ảnh tải lên nằm trong storage (cần `php artisan storage:link`).
+     */
+    public static function imageUrlFor(?string $imagePath): ?string
+    {
+        if ($imagePath === null || $imagePath === '') {
+            return null;
+        }
+
+        if (! str_starts_with($imagePath, 'images/')) {
+            return asset('storage/'.$imagePath);
+        }
+
+        // Thêm ?v= theo thời gian sửa file để trình duyệt không giữ ảnh cũ khi đổi ảnh cùng tên.
+        $fullPath = public_path($imagePath);
+
+        return asset($imagePath).(is_file($fullPath) ? '?v='.filemtime($fullPath) : '');
+    }
+
+    public function getImageUrlAttribute(): ?string
+    {
+        return self::imageUrlFor($this->image_path);
+    }
+
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class, 'category_id');

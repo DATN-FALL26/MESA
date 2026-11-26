@@ -183,14 +183,15 @@ class MenuItemTest extends TestCase
 
     public function test_image_is_stored_replaced_and_removed(): void
     {
-        Storage::fake('public');
+        // Ảnh món lưu vào public/images/<sku>.<đuôi> (ổ menu_images) để đi theo git.
+        Storage::fake('menu_images');
         $manager = $this->createUserWithRole(ConstantHelper::ROLE_BRANCH_MANAGER);
         $this->actingAs($manager);
 
         $this->post(route('menu.items.store'), $this->payload(['image' => UploadedFile::fake()->image('pho.jpg', 200, 200)]))->assertRedirect();
         $item = MenuItem::query()->where('sku', 'PHO-BO')->firstOrFail();
-        $this->assertNotNull($item->image_path);
-        Storage::disk('public')->assertExists($item->image_path);
+        $this->assertSame('images/pho-bo.jpg', $item->image_path);
+        Storage::disk('menu_images')->assertExists($item->image_path);
         $firstImage = $item->image_path;
 
         $this->put(route('menu.items.update', $item), $this->payload([
@@ -198,14 +199,14 @@ class MenuItemTest extends TestCase
             'image' => UploadedFile::fake()->image('moi.png', 200, 200),
         ]))->assertRedirect();
         $item->refresh();
-        $this->assertNotSame($firstImage, $item->image_path);
-        Storage::disk('public')->assertMissing($firstImage);
-        Storage::disk('public')->assertExists($item->image_path);
+        $this->assertSame('images/pho-bo.png', $item->image_path);
+        Storage::disk('menu_images')->assertMissing($firstImage);
+        Storage::disk('menu_images')->assertExists($item->image_path);
 
         $current = $item->image_path;
         $this->put(route('menu.items.update', $item), $this->payload(['category_id' => $item->category_id, 'remove_image' => 1]))->assertRedirect();
         $this->assertNull($item->fresh()->image_path);
-        Storage::disk('public')->assertMissing($current);
+        Storage::disk('menu_images')->assertMissing($current);
 
         $this->post(route('menu.items.store'), $this->payload(['sku' => 'FILE-LOI', 'image' => UploadedFile::fake()->create('x.pdf', 10, 'application/pdf')]))
             ->assertSessionHasErrors('image');

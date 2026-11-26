@@ -16,6 +16,7 @@ use App\Models\MenuItem;
 use App\Models\ModifierGroup;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -75,7 +76,7 @@ class MenuItemController extends Controller
     {
         $data = $request->itemData();
         $imagePath = $request->hasFile('image')
-            ? $request->file('image')->store('menu-items', 'public')
+            ? $this->storeImage($request->file('image'), $data['sku'])
             : null;
 
         try {
@@ -102,9 +103,7 @@ class MenuItemController extends Controller
                 return $menuItem;
             });
         } catch (Throwable $exception) {
-            if ($imagePath !== null) {
-                Storage::disk('public')->delete($imagePath);
-            }
+            $this->deleteImage($imagePath);
 
             throw $exception;
         }
@@ -141,7 +140,7 @@ class MenuItemController extends Controller
         $newImage = null;
 
         if ($request->hasFile('image')) {
-            $newImage = $request->file('image')->store('menu-items', 'public');
+            $newImage = $this->storeImage($request->file('image'), $data['sku'] ?? $menuItem->sku);
             $data['image_path'] = $newImage;
         } elseif ($request->boolean('remove_image')) {
             $data['image_path'] = null;
@@ -150,15 +149,15 @@ class MenuItemController extends Controller
         try {
             $menuItem->update($data);
         } catch (Throwable $exception) {
-            if ($newImage !== null) {
-                Storage::disk('public')->delete($newImage);
+            if ($newImage !== $oldImage) {
+                $this->deleteImage($newImage);
             }
 
             throw $exception;
         }
 
         if (array_key_exists('image_path', $data) && $oldImage !== null && $oldImage !== $data['image_path']) {
-            Storage::disk('public')->delete($oldImage);
+            $this->deleteImage($oldImage);
         }
 
         return redirect()->route('menu.items.edit', $menuItem)->with('success', 'Đã cập nhật món.');
@@ -211,5 +210,36 @@ class MenuItemController extends Controller
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Lưu ảnh vào public/images/<sku viết thường>.<đuôi> để ảnh đi theo git.
+     * Seeder ThucDonMoiSeeder cũng tìm ảnh theo đúng tên này.
+     */
+    private function storeImage(UploadedFile $file, string $sku): string
+    {
+        $fileName = strtolower((string) preg_replace('/[^A-Za-z0-9_-]+/', '_', $sku)).'.'.$file->extension();
+
+        Storage::disk('menu_images')->putFileAs('images', $file, $fileName);
+
+        return 'images/'.$fileName;
+    }
+
+    /**
+     * Xóa ảnh cũ: ảnh mới nằm trong public/images, ảnh tải lên trước đây nằm trong storage.
+     */
+    private function deleteImage(?string $imagePath): void
+    {
+        if ($imagePath === null || $imagePath === '') {
+            return;
+        }
+
+        if (str_starts_with($imagePath, 'images/')) {
+            Storage::disk('menu_images')->delete($imagePath);
+
+            return;
+        }
+
+        Storage::disk('public')->delete($imagePath);
     }
 }

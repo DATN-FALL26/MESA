@@ -209,6 +209,12 @@ class ThucDonMoiSeeder extends Seeder
                 'updated_at' => now(),
             ];
 
+            // Ảnh món đi theo git: đặt file public/images/<sku viết thường>.jpg|png|webp là seeder tự gắn.
+            $imagePath = $this->imagePathFor($item['sku']);
+            if ($imagePath !== null) {
+                $row['image_path'] = $imagePath;
+            }
+
             $existing = DB::table(ConstantHelper::TABLE_MENU_ITEMS)->where('sku', $item['sku'])->first();
 
             if ($existing) {
@@ -216,7 +222,7 @@ class ThucDonMoiSeeder extends Seeder
                 $itemIds[$item['sku']] = (int) $existing->id;
             } else {
                 $itemIds[$item['sku']] = (int) DB::table(ConstantHelper::TABLE_MENU_ITEMS)->insertGetId(
-                    array_merge($row, ['sku' => $item['sku'], 'image_path' => null, 'created_at' => now()])
+                    array_merge(['image_path' => null], $row, ['sku' => $item['sku'], 'created_at' => now()])
                 );
             }
         }
@@ -227,6 +233,23 @@ class ThucDonMoiSeeder extends Seeder
             ->update(['is_active' => false, 'is_default' => false, 'updated_at' => now()]);
 
         return $itemIds;
+    }
+
+    /**
+     * Tìm ảnh món trong public/images theo sku (vd PHO_GAU -> images/pho_gau.jpg).
+     * Không có file thì giữ nguyên ảnh hiện tại của món.
+     */
+    private function imagePathFor(string $sku): ?string
+    {
+        foreach (['jpg', 'jpeg', 'png', 'webp'] as $extension) {
+            $relativePath = 'images/'.strtolower($sku).'.'.$extension;
+
+            if (is_file(public_path($relativePath))) {
+                return $relativePath;
+            }
+        }
+
+        return null;
     }
 
     /**

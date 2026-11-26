@@ -111,7 +111,7 @@
             <div class="p-6 space-y-4 border-t border-slate-100">
                 <h2 class="text-sm font-bold text-slate-900">Hình ảnh</h2>
                 <div class="flex flex-wrap items-center gap-4">
-                    <img id="image-preview" src="{{ $menuItem->image_path ? asset('storage/'.$menuItem->image_path) : '' }}" alt=""
+                    <img id="image-preview" src="{{ $menuItem->image_url ?? '' }}" alt=""
                         class="w-20 h-20 rounded-lg object-cover border border-slate-200 {{ $menuItem->image_path ? '' : 'hidden' }}">
                     <div class="flex-1 min-w-60">
                         <input type="file" name="image" id="image" accept="image/jpeg,image/png,image/webp"
