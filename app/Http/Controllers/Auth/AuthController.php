@@ -1,0 +1,94 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Auth;
+
+use App\Enums\UserStatus;
+use App\Http\Controllers\Controller;
+use App\Services\Auth\BranchAccessService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
+
+class AuthController extends Controller
+{
+    public function showLogin(): View
+    {
+        return view('auth.login');
+    }
+
+    public function login(Request $request, BranchAccessService $branchAccess): RedirectResponse
+    {
+        $validated = $request->validate([
+            'login' => ['required', 'string', 'max:150'],
+            'password' => ['required', 'string'],
+        ]);
+
+        $field = filter_var($validated['login'], FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+
+        if (! Auth::attempt([
+            $field => $validated['login'],
+            'password' => $validated['password'],
+            'status' => UserStatus::ACTIVE->value,
+        ], $request->boolean('remember'))) {
+            return back()
+                ->withErrors([
+                    'login' => 'Tên đăng nhập hoặc mật khẩu không chính xác.',
+                ])
+                ->onlyInput('login');
+        }
+
+        $user = Auth::user();
+        if (! $user?->activeRoles()->exists()) {
+            Auth::logout();
+
+            return back()
+                ->withErrors([
+                    'login' => 'Tài khoản không có vai trò nhân viên đang hoạt động.',
+                ])
+                ->onlyInput('login');
+        }
+
+        $accessibleBranchIds = $branchAccess->accessibleBranchIds($user);
+        if (is_array($accessibleBranchIds) && $accessibleBranchIds === []) {
+            Auth::logout();
+
+            return back()
+                ->withErrors([
+                    'login' => 'Tài khoản chưa được cấp quyền truy cập chi nhánh đang hoạt động.',
+                ])
+                ->onlyInput('login');
+        }
+
+        $request->session()->regenerate();
+        $request->session()->forget('branch_id');
+        if (is_array($accessibleBranchIds) && count($accessibleBranchIds) === 1) {
+            $request->session()->put('branch_id', $accessibleBranchIds[0]);
+        }
+        $user->forceFill(['last_login_at' => now()])->save();
+
+        // Tài khoản order (phục vụ): vào thẳng POS & Sơ đồ bàn.
+        if (Auth::user()?->hasRole(\App\Helpers\ConstantHelper::ROLE_WAITER)) {
+            return redirect()->route('tables.index');
+        }
+
+        // Tài khoản bếp: vào thẳng Màn hình bếp (KDS).
+        if (Auth::user()?->hasRole(\App\Helpers\ConstantHelper::ROLE_KITCHEN)) {
+            return redirect()->route('kitchen.index');
+        }
+
+        return redirect()->route('admin.dashboard');
+    }
+
+    public function logout(Request $request): RedirectResponse
+    {
+        Auth::logout();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->route('login');
+    }
+}

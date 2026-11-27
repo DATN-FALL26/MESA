@@ -47,6 +47,16 @@ return [
             'report' => false,
         ],
 
+        // Ảnh món lưu thẳng vào public/images (có trong git) để cả nhóm lấy code về đều thấy.
+        'menu_images' => [
+            'driver' => 'local',
+            'root' => public_path(),
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/'),
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
