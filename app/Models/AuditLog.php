@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Helpers\ConstantHelper;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property int $id
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property array<string, mixed>|null $new_value
  * @property string|null $ip_address
  * @property CarbonInterface|null $created_at
+ * @property-read User|null $user
  */
 class AuditLog extends Model
 {
@@ -37,5 +39,10 @@ class AuditLog extends Model
             'old_value' => 'array',
             'new_value' => 'array',
         ];
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

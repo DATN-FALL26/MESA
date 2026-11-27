@@ -8,6 +8,7 @@ use App\DTOs\Inventory\StockMovementDTO;
 use App\Enums\MovementType;
 use App\Enums\PurchaseOrderSource;
 use App\Enums\PurchaseOrderStatus;
+use App\Models\AuditLog;
 use App\Models\BranchMenuItem;
 use App\Models\Ingredient;
 use App\Models\KitchenDailyCheckin;
@@ -227,6 +228,38 @@ class KitchenDailyCheckinService
                 if ($action === 'out_of_stock') {
                     $this->syncMenuItemAvailability($branchId, $ingredientId, false);
                 }
+            }
+
+            if ($purchaseOrder !== null) {
+                $poItemsCount = 0;
+                $poTotalAmount = 0.0;
+                foreach ($inwardRows as $inwardRow) {
+                    $qty = max(0, (float) ($inwardRow['quantity'] ?? 0));
+                    $ingId = (int) $inwardRow['ingredient_id'];
+                    $sl = $stockLevels->get($ingId);
+                    $price = isset($inwardRow['unit_price']) && is_numeric($inwardRow['unit_price'])
+                        ? max(0, (float) $inwardRow['unit_price'])
+                        : ($sl && (float) $sl->avg_cost > 0 ? (float) $sl->avg_cost : 0.0);
+                    $poItemsCount++;
+                    $poTotalAmount += $qty * $price;
+                }
+
+                AuditLog::query()->create([
+                    'branch_id' => $branchId,
+                    'user_id' => $userId,
+                    'action' => 'purchase_order_kitchen_checkin',
+                    'entity_type' => 'purchase_order',
+                    'entity_id' => $purchaseOrder->id,
+                    'old_value' => null,
+                    'new_value' => [
+                        'status' => PurchaseOrderStatus::RECEIVED->value,
+                        'items_count' => $poItemsCount,
+                        'total_amount' => $poTotalAmount,
+                        'note' => $purchaseOrder->note,
+                    ],
+                    'ip_address' => request()?->ip(),
+                    'created_at' => now(),
+                ]);
             }
 
             Log::info('KitchenDailyCheckinService: Hoàn tất chốt nguyên liệu từ Bếp và đồng bộ PO.', [

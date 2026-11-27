@@ -77,10 +77,12 @@ class PurchaseOrderController extends Controller
     {
         $data = $request->safe()->except('items');
         $items = $request->has('items') ? $request->input('items') : null;
+        $userId = $request->user()?->getKey() ? (int) $request->user()->getKey() : null;
 
-        $updated = $this->poService->update($purchaseOrder, $data, $items);
+        $updated = $this->poService->update($purchaseOrder, $data, $items, $userId);
+        $detailed = $this->poRepository->findByIdWithItems($updated->id) ?? $updated;
 
-        return new PurchaseOrderResource($updated);
+        return new PurchaseOrderResource($detailed);
     }
 
     /**
@@ -90,8 +92,9 @@ class PurchaseOrderController extends Controller
     {
         $userId = (int) $request->user()->getKey();
         $updated = $this->poService->submitForApproval($purchaseOrder, $userId);
+        $detailed = $this->poRepository->findByIdWithItems($updated->id) ?? $updated;
 
-        return new PurchaseOrderResource($updated);
+        return new PurchaseOrderResource($detailed);
     }
 
     /**
@@ -103,8 +106,9 @@ class PurchaseOrderController extends Controller
         $note = $request->input('note');
 
         $updated = $this->poService->approve($purchaseOrder, $approverId, $note);
+        $detailed = $this->poRepository->findByIdWithItems($updated->id) ?? $updated;
 
-        return new PurchaseOrderResource($updated);
+        return new PurchaseOrderResource($detailed);
     }
 
     /**
@@ -116,8 +120,9 @@ class PurchaseOrderController extends Controller
         $note = $request->input('note');
 
         $updated = $this->poService->reject($purchaseOrder, $deciderId, $note);
+        $detailed = $this->poRepository->findByIdWithItems($updated->id) ?? $updated;
 
-        return new PurchaseOrderResource($updated);
+        return new PurchaseOrderResource($detailed);
     }
 
     /**
@@ -129,8 +134,9 @@ class PurchaseOrderController extends Controller
         $note = $request->input('note');
 
         $updated = $this->poService->cancel($purchaseOrder, $userId, $note);
+        $detailed = $this->poRepository->findByIdWithItems($updated->id) ?? $updated;
 
-        return new PurchaseOrderResource($updated);
+        return new PurchaseOrderResource($detailed);
     }
 
     /**
@@ -142,7 +148,8 @@ class PurchaseOrderController extends Controller
         $receivedItems = $request->input('items');
 
         $updated = $this->poService->receive($purchaseOrder, $receiverId, $receivedItems);
+        $detailed = $this->poRepository->findByIdWithItems($updated->id) ?? $updated;
 
-        return new PurchaseOrderResource($updated);
+        return new PurchaseOrderResource($detailed);
     }
 }

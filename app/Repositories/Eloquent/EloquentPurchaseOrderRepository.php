@@ -19,7 +19,7 @@ class EloquentPurchaseOrderRepository implements PurchaseOrderRepositoryInterfac
     public function paginate(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $query = PurchaseOrder::query()
-            ->with(['branch', 'warehouse', 'supplier', 'creator', 'approver', 'receiver', 'items.ingredient'])
+            ->with(['branch', 'warehouse', 'supplier', 'creator', 'approver', 'receiver', 'items.ingredient', 'approvalRequest'])
             ->withCount('items');
 
         if (!empty($filters['branch_id'])) {
@@ -58,7 +58,21 @@ class EloquentPurchaseOrderRepository implements PurchaseOrderRepositoryInterfac
     public function findByIdWithItems(int $id): ?PurchaseOrder
     {
         return PurchaseOrder::query()
-            ->with(['branch', 'warehouse', 'supplier', 'creator', 'approver', 'receiver', 'items.ingredient'])
+            ->with([
+                'branch',
+                'warehouse',
+                'supplier',
+                'creator',
+                'approver',
+                'receiver',
+                'items.ingredient',
+                'approvalRequest.requester',
+                'approvalRequest.decider',
+                'stockBatches.ingredient',
+                'stockMovements.ingredient',
+                'auditLogs.user',
+                'kitchenDailyCheckin.user',
+            ])
             ->find($id);
     }
 

@@ -28,6 +28,8 @@ class PurchaseOrderItemResource extends JsonResource
             'quantity' => (float) $this->quantity,
             'unit_price' => (float) $this->unit_price,
             'received_qty' => (float) $this->received_qty,
+            'batch_no' => $this->batch_no,
+            'expiry_date' => $this->expiry_date,
             'subtotal' => (float) ($this->quantity * $this->unit_price),
         ];
     }

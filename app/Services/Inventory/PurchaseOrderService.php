@@ -10,6 +10,7 @@ use App\Enums\ApprovalType;
 use App\Enums\MovementType;
 use App\Enums\PurchaseOrderStatus;
 use App\Models\ApprovalRequest;
+use App\Models\AuditLog;
 use App\Models\PurchaseOrder;
 use App\Models\Warehouse;
 use App\Repositories\Contracts\PurchaseOrderRepositoryInterface;
@@ -43,7 +44,24 @@ class PurchaseOrderService
         $data['status'] = PurchaseOrderStatus::DRAFT;
         $data['source'] = $data['source'] ?? \App\Enums\PurchaseOrderSource::MANUAL;
 
-        return $this->poRepository->create($data, $items);
+        return DB::transaction(function () use ($data, $items, $userId): PurchaseOrder {
+            $po = $this->poRepository->create($data, $items);
+
+            $totalAmount = collect($items)->sum(
+                fn ($item) => (float) ($item['quantity'] ?? 0) * (float) ($item['unit_price'] ?? 0)
+            );
+
+            $this->recordAuditLog($po, $userId, 'purchase_order_created', null, [
+                'status' => PurchaseOrderStatus::DRAFT->value,
+                'po_no' => $po->po_no,
+                'source' => $po->source?->value,
+                'items_count' => count($items),
+                'total_amount' => $totalAmount,
+                'note' => $po->note,
+            ]);
+
+            return $po;
+        });
     }
 
     /**
@@ -54,7 +72,7 @@ class PurchaseOrderService
      *
      * @throws ValidationException
      */
-    public function update(PurchaseOrder $po, array $data, ?array $items = null): PurchaseOrder
+    public function update(PurchaseOrder $po, array $data, ?array $items = null, ?int $userId = null): PurchaseOrder
     {
         if ($po->status !== PurchaseOrderStatus::DRAFT) {
             throw ValidationException::withMessages([
@@ -70,7 +88,32 @@ class PurchaseOrderService
             ]);
         }
 
-        return $this->poRepository->update($po, $data, $items);
+        return DB::transaction(function () use ($po, $data, $items, $userId): PurchaseOrder {
+            $oldItems = $po->items()->get();
+            $oldSummary = [
+                'warehouse_id' => $po->warehouse_id,
+                'supplier_id' => $po->supplier_id,
+                'items_count' => $oldItems->count(),
+                'total_amount' => (float) $oldItems->sum(fn ($i) => (float) $i->quantity * (float) $i->unit_price),
+                'note' => $po->note,
+            ];
+
+            $updatedPo = $this->poRepository->update($po, $data, $items);
+
+            $newItems = $updatedPo->items;
+            $newSummary = [
+                'warehouse_id' => $updatedPo->warehouse_id,
+                'supplier_id' => $updatedPo->supplier_id,
+                'items_count' => $newItems->count(),
+                'total_amount' => (float) $newItems->sum(fn ($i) => (float) $i->quantity * (float) $i->unit_price),
+                'note' => $updatedPo->note,
+            ];
+
+            $actorId = $userId ?? (int) (auth()->id() ?? $po->created_by);
+            $this->recordAuditLog($updatedPo, $actorId, 'purchase_order_updated', $oldSummary, $newSummary);
+
+            return $updatedPo;
+        });
     }
 
     /**
@@ -93,6 +136,7 @@ class PurchaseOrderService
         }
 
         return DB::transaction(function () use ($po, $userId): PurchaseOrder {
+            $oldStatus = $po->status->value;
             // Chuyển trạng thái PO sang Chờ duyệt
             $updatedPo = $this->poRepository->updateStatus($po, PurchaseOrderStatus::PENDING_APPROVAL);
 
@@ -110,6 +154,14 @@ class PurchaseOrderService
                     'decided_at' => null,
                     'note' => $po->note,
                 ]
+            );
+
+            $this->recordAuditLog(
+                $updatedPo,
+                $userId,
+                'purchase_order_submitted',
+                ['status' => $oldStatus],
+                ['status' => PurchaseOrderStatus::PENDING_APPROVAL->value, 'note' => $po->note]
             );
 
             return $updatedPo;
@@ -130,6 +182,7 @@ class PurchaseOrderService
         }
 
         return DB::transaction(function () use ($po, $approverId, $note): PurchaseOrder {
+            $oldStatus = $po->status->value;
             $updatedPo = $this->poRepository->updateStatus($po, PurchaseOrderStatus::APPROVED, [
                 'approved_by' => $approverId,
                 'approved_at' => now(),
@@ -143,6 +196,14 @@ class PurchaseOrderService
                     'decided_at' => now(),
                     'note' => $note ?? $po->note,
                 ]);
+
+            $this->recordAuditLog(
+                $updatedPo,
+                $approverId,
+                'purchase_order_approved',
+                ['status' => $oldStatus],
+                ['status' => PurchaseOrderStatus::APPROVED->value, 'note' => $note]
+            );
 
             return $updatedPo;
         });
@@ -162,6 +223,7 @@ class PurchaseOrderService
         }
 
         return DB::transaction(function () use ($po, $deciderId, $note): PurchaseOrder {
+            $oldStatus = $po->status->value;
             $updatedPo = $this->poRepository->updateStatus($po, PurchaseOrderStatus::DRAFT, [
                 'approved_by' => null,
                 'approved_at' => null,
@@ -175,6 +237,14 @@ class PurchaseOrderService
                     'decided_at' => now(),
                     'note' => $note,
                 ]);
+
+            $this->recordAuditLog(
+                $updatedPo,
+                $deciderId,
+                'purchase_order_rejected',
+                ['status' => $oldStatus],
+                ['status' => PurchaseOrderStatus::DRAFT->value, 'note' => $note]
+            );
 
             return $updatedPo;
         });
@@ -193,7 +263,9 @@ class PurchaseOrderService
             ]);
         }
 
-        return DB::transaction(function () use ($po, $note): PurchaseOrder {
+        return DB::transaction(function () use ($po, $userId, $note): PurchaseOrder {
+            $oldStatus = $po->status->value;
+            $cancelNote = $note ?? 'Đơn hàng đã bị hủy bởi người dùng.';
             $updatedPo = $this->poRepository->updateStatus($po, PurchaseOrderStatus::CANCELLED, [
                 'note' => $note ?? $po->note,
             ]);
@@ -202,8 +274,18 @@ class PurchaseOrderService
                 ->where('ref_id', $po->id)
                 ->update([
                     'status' => ApprovalStatus::REJECTED,
-                    'note' => $note ?? 'Đơn hàng đã bị hủy bởi người dùng.',
+                    'decided_by' => $userId,
+                    'decided_at' => now(),
+                    'note' => $cancelNote,
                 ]);
+
+            $this->recordAuditLog(
+                $updatedPo,
+                $userId,
+                'purchase_order_cancelled',
+                ['status' => $oldStatus],
+                ['status' => PurchaseOrderStatus::CANCELLED->value, 'note' => $cancelNote]
+            );
 
             return $updatedPo;
         });
@@ -226,6 +308,7 @@ class PurchaseOrderService
 
         return DB::transaction(function () use ($po, $receiverId, $receivedItems): PurchaseOrder {
             $items = $po->items()->get();
+            $oldStatus = $po->status->value;
 
             // Lập map nếu người dùng truyền danh sách số lượng nhận riêng biệt
             $receivedMap = [];
@@ -240,6 +323,10 @@ class PurchaseOrderService
                 }
             }
 
+            $batchesCreated = 0;
+            $totalReceivedAmount = 0.0;
+            $hasDiscrepancy = false;
+
             foreach ($items as $poItem) {
                 $ingId = (int) $poItem->ingredient_id;
                 $receivedQty = isset($receivedMap[$ingId])
@@ -252,6 +339,11 @@ class PurchaseOrderService
 
                 $batchNo = $receivedMap[$ingId]['batch_no'] ?? $poItem->batch_no ?? null;
                 $expiryDate = $receivedMap[$ingId]['expiry_date'] ?? $poItem->expiry_date ?? null;
+
+                if (abs($receivedQty - (float) $poItem->quantity) > 0.0001) {
+                    $hasDiscrepancy = true;
+                }
+                $totalReceivedAmount += $receivedQty * $unitPrice;
 
                 // Cập nhật số lượng thực nhận trên dòng PO item
                 $poItem->update([
@@ -295,14 +387,58 @@ class PurchaseOrderService
                         'expiry_date' => $finalExpiry,
                         'created_by' => $receiverId,
                     ]);
+
+                    $batchesCreated++;
                 }
             }
 
             // Cập nhật trạng thái đơn hàng sang Đã nhận hàng
-            return $this->poRepository->updateStatus($po, PurchaseOrderStatus::RECEIVED, [
+            $updatedPo = $this->poRepository->updateStatus($po, PurchaseOrderStatus::RECEIVED, [
                 'received_by' => $receiverId,
                 'received_at' => now(),
             ]);
+
+            $this->recordAuditLog(
+                $updatedPo,
+                $receiverId,
+                'purchase_order_received',
+                ['status' => $oldStatus],
+                [
+                    'status' => PurchaseOrderStatus::RECEIVED->value,
+                    'items_count' => $items->count(),
+                    'batches_created' => $batchesCreated,
+                    'total_received_amount' => $totalReceivedAmount,
+                    'has_discrepancy' => $hasDiscrepancy,
+                ]
+            );
+
+            return $updatedPo;
         });
+    }
+
+    /**
+     * Ghi nhận nhật ký quá trình xử lý đơn nhập hàng vào audit_logs.
+     *
+     * @param array<string, mixed>|null $oldValue
+     * @param array<string, mixed>|null $newValue
+     */
+    private function recordAuditLog(
+        PurchaseOrder $po,
+        int $userId,
+        string $action,
+        ?array $oldValue = null,
+        ?array $newValue = null
+    ): void {
+        AuditLog::query()->create([
+            'branch_id' => $po->branch_id,
+            'user_id' => $userId,
+            'action' => $action,
+            'entity_type' => 'purchase_order',
+            'entity_id' => $po->id,
+            'old_value' => $oldValue,
+            'new_value' => $newValue,
+            'ip_address' => request()?->ip(),
+            'created_at' => now(),
+        ]);
     }
 }
