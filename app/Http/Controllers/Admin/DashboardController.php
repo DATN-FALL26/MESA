@@ -92,82 +92,6 @@ class DashboardController extends Controller
         return null;
     }
 
-    private function resolveRealCogs(int $branchId, string $fromDate, string $toDate): float
-    {
-        $fromDt = $fromDate . ' 00:00:00';
-        $toDt = $toDate . ' 23:59:59';
-
-        if (Schema::hasTable('stock_movements')) {
-            $smQuery = DB::table('stock_movements');
-
-            if (Schema::hasColumn('stock_movements', 'created_at')) {
-                $smQuery->whereBetween('stock_movements.created_at', [$fromDt, $toDt]);
-            }
-
-            if (Schema::hasColumn('stock_movements', 'type')) {
-                $smQuery->whereIn('stock_movements.type', ['out', 'export', 'sale', 'order', 'xuat', 'xuat_kho']);
-            } elseif (Schema::hasColumn('stock_movements', 'movement_type')) {
-                $smQuery->whereIn('stock_movements.movement_type', ['out', 'export', 'sale', 'order', 'xuat', 'xuat_kho']);
-            }
-
-            if (Schema::hasColumn('stock_movements', 'branch_id')) {
-                $smQuery->where('stock_movements.branch_id', $branchId);
-            } elseif (Schema::hasColumn('stock_movements', 'warehouse_id') && Schema::hasTable('warehouses')) {
-                $smQuery->join('warehouses', 'stock_movements.warehouse_id', '=', 'warehouses.id');
-                if (Schema::hasColumn('warehouses', 'branch_id')) {
-                    $smQuery->where('warehouses.branch_id', $branchId);
-                }
-            }
-
-            $costCol = null;
-            foreach (['total_cost', 'cost_amount', 'amount', 'value'] as $col) {
-                if (Schema::hasColumn('stock_movements', $col)) {
-                    $costCol = 'stock_movements.' . $col;
-                    break;
-                }
-            }
-
-            if ($costCol) {
-                $val = (float) ($smQuery->sum($costCol) ?? 0);
-                if ($val > 0) {
-                    return $val;
-                }
-            }
-
-            $qtyCol = null;
-            foreach (['quantity', 'qty', 'change_quantity'] as $col) {
-                if (Schema::hasColumn('stock_movements', $col)) {
-                    $qtyCol = 'stock_movements.' . $col;
-                    break;
-                }
-            }
-
-            $unitCostCol = null;
-            if (Schema::hasColumn('stock_movements', 'unit_cost')) {
-                $unitCostCol = 'stock_movements.unit_cost';
-            } elseif (Schema::hasColumn('stock_movements', 'cost_price')) {
-                $unitCostCol = 'stock_movements.cost_price';
-            } elseif (Schema::hasTable('ingredients') && Schema::hasColumn('stock_movements', 'ingredient_id')) {
-                $smQuery->leftJoin('ingredients', 'stock_movements.ingredient_id', '=', 'ingredients.id');
-                foreach (['cost_price', 'unit_cost', 'price', 'cost'] as $col) {
-                    if (Schema::hasColumn('ingredients', $col)) {
-                        $unitCostCol = 'ingredients.' . $col;
-                        break;
-                    }
-                }
-            }
-
-            if ($qtyCol && $unitCostCol) {
-                $val = (float) ($smQuery->sum(DB::raw("ABS($qtyCol) * COALESCE($unitCostCol, 0)")) ?? 0);
-                if ($val > 0) {
-                    return $val;
-                }
-            }
-        }
-
-        return 0.0;
-    }
-
     public function index(Request $request)
     {
         $user = $this->currentUser($request);
@@ -558,6 +482,40 @@ class DashboardController extends Controller
             $tongSoTo = (int) ((clone $qi)->sum(DB::raw($qtyCol)) ?? 0);
         }
 
+        $tongGiaVonKy = 0.0;
+        $tongLoiNhuanKy = 0.0;
+        if (Schema::hasTable('order_items') && Schema::hasColumn('order_items', 'cogs_total')) {
+            $qCogs = DB::table('order_items');
+            if (Schema::hasTable('orders') && Schema::hasColumn('order_items', 'order_id')) {
+                $qCogs->join('orders', 'order_items.order_id', '=', 'orders.id')
+                    ->whereBetween('orders.created_at', [$fromDate . ' 00:00:00', $toDate . ' 23:59:59']);
+                $this->applyValidOrderScope($qCogs, 'orders.status');
+                if ($hasBranchOnOrders) {
+                    $qCogs->where('orders.branch_id', $branchId);
+                } else {
+                    $qCogs->whereRaw('1 = 0');
+                }
+            } else {
+                $qCogs->whereBetween('order_items.created_at', [$fromDate . ' 00:00:00', $toDate . ' 23:59:59']);
+                if (Schema::hasColumn('order_items', 'branch_id')) {
+                    $qCogs->where('order_items.branch_id', $branchId);
+                } else {
+                    $qCogs->whereRaw('1 = 0');
+                }
+            }
+            $tongGiaVonKy = (float) ((clone $qCogs)->sum('order_items.cogs_total') ?? 0);
+            if (Schema::hasColumn('order_items', 'gross_profit')) {
+                $tongLoiNhuanKy = (float) ((clone $qCogs)->sum('order_items.gross_profit') ?? 0);
+            }
+        }
+
+        if ($tongLoiNhuanKy == 0.0 && $tongDoanhThuKy > 0 && $tongGiaVonKy > 0) {
+            $tongLoiNhuanKy = max(0, $tongDoanhThuKy - $tongGiaVonKy);
+        }
+
+        $foodCostPercentage = $tongDoanhThuKy > 0 ? round(($tongGiaVonKy / $tongDoanhThuKy) * 100, 1) : 0;
+        $marginPercentage = $tongDoanhThuKy > 0 ? round(($tongLoiNhuanKy / $tongDoanhThuKy) * 100, 1) : 0;
+
         $topMonAn = collect();
         if (Schema::hasTable('order_items') && Schema::hasTable('menu_items')) {
             $qtyExpr = Schema::hasColumn('order_items', 'quantity') ? 'order_items.quantity' : '1';
@@ -584,7 +542,12 @@ class DashboardController extends Controller
                 $revExpr = '0';
             }
 
-            $selectRaw = 'SUM(' . $qtyExpr . ') as total_qty, ' . $revExpr . ' as total_revenue';
+            $hasCogs = Schema::hasColumn('order_items', 'cogs_total') && Schema::hasColumn('order_items', 'gross_profit');
+            $cogsSelect = $hasCogs
+                ? ', SUM(COALESCE(order_items.cogs_total, 0)) as total_cogs, SUM(COALESCE(order_items.gross_profit, 0)) as total_profit'
+                : ', 0 as total_cogs, 0 as total_profit';
+
+            $selectRaw = 'SUM(' . $qtyExpr . ') as total_qty, ' . $revExpr . ' as total_revenue' . $cogsSelect;
 
             $topQuery = DB::table('order_items')
                 ->join('menu_items', 'order_items.menu_item_id', '=', 'menu_items.id');
@@ -621,26 +584,70 @@ class DashboardController extends Controller
                         'dish' => (object) ['name' => $item->name],
                         'total_qty' => (int) $item->total_qty,
                         'total_revenue' => (float) ($item->total_revenue ?? 0),
+                        'total_cogs' => (float) ($item->total_cogs ?? 0),
+                        'total_profit' => (float) ($item->total_profit ?? 0),
                     ];
                 });
         }
 
-        $cogs = $this->resolveRealCogs($branchId, $fromDate, $toDate);
-        if ($cogs <= 0 && $tongDoanhThuKy > 0) {
-            $cogs = round($tongDoanhThuKy * 0.32, -3);
-        }
-
-        $loiNhuanGop = $tongDoanhThuKy - $cogs;
-        $bienLoiNhuan = $tongDoanhThuKy > 0 ? round(($loiNhuanGop / $tongDoanhThuKy) * 100, 1) : 0.0;
-        $tyLeFoodCost = $tongDoanhThuKy > 0 ? round(($cogs / $tongDoanhThuKy) * 100, 1) : 0.0;
-
         $ingredients = collect();
-        if (Schema::hasTable('ingredients')) {
-            $ingQuery = DB::table('ingredients');
-            if (Schema::hasColumn('ingredients', 'branch_id')) {
-                $ingQuery->where('branch_id', $branchId);
-            }
-            $ingredients = $ingQuery->get();
+        $alertSummary = [];
+        if (
+            Schema::hasTable(ConstantHelper::TABLE_INGREDIENTS)
+            && Schema::hasTable(ConstantHelper::TABLE_STOCK_LEVELS)
+            && Schema::hasTable(ConstantHelper::TABLE_STOCK_BATCHES)
+            && Schema::hasTable(ConstantHelper::TABLE_WAREHOUSES)
+        ) {
+            $alertService = app(\App\Services\Inventory\StockAlertService::class);
+            $stockPaginator = $alertService->getBranchStockOverview((int) $branchId, [
+                'search' => $request->query('search'),
+                'type' => $request->query('type'),
+                'status_filter' => $request->query('status_filter'),
+            ], 100);
+
+            $alertSummary = $alertService->getAlertSummary((int) $branchId);
+
+            $todayStr = Carbon::today()->toDateString();
+            $threeDaysStr = Carbon::today()->addDays(3)->toDateString();
+
+            $ingredients = collect($stockPaginator->items())->map(function ($item) use ($todayStr, $threeDaysStr) {
+                $currentQty = (float) $item->current_quantity;
+                $minStock = (float) $item->min_stock;
+                $expiry = $item->earliest_expiry;
+
+                if ($currentQty <= 0) {
+                    $status = 'Hết hàng';
+                    $statusClass = 'danger';
+                } elseif ($expiry !== null && $expiry < $todayStr) {
+                    $status = 'Đã hết hạn';
+                    $statusClass = 'danger';
+                } elseif ($expiry !== null && $expiry <= $threeDaysStr) {
+                    $status = 'Sắp hết hạn';
+                    $statusClass = 'warning';
+                } elseif ($currentQty <= $minStock) {
+                    $status = 'Sắp hết';
+                    $statusClass = 'warning';
+                } else {
+                    $status = 'Ổn định';
+                    $statusClass = 'success';
+                }
+
+                return (object) [
+                    'id' => $item->ingredient_id,
+                    'sku' => $item->sku,
+                    'name' => $item->name,
+                    'ingredient_type' => $item->ingredient_type,
+                    'unit' => $item->base_uom,
+                    'stock_quantity' => $currentQty,
+                    'min_stock' => $minStock,
+                    'avg_cost' => (float) $item->avg_cost,
+                    'total_value' => (float) $item->total_value,
+                    'expiry_date' => $expiry,
+                    'active_batches_count' => (int) $item->active_batches_count,
+                    'quality_status' => $status,
+                    'status_class' => $statusClass,
+                ];
+            });
         }
 
         return view('admin.reports', compact(
@@ -650,12 +657,13 @@ class DashboardController extends Controller
             'toDate',
             'tongDoanhThuKy',
             'tongSoTo',
-            'cogs',
-            'loiNhuanGop',
-            'bienLoiNhuan',
-            'tyLeFoodCost',
+            'tongGiaVonKy',
+            'tongLoiNhuanKy',
+            'foodCostPercentage',
+            'marginPercentage',
             'topMonAn',
-            'ingredients'
+            'ingredients',
+            'alertSummary'
         ));
     }
 
@@ -760,12 +768,46 @@ class DashboardController extends Controller
 
         $ingredients = collect();
 
-        if (Schema::hasTable('ingredients')) {
-            $query = DB::table('ingredients');
-            if ($branchId && Schema::hasColumn('ingredients', 'branch_id')) {
-                $query->where('branch_id', $branchId);
-            }
-            $ingredients = $query->select('name', 'stock_quantity', 'unit', 'quality_status')->get();
+        if (
+            Schema::hasTable(ConstantHelper::TABLE_INGREDIENTS)
+            && Schema::hasTable(ConstantHelper::TABLE_STOCK_LEVELS)
+            && Schema::hasTable(ConstantHelper::TABLE_STOCK_BATCHES)
+            && Schema::hasTable(ConstantHelper::TABLE_WAREHOUSES)
+        ) {
+            $alertService = app(\App\Services\Inventory\StockAlertService::class);
+            $stockPaginator = $alertService->getBranchStockOverview($branchId, [], 100);
+
+            $todayStr = Carbon::today()->toDateString();
+            $threeDaysStr = Carbon::today()->addDays(3)->toDateString();
+
+            $ingredients = collect($stockPaginator->items())->map(function ($item) use ($todayStr, $threeDaysStr) {
+                $currentQty = (float) $item->current_quantity;
+                $minStock = (float) $item->min_stock;
+                $expiry = $item->earliest_expiry;
+
+                if ($currentQty <= 0) {
+                    $status = 'Hết hàng';
+                } elseif ($expiry !== null && $expiry < $todayStr) {
+                    $status = 'Đã hết hạn';
+                } elseif ($expiry !== null && $expiry <= $threeDaysStr) {
+                    $status = 'Sắp hết hạn';
+                } elseif ($currentQty <= $minStock) {
+                    $status = 'Sắp hết';
+                } else {
+                    $status = 'Ổn định';
+                }
+
+                return [
+                    'id' => $item->ingredient_id,
+                    'sku' => $item->sku,
+                    'name' => $item->name,
+                    'stock_quantity' => $currentQty,
+                    'unit' => $item->base_uom,
+                    'min_stock' => $minStock,
+                    'expiry_date' => $expiry,
+                    'quality_status' => $status,
+                ];
+            });
         }
 
         return response()->json([

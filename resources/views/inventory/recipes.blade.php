@@ -4,6 +4,22 @@
         ->where('is_active', true)
         ->orderBy('name')
         ->get();
+
+    $authUser = auth()->user();
+    $allowedBranchIds = $authUser instanceof \App\Models\User
+        ? app(\App\Services\Auth\BranchAccessService::class)->accessibleBranchIds($authUser, [\App\Helpers\ConstantHelper::PERM_INVENTORY_VIEW])
+        : null;
+
+    $branches = \App\Models\Branch::query()
+        ->where('status', \App\Enums\BranchStatus::ACTIVE)
+        ->when(is_array($allowedBranchIds), fn($q) => $q->whereIn('id', $allowedBranchIds))
+        ->orderBy('id')
+        ->get();
+
+    $requestedBranchId = request()->query('branch_id') ?? session('branch_id');
+    $selectedBranchId = (is_numeric($requestedBranchId) && $branches->contains('id', (int) $requestedBranchId))
+        ? (int) $requestedBranchId
+        : $branches->first()?->id;
 @endphp
 
 @extends('layouts.auth')
@@ -35,9 +51,26 @@
 
         <!-- SELECTOR BAR -->
         <div class="bg-white p-4 rounded-xl border border-slate-200">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">1. Chọn món ăn trong thực đơn <span class="text-rose-500">*</span></label>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">1. Chọn chi nhánh (Tính giá vốn)</label>
+                    <select 
+                        id="select-branch" 
+                        class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-emerald-600 font-medium"
+                        onchange="loadRecipesForSelected()"
+                    >
+                        @forelse($branches as $b)
+                            <option value="{{ $b->id }}" {{ (int) ($selectedBranchId ?? 0) === (int) $b->id ? 'selected' : '' }}>
+                                {{ $b->name }}
+                            </option>
+                        @empty
+                            <option value="">-- Không có chi nhánh khả dụng --</option>
+                        @endforelse
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">2. Chọn món ăn trong thực đơn <span class="text-rose-500">*</span></label>
                     <select 
                         id="select-menu-item" 
                         class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-emerald-600 font-medium"
@@ -53,7 +86,7 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">2. Chọn kích cỡ / Biến thể (Variant)</label>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">3. Chọn kích cỡ / Biến thể (Variant)</label>
                     <select 
                         id="select-variant" 
                         class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-emerald-600"
@@ -504,23 +537,40 @@
         async function loadCostAnalysisForSelected(menuItemId, variantId) {
             const container = document.getElementById('dish-cost-cards-container');
             if (!menuItemId) {
+                currentCostAnalysis = null;
                 if (container) container.classList.add('hidden');
                 return;
             }
 
             try {
-                const url = `/api/v1/inventory/cost-analysis/dishes/${menuItemId}${variantId ? '?variant_id=' + variantId : ''}`;
+                const branchId = document.getElementById('select-branch')?.value;
+                const params = new URLSearchParams();
+                if (variantId) params.append('variant_id', variantId);
+                if (branchId) params.append('branch_id', branchId);
+
+                const queryStr = params.toString();
+                const url = `/api/v1/inventory/cost-analysis/dishes/${menuItemId}${queryStr ? '?' + queryStr : ''}`;
                 const res = await fetch(url, {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                 });
-                if (res.ok) {
-                    const json = await res.json();
+                const json = await res.json().catch(() => ({}));
+                if (res.ok && json.data) {
                     currentCostAnalysis = json.data;
                     renderDishCostCards(currentCostAnalysis);
                     // Cập nhật lại cột giá vốn trên bảng nếu đã render items
                     const currentRecipe = currentLoadedRecipes.find(r => r.id === selectedRecipeId);
                     if (currentRecipe) {
                         renderRecipeDetails(currentRecipe);
+                    }
+                } else {
+                    currentCostAnalysis = null;
+                    if (container) container.classList.add('hidden');
+                    const currentRecipe = currentLoadedRecipes.find(r => r.id === selectedRecipeId);
+                    if (currentRecipe) {
+                        renderRecipeDetails(currentRecipe);
+                    }
+                    if (json.message && window.showToast) {
+                        window.showToast(json.message, 'warning');
                     }
                 }
             } catch (e) {
