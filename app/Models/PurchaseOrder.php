@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ApprovalType;
 use App\Enums\PurchaseOrderSource;
 use App\Enums\PurchaseOrderStatus;
 use App\Helpers\ConstantHelper;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property int $id
@@ -36,6 +38,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read User|null $approver
  * @property-read User|null $receiver
  * @property-read Collection<int, PurchaseOrderItem> $items
+ * @property-read ApprovalRequest|null $approvalRequest
+ * @property-read Collection<int, StockBatch> $stockBatches
+ * @property-read Collection<int, StockMovement> $stockMovements
+ * @property-read Collection<int, AuditLog> $auditLogs
+ * @property-read KitchenDailyCheckin|null $kitchenDailyCheckin
  */
 class PurchaseOrder extends Model
 {
@@ -89,5 +96,35 @@ class PurchaseOrder extends Model
     public function items(): HasMany
     {
         return $this->hasMany(PurchaseOrderItem::class, 'purchase_order_id');
+    }
+
+    public function approvalRequest(): HasOne
+    {
+        return $this->hasOne(ApprovalRequest::class, 'ref_id')
+            ->where('request_type', ApprovalType::PURCHASE_ORDER->value);
+    }
+
+    public function stockBatches(): HasMany
+    {
+        return $this->hasMany(StockBatch::class, 'purchase_order_id');
+    }
+
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class, 'ref_id')
+            ->where('ref_type', 'purchase_order');
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AuditLog::class, 'entity_id')
+            ->where('entity_type', 'purchase_order')
+            ->orderBy('created_at')
+            ->orderBy('id');
+    }
+
+    public function kitchenDailyCheckin(): HasOne
+    {
+        return $this->hasOne(KitchenDailyCheckin::class, 'purchase_order_id');
     }
 }
