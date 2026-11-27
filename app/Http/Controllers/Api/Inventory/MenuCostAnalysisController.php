@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\Inventory;
 
+use App\Enums\BranchStatus;
 use App\Enums\WarehouseType;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
@@ -186,7 +187,7 @@ class MenuCostAnalysisController extends Controller
     }
 
     /**
-     * Xác định ID kho hàng mục tiêu từ request (ưu tiên warehouse_id, sau đó tới branch_id, fallback kho đầu tiên).
+     * Xác định ID kho hàng mục tiêu từ request (ưu tiên warehouse_id, sau đó tới branch_id/session, fallback kho hoạt động thuộc chi nhánh được phép).
      */
     protected function resolveWarehouseId(Request $request): ?int
     {
@@ -195,21 +196,41 @@ class MenuCostAnalysisController extends Controller
         }
 
         $branchId = $this->selectedBranchId($request);
-        if ($branchId === null) {
+        if ($branchId !== null) {
+            $warehouse = $this->findActiveWarehouseForBranchIds([$branchId]);
+
+            return $warehouse ? (int) $warehouse->id : null;
+        }
+
+        $allowedBranchIds = $request->attributes->get('authorized_branch_ids');
+        if ($allowedBranchIds === []) {
             return null;
         }
 
-        $warehouse = Warehouse::query()
-            ->where('branch_id', $branchId)
-            ->where('type', WarehouseType::BRANCH)
-            ->where('is_active', true)
-            ->first()
-            ?? Warehouse::query()
-                ->where('branch_id', $branchId)
-                ->where('is_active', true)
-                ->first();
+        $warehouse = $this->findActiveWarehouseForBranchIds(
+            is_array($allowedBranchIds) ? $allowedBranchIds : null
+        );
 
         return $warehouse ? (int) $warehouse->id : null;
+    }
+
+    /**
+     * @param  list<int>|null  $branchIds
+     */
+    private function findActiveWarehouseForBranchIds(?array $branchIds): ?Warehouse
+    {
+        $baseQuery = fn () => Warehouse::query()
+            ->where('is_active', true)
+            ->when(
+                $branchIds !== null,
+                fn ($q) => $q->whereIn('branch_id', $branchIds),
+                fn ($q) => $q->whereHas('branch', fn ($b) => $b->where('status', BranchStatus::ACTIVE))
+            )
+            ->orderBy('branch_id')
+            ->orderBy('id');
+
+        return $baseQuery()->where('type', WarehouseType::BRANCH)->first()
+            ?? $baseQuery()->first();
     }
 
     private function selectedBranchId(Request $request): ?int
